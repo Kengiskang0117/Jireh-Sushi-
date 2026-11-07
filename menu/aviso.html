@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panel del pedido · Jireh Sushi</title>
+<!--
+  =========================================================
+  PANEL DEL PEDIDO (para el negocio) · Kenmake Soluciones
+  ---------------------------------------------------------
+  Se abre desde el enlace que llega al final de cada pedido.
+  Los datos del pedido viajan dentro del enlace (después del ?),
+  por eso no necesita base de datos.
+
+  Para cambiar algo, busca con Ctrl+F:
+  @@AVISOS        Mensajes que se le mandan al cliente
+  @@DELIVERY-MSG  Mensaje que se manda al grupo de delivery
+  @@COLORES       Colores
+  =========================================================
+-->
+<style>
+/* @@COLORES */
+:root{--fondo:#0E0E0E;--tarjeta:#1A1A1A;--borde:#2E2E2E;--rojo:#E3121B;--rojo-claro:#FF4D55;--texto:#F4F1EC;--suave:#A9A39A;--verde:#25D366}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(120% 60% at 50% 0%,#2A0E10 0%,var(--fondo) 55%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+.caja{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+.cab{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.cab img{width:48px;height:48px;border-radius:50%;background:#fff;object-fit:cover}
+.cab h1{margin:0;font-size:20px}
+.cab small{color:var(--suave)}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:14px 16px;margin-bottom:14px}
+.fila{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:15px}
+.fila span:first-child{color:var(--suave)}
+.fila span:last-child{text-align:right;font-weight:600}
+.total{font-size:20px;font-weight:800;color:var(--rojo-claro)}
+.chip{display:inline-block;padding:3px 10px;border-radius:999px;background:#2A0E10;border:1px solid #5E1A1E;color:#FFB4B8;font-size:12px;font-weight:700;margin-bottom:8px}
+.items{margin:8px 0 0;padding-left:18px;color:#DDD7CE;font-size:14px;line-height:1.5}
+h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);margin:20px 0 8px}
+.botones{display:flex;flex-direction:column;gap:10px}
+.btn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:56px;padding:0 16px;border-radius:14px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:16px;font-weight:700;text-decoration:none;cursor:pointer}
+.btn .ok{font-size:13px;font-weight:700;color:var(--verde);opacity:0}
+.btn.hecho{border-color:#1F5B37;background:#132219}
+.btn.hecho .ok{opacity:1}
+.btn.delivery{background:var(--rojo);border-color:var(--rojo);justify-content:center}
+.btn.delivery.hecho{background:#132219;border-color:#1F5B37}
+.btn.llamar{justify-content:center;background:transparent}
+.enlace{color:var(--rojo-claro);word-break:break-all}
+.vacio{text-align:center;color:var(--suave);padding:60px 20px}
+.pie{text-align:center;color:#6E6862;font-size:12px;margin-top:24px}
+</style>
+</head>
+<body>
+<div class="caja" id="app"></div>
+
+<script>
+const NEGOCIO = { nombre: "Jireh Sushi", logo: "fotos/logo.png" };
+
+/* ================= @@AVISOS — MENSAJES PARA EL CLIENTE =================
+   {nombre} se cambia por el nombre del cliente y {id} por el número del pedido.
+   "para": en qué tipo de pedido sale el botón (delivery, llevar o los dos). */
+const AVISOS = [
+  { clave: "recibido",  boton: "✅ Pedido recibido",      para: ["delivery","llevar"], texto: "¡Hola {nombre}! 🍣 Recibimos tu pedido #{id}. Ya lo estamos preparando." },
+  { clave: "preparando",boton: "👨‍🍳 En preparación",      para: ["delivery","llevar"], texto: "{nombre}, tu pedido #{id} está en preparación 👨‍🍳 ¡Ya casi!" },
+  { clave: "camino",    boton: "🛵 Va en camino",          para: ["delivery"],          texto: "¡{nombre}, tu pedido #{id} va en camino! 🛵 Llega en unos minutos." },
+  { clave: "listo",     boton: "🙌 Listo para buscar",     para: ["llevar"],            texto: "¡{nombre}, tu pedido #{id} está listo! 🙌 Puedes pasar a buscarlo." },
+  { clave: "pago",      boton: "💰 Pago recibido",        para: ["delivery","llevar"], texto: "¡Gracias {nombre}! Recibimos tu pago del pedido #{id} ✅" },
+  { clave: "gracias",   boton: "❤️ Gracias por tu compra", para: ["delivery","llevar"], texto: "¡Gracias por tu compra, {nombre}! Esperamos que lo disfrutes 🍣 ¡Te esperamos pronto en {negocio}!" }
+];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const q = new URLSearchParams(location.search);
+const P = {
+  id: q.get("id") || "", nombre: q.get("n") || "", tel: q.get("t") || "", modo: q.get("m") || "llevar",
+  items: q.get("i") || "", sub: q.get("s") || "", del: q.get("d") || "", km: q.get("k") || "", total: q.get("tt") || "",
+  dir: q.get("dir") || "", ref: q.get("ref") || "", ubic: q.get("u") || "", pago: q.get("p") || "", banco: q.get("b") || "", cambio: q.get("c") || ""
+};
+const primerNombre = (P.nombre.trim().split(/\s+/)[0] || "");
+const rellenar = t => t.replace(/\{nombre\}/g, primerNombre).replace(/\{id\}/g, P.id).replace(/\{negocio\}/g, NEGOCIO.nombre);
+
+// Teléfono del cliente para WhatsApp: los números de RD tienen 10 dígitos; WhatsApp necesita el 1 delante.
+function telWA(t){ let n = String(t).replace(/\D/g, ""); if (n.length === 10) n = "1" + n; return n; }
+const esCelular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+function abrirWA(numero, texto){
+  const base = esCelular ? "https://api.whatsapp.com/send" : "https://web.whatsapp.com/send";
+  const url = `${base}?${numero ? "phone=" + numero + "&" : ""}text=${encodeURIComponent(texto)}`;
+  if (esCelular) location.href = url; else window.open(url, "_blank");
+}
+
+/* Recuerda en este teléfono qué avisos ya se mandaron (solo para marcar ✓) */
+const CLAVE = "avisos-" + P.id;
+let hechos = {}; try { hechos = JSON.parse(localStorage.getItem(CLAVE) || "{}"); } catch(e) {}
+function marcar(k){ hechos[k] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechos)); } catch(e) {} pintar(); }
+
+/* ================= @@DELIVERY-MSG — MENSAJE PARA EL GRUPO DE DELIVERY ================= */
+function mensajeDelivery(){
+  let m = `🛵 *PEDIDO #${P.id}* — ${NEGOCIO.nombre}\n\n`;
+  m += `Cliente: ${P.nombre}\nTeléfono: ${P.tel}\n`;
+  m += `Dirección: ${P.dir}${P.ref ? `\nReferencia: ${P.ref}` : ""}\n`;
+  if (P.ubic) m += `Ubicación: https://maps.google.com/?q=${P.ubic}\n`;
+  if (P.km) m += `Distancia aprox.: ${P.km} km\n`;
+  m += `\n${P.items.split(";").map(x => "• " + x.trim()).join("\n")}\n\n`;
+  if (P.pago === "Efectivo") m += `💵 *COBRAR: ${P.total}* en efectivo${P.cambio ? ` (paga con ${P.cambio})` : ""}`;
+  else m += `✅ Pago por transferencia${P.banco ? ` (${P.banco})` : ""}: verificar comprobante antes de salir`;
+  m += `\n\nResponde "Lo tomo ✋" si vas tú.`;
+  return m;
+}
+
+function pintar(){
+  if (!P.nombre) {
+    $("#app").innerHTML = `<div class="vacio"><h1>Panel del pedido</h1><p>Esta página se abre desde el enlace que llega al final de cada pedido por WhatsApp.</p></div>`;
+    return;
+  }
+  const lista = AVISOS.filter(a => a.para.includes(P.modo));
+  $("#app").innerHTML = `
+    <div class="cab"><img src="${NEGOCIO.logo}" alt=""><div><h1>Pedido #${esc(P.id)}</h1><small>${esc(NEGOCIO.nombre)} · Panel del pedido</small></div></div>
+    <div class="tarjeta">
+      <span class="chip">${P.modo === "delivery" ? "🛵 DELIVERY" : "🥡 PARA LLEVAR"}</span>
+      <div class="fila"><span>Cliente</span><span>${esc(P.nombre)}</span></div>
+      <div class="fila"><span>Teléfono</span><span>${esc(P.tel)}</span></div>
+      ${P.modo === "delivery" ? `<div class="fila"><span>Dirección</span><span>${esc(P.dir)}</span></div>
+      ${P.ref ? `<div class="fila"><span>Referencia</span><span>${esc(P.ref)}</span></div>` : ""}
+      ${P.ubic ? `<div class="fila"><span>Ubicación</span><span><a class="enlace" href="https://maps.google.com/?q=${esc(P.ubic)}" target="_blank" rel="noopener">Ver en el mapa</a></span></div>` : ""}` : ""}
+      <div class="fila"><span>Pago</span><span>${esc(P.pago)}${P.banco ? " · " + esc(P.banco) : ""}${P.cambio ? " · paga con " + esc(P.cambio) : ""}</span></div>
+      <ul class="items">${P.items.split(";").filter(Boolean).map(x => `<li>${esc(x.trim())}</li>`).join("")}</ul>
+      ${P.modo === "delivery" ? `<div class="fila"><span>Subtotal</span><span>${esc(P.sub)}</span></div><div class="fila"><span>Delivery${P.km ? " (" + esc(P.km) + " km)" : ""}</span><span>${esc(P.del || "Por confirmar")}</span></div>` : ""}
+      <div class="fila"><span>Total</span><span class="total">${esc(P.total)}</span></div>
+    </div>
+
+    <h2>Avisar al cliente</h2>
+    <div class="botones">
+      ${lista.map(a => `<button class="btn${hechos[a.clave] ? " hecho" : ""}" data-aviso="${a.clave}"><span>${a.boton}</span><span class="ok">✓ Enviado</span></button>`).join("")}
+      <a class="btn llamar" href="tel:${esc(P.tel.replace(/\D/g, ""))}">📞 Llamar al cliente</a>
+    </div>
+
+    ${P.modo === "delivery" ? `<h2>Delivery</h2>
+    <div class="botones"><button class="btn delivery${hechos.delivery ? " hecho" : ""}" data-aviso="delivery">📤 Enviar al grupo de delivery</button></div>` : ""}
+
+    <div class="pie">Los botones abren WhatsApp con el mensaje listo: solo toca enviar.<br>Kenmake Soluciones</div>`;
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-aviso]"); if (!b) return;
+  const k = b.dataset.aviso;
+  if (k === "delivery") { marcar("delivery"); abrirWA("", mensajeDelivery()); return; }   // sin número: WhatsApp deja elegir el grupo
+  const a = AVISOS.find(x => x.clave === k);
+  marcar(k); abrirWA(telWA(P.tel), rellenar(a.texto));
+});
+pintar();
+</script>
+</body>
+</html>

@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Jireh Sushi · Frescura sagrada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;1,800;1,900&display=swap" rel="stylesheet">
+<!--
+  PÁGINA WEB · JIREH SUSHI · Diseño y desarrollo: Kenmake Soluciones
+  Busca con Ctrl+F:  @@NEGOCIO  @@PORTADA  @@MENU  @@PROMOCIONES  @@NOSOTROS  @@CONTACTO
+-->
+<style>
+:root{
+  --fondo:#0B0B0C; --fondo-2:#121214; --tarjeta:#17171A; --borde:#2A2A2E;
+  --texto:#FFFFFF; --suave:#B5B1AD; --rojo:#E3121B; --rojo-claro:#FF3B42;
+  --letra:'Montserrat',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--fondo);color:var(--texto);font-family:var(--letra);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+img.roto{visibility:hidden}
+a{color:inherit}
+.contenedor{max-width:1180px;margin:0 auto;padding:0 20px}
+.aviso-demo{background:#2A0B0D;border-bottom:1px solid #5A1418;color:#FFB4B8;text-align:center;font-size:12.5px;padding:7px 16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:54px;padding:0 28px;border-radius:999px;font-weight:700;font-size:16px;text-decoration:none;transition:transform .15s,box-shadow .15s;border:2px solid transparent}
+.btn:hover{transform:translateY(-2px)}
+.btn.rojo{background:linear-gradient(180deg,#F02029,#C30D15);color:#fff;box-shadow:0 10px 30px rgba(227,18,27,.35)}
+.btn.borde{border-color:#fff;color:#fff}
+.titulo-seccion{text-align:center;margin:0 0 30px}
+.titulo-seccion h2{font-size:clamp(30px,4.5vw,44px);font-weight:800;margin:0;line-height:1.1}
+.titulo-seccion h2 em{font-style:italic;font-weight:900}
+.titulo-seccion .raya{width:150px;height:4px;border-radius:4px;background:var(--rojo);margin:10px auto 0;transform:rotate(-2deg)}
+.titulo-seccion p{color:var(--suave);margin:12px auto 0;max-width:560px}
+:focus-visible{outline:2px solid var(--rojo-claro);outline-offset:3px}
+
+/* Encabezado */
+.nav{position:sticky;top:0;z-index:30;background:rgba(11,11,12,.94);backdrop-filter:blur(10px);border-bottom:1px solid #1E1E21}
+.nav .contenedor{display:flex;align-items:center;gap:18px;height:78px}
+.nav .logo img{width:64px;height:64px}
+.enlaces{display:flex;gap:30px;margin:0 auto}
+.enlaces a{text-decoration:none;font-weight:600;font-size:15px;padding:6px 0;border-bottom:3px solid transparent}
+.enlaces a:hover,.enlaces a.activo{border-color:var(--rojo)}
+.carrito{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;border:1px solid var(--borde)}
+.abrir-menu{display:none;width:46px;height:46px;border-radius:12px;border:1px solid var(--borde);background:var(--tarjeta);color:#fff;cursor:pointer;align-items:center;justify-content:center}
+@media (max-width:880px){
+  .enlaces{position:absolute;top:78px;left:0;right:0;flex-direction:column;gap:0;background:#111113;border-bottom:1px solid var(--borde);display:none;margin:0}
+  .enlaces.abierto{display:flex}
+  .enlaces a{padding:16px 20px;border-bottom:1px solid #1E1E21}
+  .abrir-menu{display:flex}
+  .carrito{margin-left:auto}
+  .nav .logo img{width:54px;height:54px}
+}
+
+/* @@PORTADA */
+.portada{position:relative;overflow:hidden;background:radial-gradient(circle at 15% 40%,rgba(227,18,27,.22),transparent 45%),var(--fondo)}
+.portada .contenedor{display:grid;grid-template-columns:1.15fr 1fr;gap:28px;align-items:center;min-height:480px;padding-top:30px;padding-bottom:30px}
+.portada h1{font-size:clamp(40px,5.8vw,70px);font-weight:900;font-style:italic;line-height:1.02;margin:0}
+.portada h1 span{color:var(--rojo-claro)}
+.portada .lema{letter-spacing:.42em;font-weight:600;font-size:clamp(13px,1.6vw,17px);margin:20px 0 26px}
+.portada .foto{border-radius:22px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.portada .foto img{width:100%;aspect-ratio:16/8;object-fit:cover}
+.estado{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.06);border:1px solid var(--borde);padding:7px 14px;border-radius:999px;font-size:13.5px;font-weight:700;margin-bottom:18px}
+.estado i{width:9px;height:9px;border-radius:50%;background:#3DDC84}
+/* @@ESTILO-PASARELA */
+.pasarela{position:relative;aspect-ratio:4/3;background:#111}
+.pasarela .diapos{position:absolute;inset:0}
+.pasarela .diapo{position:absolute;inset:0;opacity:0;transition:opacity .8s ease}
+.pasarela .diapo.activa{opacity:1}
+.pasarela{background:#000}
+.pasarela .diapo img{width:100%;height:100%;aspect-ratio:auto;object-fit:contain;display:block}   /* contain: se ve la foto completa, con su texto */
+.pasarela .diapo.llenar img{object-fit:cover}   /* llenar: la foto cubre todo el cuadro */
+.pasarela .etiqueta{position:absolute;left:14px;top:14px;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);color:#fff;padding:6px 12px;border-radius:999px;font-weight:700;font-size:14px}
+.pasarela .etiqueta b{color:var(--rojo-claro);margin-left:6px}
+.pasarela .flecha{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2}
+.pasarela .ant{left:10px}.pasarela .sig{right:10px}
+.pasarela .puntos{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:center;gap:7px;z-index:2}
+.pasarela .puntos button{width:9px;height:9px;border-radius:50%;border:0;background:rgba(255,255,255,.45);padding:0;cursor:pointer}
+.pasarela .puntos button.activo{background:#fff;width:22px;border-radius:999px}
+@media (max-width:880px){.portada .contenedor{grid-template-columns:1fr;min-height:0;padding-top:24px}.portada .foto{order:-1}}
+
+/* Franja de datos */
+.franja{border-top:1px solid #1E1E21;border-bottom:1px solid #1E1E21;background:#0E0E10}
+.franja .contenedor{display:grid;grid-template-columns:repeat(4,1fr)}
+.dato{display:flex;gap:14px;align-items:center;padding:18px 16px;border-right:1px solid #222226}
+.dato:last-child{border-right:none}
+.dato svg{flex:0 0 auto;color:var(--rojo-claro)}
+.dato b{display:block;font-size:15px}
+.dato span{font-size:13px;color:var(--suave)}
+@media (max-width:880px){.franja .contenedor{grid-template-columns:1fr 1fr}.dato:nth-child(2){border-right:none}.dato:nth-child(-n+2){border-bottom:1px solid #222226}}
+@media (max-width:480px){.franja .contenedor{grid-template-columns:1fr}.dato{border-right:none;border-bottom:1px solid #222226}}
+
+section{padding:70px 0}
+
+/* @@MENU */
+.categorias{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
+.cat{position:relative;border:1.5px solid rgba(227,18,27,.75);border-radius:16px;overflow:hidden;text-decoration:none;background:#151517;aspect-ratio:1/1;transition:transform .15s,border-color .15s}
+.cat:hover{transform:translateY(-3px);border-color:var(--rojo-claro)}
+.cat img{width:100%;height:100%;object-fit:cover}
+.cat::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.85))}
+.cat b{position:absolute;left:10px;right:10px;bottom:10px;z-index:1;text-align:center;font-weight:800;font-size:16px;line-height:1.15}
+@media (max-width:1000px){.categorias{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:560px){.categorias{grid-template-columns:repeat(2,1fr)}}
+.centro{display:flex;justify-content:center;margin-top:28px}
+
+/* @@PROMOCIONES */
+.promos{background:var(--fondo-2)}
+.promo{display:grid;grid-template-columns:1fr 1fr;border-radius:24px;overflow:hidden;border:1px solid var(--borde);background:var(--tarjeta)}
+.promo img{width:100%;height:100%;object-fit:cover;min-height:280px}
+.promo .texto{padding:34px;display:flex;flex-direction:column;gap:12px;justify-content:center}
+.chip{align-self:flex-start;background:var(--rojo);color:#fff;font-weight:800;font-size:12px;letter-spacing:.08em;padding:5px 12px;border-radius:999px}
+.promo h3{font-size:clamp(28px,3.6vw,40px);font-weight:900;font-style:italic;margin:0;line-height:1.05}
+.precio{display:flex;align-items:baseline;gap:12px}
+.precio s{color:#8A8580;font-size:18px}
+.precio b{font-size:34px;font-weight:900;color:var(--rojo-claro)}
+@media (max-width:880px){.promo{grid-template-columns:1fr}.promo img{min-height:200px;max-height:260px}.promo .texto{padding:24px}}
+
+/* Así recibimos tu pedido */
+.pasos-caja{border:1px solid var(--borde);border-radius:22px;padding:28px;display:grid;grid-template-columns:1.1fr repeat(4,1fr);gap:16px;align-items:center;background:var(--tarjeta)}
+.pasos-caja h2{font-size:clamp(26px,3vw,32px);font-weight:800;margin:0;line-height:1.15}
+.paso{text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;font-size:14px;color:#DDD8D2}
+.paso .ico{width:76px;height:76px;border-radius:50%;background:linear-gradient(180deg,#F02029,#B00C13);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(227,18,27,.3)}
+.paso b{color:#fff}
+@media (max-width:880px){.pasos-caja{grid-template-columns:1fr 1fr}.pasos-caja h2{grid-column:1/-1;text-align:center}}
+
+/* @@NOSOTROS */
+.nosotros .contenedor{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+.nosotros img{border-radius:22px;width:100%;aspect-ratio:4/3;object-fit:cover}
+.nosotros h2{font-size:clamp(30px,4vw,42px);font-weight:900;font-style:italic;margin:0 0 14px;line-height:1.05}
+.nosotros h2 span{color:var(--rojo-claro)}
+.nosotros p{color:#D6D1CB}
+@media (max-width:880px){.nosotros .contenedor{grid-template-columns:1fr;gap:24px}}
+
+/* @@CONTACTO */
+.contacto .contenedor{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.panel{background:var(--tarjeta);border:1px solid var(--borde);border-radius:22px;padding:26px}
+.panel h3{font-size:24px;font-weight:800;margin:0 0 14px}
+.linea{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;color:#D6D1CB}
+.linea svg{flex:0 0 auto;color:var(--rojo-claro);margin-top:2px}
+.horas{display:grid;gap:8px;font-variant-numeric:tabular-nums}
+.horas div{display:flex;justify-content:space-between;border-bottom:1px solid #26262A;padding-bottom:8px;color:#D6D1CB}
+.horas div.hoy{color:#fff;font-weight:700;background:rgba(227,18,27,.12);border:1px solid rgba(227,18,27,.45);border-radius:12px;padding:10px 12px;margin:2px -12px}   /* @@HOY  día de hoy resaltado */
+.horas .pill-hoy{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:var(--rojo,#E3121B);color:#fff;font-size:11px;font-weight:800;letter-spacing:.06em;vertical-align:middle}
+.horas .estado-hoy{display:block;font-size:12px;font-weight:600;margin-top:2px}
+.horas div.cerrado span:last-child{color:#8A8580}
+.acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+@media (max-width:880px){.contacto .contenedor{grid-template-columns:1fr}}
+
+footer{border-top:1px solid #1E1E21;padding:28px 0 92px;color:#8A8580;font-size:13px}
+footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+.flotante{position:fixed;right:18px;bottom:18px;z-index:40;height:56px;padding:0 20px;border-radius:999px;background:linear-gradient(180deg,#F02029,#C30D15);color:#fff;display:flex;align-items:center;gap:10px;font-weight:800;text-decoration:none;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.cat{transition:none}}
+</style>
+</head>
+<body>
+
+<!-- @@AVISO-PRUEBAS: borrar esta línea el día que se publique oficialmente -->
+<div class="aviso-demo">Página en pruebas · Precios por confirmar</div>
+
+<header class="nav">
+  <div class="contenedor">
+    <a href="#inicio" class="logo"><img src="menu/fotos/logo.png" alt="Jireh Sushi"></a>
+    <nav class="enlaces" id="enlaces" aria-label="Secciones">
+      <a href="#inicio" class="activo">Inicio</a>
+      <a href="#menu">Menú</a>
+      <a href="#promociones">Promociones</a>
+      <a href="#nosotros">Nosotros</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+    <a class="carrito js-menu" href="menu/index.html" aria-label="Ir al menú para ordenar"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h15l-1.5 9h-12z"/><path d="M6 7 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg></a>
+    <button class="abrir-menu" id="abrir-menu" aria-label="Abrir secciones" aria-expanded="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </div>
+</header>
+
+<main id="inicio">
+  <!-- @@PORTADA -->
+  <div class="portada">
+    <div class="contenedor">
+      <div>
+        <div class="estado" id="estado"><i></i><span>Abierto ahora</span></div>
+        <h1>Más que sushi,<br>una <span>experiencia.</span></h1>
+        <div class="lema">FRESCURA SAGRADA</div>
+        <a class="btn rojo js-menu" href="menu/index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h15l-1.5 9h-12z"/><path d="M6 7 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>Ordenar ahora</a>
+      </div>
+      <!-- @@PASARELA — fotos que van pasando solas (se cambian en la lista PASARELA, abajo en el código) -->
+      <div class="foto pasarela" id="pasarela" aria-roledescription="carrusel" aria-label="Nuestros productos">
+        <div class="diapos" id="diapos"></div>
+        <button class="flecha ant" id="pas-ant" aria-label="Foto anterior">‹</button>
+        <button class="flecha sig" id="pas-sig" aria-label="Foto siguiente">›</button>
+        <div class="puntos" id="puntos"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="franja">
+    <div class="contenedor">
+      <div class="dato"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="2.5"/><circle cx="18" cy="17" r="2.5"/><path d="M8.5 17h7M4 13h7l2-5h3l2.5 6.5"/></svg><div><b>Entrega a domicilio</b><span>Santo Domingo Este</span></div></div>
+      <div class="dato"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><div><b>Retiro en el local</b><span>Sin filas</span></div></div>
+      <div class="dato"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg><div><b>Pago fácil</b><span>Efectivo y transferencia</span></div></div>
+      <div class="dato"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div><b>Horario</b><span id="horario-corto"></span></div></div>
+    </div>
+  </div>
+
+  <!-- @@MENU -->
+  <section id="menu">
+    <div class="contenedor">
+      <div class="titulo-seccion"><h2>Nuestro <em>Menú</em></h2><div class="raya"></div><p>Toca una categoría para ver los productos y armar tu pedido.</p></div>
+      <div class="categorias">
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/mixta-16.jpg" alt="" loading="lazy"><b>Combos</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/fernando-rolls.jpg" alt="" loading="lazy"><b>Rolls de la casa</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/california-green.jpg" alt="" loading="lazy"><b>California</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Hot Rolls</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/sushi-burger-pollo.jpg" alt="" loading="lazy"><b>Sushi Burger</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hand-rolls-pollo.jpg" alt="" loading="lazy"><b>Hand Rolls</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/tiritas-pollo.jpg" alt="" loading="lazy"><b>Entradas</b></a>
+      </div>
+      <div class="centro"><a class="btn rojo js-menu" href="menu/index.html">Ver el menú completo y ordenar</a></div>
+    </div>
+  </section>
+
+  <!-- @@PROMOCIONES -->
+  <section class="promos" id="promociones">
+    <div class="contenedor">
+      <div class="titulo-seccion"><h2>Promo<em>ciones</em></h2><div class="raya"></div></div>
+      <div class="promo">
+        <img src="menu/fotos/eby-banana.jpg" alt="Eby Banana Rolls" loading="lazy">
+        <div class="texto">
+          <span class="chip">NUEVO</span>
+          <h3>Eby Banana Rolls</h3>
+          <p style="margin:0;color:#D6D1CB">Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado. El sabor dominicano en un roll.</p>
+          <div class="precio"><b>RD$ 525</b></div>
+          <div><a class="btn rojo js-menu" href="menu/index.html">Pedirlo ahora</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="contenedor">
+      <div class="pasos-caja">
+        <h2>Así recibimos<br>tu pedido</h2>
+        <div class="paso"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></svg></div><span><b>1.</b> Haces tu pedido en la web</span></div>
+        <div class="paso"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/></svg></div><span><b>2.</b> Lo recibimos al instante en el local</span></div>
+        <div class="paso"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13h12M7 13a5 5 0 0 1 10 0"/><path d="M5 17h14"/><path d="M12 5v3"/></svg></div><span><b>3.</b> Lo preparamos al momento</span></div>
+        <div class="paso"><div class="ico"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="2.5"/><circle cx="18" cy="17" r="2.5"/><path d="M8.5 17h7M4 13h7l2-5h3l2.5 6.5"/></svg></div><span><b>4.</b> Te lo llevamos o pasas a buscarlo</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- @@NOSOTROS -->
+  <section class="nosotros" id="nosotros">
+    <div class="contenedor">
+      <img src="menu/fotos/fernando-rolls.jpg" alt="Fernando Rolls" loading="lazy">
+      <div>
+        <h2>Hecho al momento,<br>con <span>frescura sagrada</span></h2>
+        <p>En Jireh Sushi preparamos cada roll al momento, con ingredientes frescos y porciones generosas. Nuestros clientes nos piden desde todo Santo Domingo Este para la casa, la oficina y cualquier celebración.</p>
+        <p>Desde los clásicos California hasta nuestros rolls aplatanados, el Sushi Burger y las entradas crujientes, hay algo para cada antojo.</p>
+        <div class="acciones"><a class="btn rojo js-menu" href="menu/index.html">Ordenar ahora</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- @@CONTACTO -->
+  <section class="contacto" id="contacto">
+    <div class="contenedor">
+      <div class="panel">
+        <h3>Contacto</h3>
+        <div class="linea"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span id="c-direccion"></span></div>
+        <div class="linea"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span id="c-telefono"></span></div>
+        <div class="acciones"><a class="btn rojo js-wa" href="#" target="_blank" rel="noopener">Escríbenos por WhatsApp</a><a class="btn borde" id="mapa" href="#" target="_blank" rel="noopener">Cómo llegar</a></div>
+      </div>
+      <div class="panel">
+        <h3>Horario</h3>
+        <div class="horas" id="horas"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="contenedor">
+    <span>© <span id="anio"></span> Jireh Sushi · Santo Domingo Este</span>
+    <span>Diseño y desarrollo: Kenmake Soluciones</span>
+  </div>
+</footer>
+
+<a class="flotante js-menu" href="menu/index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h15l-1.5 9h-12z"/><path d="M6 7 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>Ordenar</a>
+
+<script>
+/* @@NEGOCIO */
+const NEGOCIO = {
+  nombre: "Jireh Sushi",
+  whatsapp: "19785664534",          // PRUEBAS: llega al número de Kenmake. Al publicar, cambiar a 18493604892
+  telefono: "(849) 360-4892",
+  direccion: "Santo Domingo Este",
+  mapa: "",
+  menu: "menu/index.html",
+  horario: { abre: "13:00", cierra: "20:00", cierraDia: { 0: "19:00" } },   // domingo cierra 7:00 PM
+  diasCerrado: [1]                  // 1 = lunes
+};
+
+const $ = s => document.querySelector(s);
+const wa = t => `https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp.replace(/\D/g, "")}&text=${encodeURIComponent(t)}`;
+document.querySelectorAll(".js-wa").forEach(a => a.href = wa(`¡Hola ${NEGOCIO.nombre}! Tengo una pregunta: `));
+document.querySelectorAll(".js-menu").forEach(a => a.href = NEGOCIO.menu);
+$("#c-direccion").textContent = NEGOCIO.direccion;
+$("#c-telefono").textContent = NEGOCIO.telefono;
+$("#mapa").href = NEGOCIO.mapa || "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(NEGOCIO.nombre + " " + NEGOCIO.direccion);
+$("#anio").textContent = new Date().getFullYear();
+
+const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const min = h => { const [a, b] = h.split(":").map(Number); return a * 60 + (b || 0); };
+const bonita = h => { const [a, b] = h.split(":").map(Number); return `${(a % 12) || 12}:${String(b || 0).padStart(2, "0")} ${a >= 12 ? "PM" : "AM"}`; };
+const cierreDe = d => (NEGOCIO.horario.cierraDia || {})[d] || NEGOCIO.horario.cierra;
+const rangoDe = d => `${bonita(NEGOCIO.horario.abre)} – ${bonita(cierreDe(d))}`;
+const rango = rangoDe(2);
+const cerrados = NEGOCIO.diasCerrado.map(d => DIAS[d]).join(", ");
+/* @@HOY — tabla del horario con el día de hoy resaltado */
+function pintarHoras(){
+  const ahora = new Date(), hoy = ahora.getDay(), t = ahora.getHours() * 60 + ahora.getMinutes();
+  const abiertoAhora = !NEGOCIO.diasCerrado.includes(hoy) && t >= min(NEGOCIO.horario.abre) && t < min(cierreDe(hoy));
+  $("#horas").innerHTML = [1,2,3,4,5,6,0].map(d => {
+    const c = NEGOCIO.diasCerrado.includes(d), esHoy = d === hoy;
+    const est = esHoy ? `<span class="estado-hoy" style="color:${abiertoAhora ? "#3DDC84" : "#8A8580"}">${abiertoAhora ? "● Abierto ahora" : "● Cerrado ahora"}</span>` : "";
+    return `<div class="${esHoy ? "hoy" : ""} ${c ? "cerrado" : ""}"><span>${DIAS[d]}${esHoy ? '<span class="pill-hoy">HOY</span>' : ""}${est}</span><span>${c ? "Cerrado" : rangoDe(d)}</span></div>`;
+  }).join("");
+  // Franja de arriba: el horario de HOY
+  $("#horario-corto").textContent = NEGOCIO.diasCerrado.includes(hoy) ? `Hoy ${DIAS[hoy].toLowerCase()}: cerrado` : `Hoy ${DIAS[hoy].toLowerCase()}: ${rangoDe(hoy)}`;
+}
+pintarHoras(); setInterval(pintarHoras, 60000);
+function estado(){
+  const ahora = new Date(), t = ahora.getHours() * 60 + ahora.getMinutes(), a = min(NEGOCIO.horario.abre), c = min(cierreDe(ahora.getDay()));
+  const abierto = !NEGOCIO.diasCerrado.includes(ahora.getDay()) && t >= a && t < c;
+  let prox = "hoy";
+  for (let k = 0; k < 8; k++) { const d = (ahora.getDay() + k) % 7; if (NEGOCIO.diasCerrado.includes(d) || (k === 0 && t >= a)) continue; prox = k === 0 ? "hoy" : k === 1 ? "mañana" : "el " + DIAS[d].toLowerCase(); break; }
+  const h = bonita(NEGOCIO.horario.abre), alas = (h.startsWith("1:") ? "a la " : "a las ") + h;
+  $("#estado span").textContent = abierto ? "Abierto ahora · Ordena en línea" : `Cerrado · Abrimos ${prox === "hoy" ? "" : prox + " "}${alas}`;
+  $("#estado i").style.background = abierto ? "#3DDC84" : "#8A8580";
+}
+estado(); setInterval(estado, 60000);
+
+/* ================= @@PASARELA — fotos de la portada =================
+   Para cambiar las fotos: agrega o quita líneas. "precio" es opcional.
+   llenar: true = la foto cubre todo el cuadro (para fotos anchas sin texto). */
+const PASARELA = [
+  { img: "menu/fotos/portada.jpg",            nombre: "Frescura Sagrada", llenar: true },
+  { img: "menu/fotos/pasarela/mixta-16.jpg",           nombre: "16 Piezas Mixta",   precio: "RD$ 650" },
+  { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "Fernando Rolls",    precio: "RD$ 495" },
+  { img: "menu/fotos/pasarela/eby-banana.jpg",         nombre: "Eby Banana Rolls",  precio: "RD$ 525" },
+  { img: "menu/fotos/pasarela/sushi-burger-pollo.jpg", nombre: "Sushi Burger",      precio: "RD$ 550" },
+  { img: "menu/fotos/pasarela/california-green.jpg",   nombre: "California Green",  precio: "RD$ 395" }
+];
+const SEGUNDOS = 4;   // cada cuántos segundos cambia la foto
+(function(){
+  let actual = 0, temporizador;
+  $("#diapos").innerHTML = PASARELA.map((f, i) => `<div class="diapo${i === 0 ? " activa" : ""}${f.llenar ? " llenar" : ""}"><img src="${f.img}" alt="${f.nombre}" ${i ? 'loading="lazy"' : ""}><span class="etiqueta">${f.nombre}${f.precio ? `<b>${f.precio}</b>` : ""}</span></div>`).join("");
+  $("#puntos").innerHTML = PASARELA.map((f, i) => `<button class="${i === 0 ? "activo" : ""}" aria-label="Foto ${i + 1}"></button>`).join("");
+  const diapos = document.querySelectorAll("#diapos .diapo"), puntos = document.querySelectorAll("#puntos button");
+  function ir(n){
+    actual = (n + PASARELA.length) % PASARELA.length;
+    diapos.forEach((d, i) => d.classList.toggle("activa", i === actual));
+    puntos.forEach((p, i) => p.classList.toggle("activo", i === actual));
+    reiniciar();
+  }
+  function reiniciar(){ clearInterval(temporizador); temporizador = setInterval(() => ir(actual + 1), SEGUNDOS * 1000); }
+  $("#pas-sig").addEventListener("click", () => ir(actual + 1));
+  $("#pas-ant").addEventListener("click", () => ir(actual - 1));
+  puntos.forEach((p, i) => p.addEventListener("click", () => ir(i)));
+  let x0 = null;   // deslizar con el dedo en el celular
+  $("#pasarela").addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+  $("#pasarela").addEventListener("touchend", e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) ir(actual + (dx < 0 ? 1 : -1)); x0 = null; });
+  reiniciar();
+})();
+
+$("#abrir-menu").addEventListener("click", () => { const ab = $("#enlaces").classList.toggle("abierto"); $("#abrir-menu").setAttribute("aria-expanded", ab); });
+document.querySelectorAll("#enlaces a").forEach(a => a.addEventListener("click", () => { $("#enlaces").classList.remove("abierto"); document.querySelectorAll("#enlaces a").forEach(x => x.classList.toggle("activo", x === a)); }));
+document.querySelectorAll("img").forEach(i => { const f = () => i.classList.add("roto"); if (i.complete && !i.naturalWidth) f(); else i.addEventListener("error", f); });
+</script>
+</body>
+</html>
