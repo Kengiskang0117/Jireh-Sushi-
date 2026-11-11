@@ -489,14 +489,14 @@ const NEGOCIO = {
   nombre: "Jireh Sushi",
   whatsapp: "19785664534",           // @@WHATSAPP  PRUEBAS: llega al número de Kenmake. Al publicar, cambiar a 18493604892
   telefono: "(849) 360-4892",         // @@TELEFONO
-  direccion: "Santo Domingo Este",    // @@DIRECCION
-  mapa: "",                           // @@MAPA
-  horario: { abre: "13:00", cierra: "20:00",            // @@HORARIO  hora normal de abrir y cerrar
-             cierraDia: { 0: "19:00" },                  // días que cierran a otra hora (0 = domingo cierra 7:00 PM)
-             texto: "Mar–Sáb 1:00–8:00 PM · Dom 1:00–7:00 PM · Lunes cerrado" },
+  direccion: "Carretera Mella, cerca de la bomba Credigas · Villa Tropicalia, Santo Domingo Este",    // @@DIRECCION
+  mapa: "https://www.google.com/maps/search/?api=1&query=Jireh+sushi+Rd&query_place_id=ChIJx40rD8SHr44R7_ZfhKZl_YU",                           // @@MAPA
+  horario: { abre: "13:00", cierra: "20:30",            // @@HORARIO  hora normal de abrir y cerrar
+             cierraDia: { 0: "19:45" },                  // días que cierran a otra hora (0 = domingo cierra 7:45 PM)
+             texto: "Mar–Sáb 1:00–8:30 PM · Dom 1:00–7:45 PM · Lunes cerrado" },
   diasCerrado: [1],                   // @@DIAS-CERRADO  0 domingo · 1 lunes · … · 6 sábado
   delivery: true,                     // @@DELIVERY
-  redes: { instagram: "", facebook: "", tiktok: "" },   // @@REDES
+  redes: { instagram: "https://www.instagram.com/jirehsushird", facebook: "", tiktok: "" },   // @@REDES
   moneda: "RD$",
   logo: "fotos/logo.png",
   iniciales: "JS",
@@ -517,11 +517,11 @@ const NEGOCIO = {
   ],
 
   /* @@DELIVERY-KM — cálculo del delivery por distancia */
-  local: { lat: 18.4880, lng: -69.8570 },  // @@UBICACION-LOCAL  EJEMPLO: poner la ubicación exacta del local
+  local: { lat: 18.5253433, lng: -69.8228972 },  // @@UBICACION-LOCAL  Jireh Sushi (Google Maps), cerca de la bomba Credigas, Carr. Mella
   deliveryPorKm: 30,       // RD$ por cada kilómetro
   deliveryMinimo: 60,      // lo mínimo que se cobra de delivery
   factorCalles: 1.3,       // distancia en línea recta × 1.3 ≈ distancia por las calles
-  deliveryMaxKm: 15        // más lejos de esto: el delivery se confirma por WhatsApp
+  deliveryMaxKm: 20        // más lejos de esto: el delivery se coordina con el cliente por WhatsApp
 };
 
 const DESTACADO = "eby-banana";     // @@DESTACADO  Producto que sale grande arriba (escribe su id)
@@ -567,15 +567,15 @@ const MENU = [
   ]},
   /* ---------- @@ROLLS-CASA ---------- */
   { id:"rolls-casa", nombre:"Rolls de la casa", tab:"De la casa", arte:"burger", sub:"Nuestras creaciones, con Frescura Sagrada.", grupos:[{ items:[
-    { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:525, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
+    { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:710, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
     { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:495, desc:"Pollo empanizado y queso crema, cubierto de plátano maduro.", img:"fotos/chicken-aplatanao.jpg" }
   ]}]},
   /* ---------- @@CALIFORNIA ---------- */
   { id:"california", nombre:"California", tab:"California", arte:"burger", grupos:[{ items:[
-    { id:"california-camaron", nombre:"California Camarón", precio:null, desc:"Camarón y aguacate, cubierto de ajonjolí.", img:"fotos/california-camaron.jpg" },   // ⚠️ precio pendiente
+    { id:"california-camaron", oculto:true, nombre:"California Camarón", precio:null, desc:"Camarón y aguacate, cubierto de ajonjolí.", img:"fotos/california-camaron.jpg" },   // ⚠️ precio pendiente
     { id:"california-green", nombre:"California Green Roll", precio:395, desc:"Pollo crujiente, queso crema y aguacate, cubierto de cebollín.", img:"fotos/california-green.jpg" },
-    { id:"california-roll", nombre:"California Roll", precio:350, desc:"Kani, aguacate y pepino, cubierto de ajonjolí.", img:"fotos/california.jpg" },
-    { id:"avocado-roll", nombre:"Avocado Roll", precio:450, desc:"Camarón tempura y queso crema, cubierto de láminas de aguacate.", img:"fotos/avocado.jpg" }
+    { id:"california-roll", oculto:true, nombre:"California Roll", precio:350, desc:"Kani, aguacate y pepino, cubierto de ajonjolí.", img:"fotos/california.jpg" },
+    { id:"avocado-roll", oculto:true, nombre:"Avocado Roll", precio:450, desc:"Camarón tempura y queso crema, cubierto de láminas de aguacate.", img:"fotos/avocado.jpg" }
   ]}]},
   /* ---------- @@EMPANIZADOS (19 rolls reales del catálogo, por precio) ---------- */
   { id:"empanizados", nombre:"Empanizados", tab:"Empanizados", arte:"burger", sub:"Rolls crujientes, empanizados al momento. 8 piezas cada uno.", grupos:[{ items:[
@@ -602,13 +602,13 @@ const MENU = [
   /* ---------- @@SUSHI-BURGER ---------- */
   { id:"sushi-burger", nombre:"Sushi Burger", tab:"Sushi Burger", arte:"burger", grupos:[{ items:[
     { id:"sushi-burger-pollo", nombre:"Sushi Burger de Pollo", tag:"NUEVO", precio:550, desc:"Pan de arroz empanizado con pollo crujiente, aguacate y queso crema.", img:"fotos/sushi-burger-pollo.jpg" },
-    { id:"sushi-burger-salmon", nombre:"Sushi Burger de Salmón", precio:595, desc:"Pan de arroz crujiente con salmón, aguacate y queso crema.", img:"fotos/sushi-burger.jpg" }
+    { id:"sushi-burger-salmon", oculto:true, nombre:"Sushi Burger de Salmón", precio:595, desc:"Pan de arroz crujiente con salmón, aguacate y queso crema.", img:"fotos/sushi-burger.jpg" }
   ]}]},
   /* ---------- @@SIN-ARROZ ---------- */
   { id:"sin-arroz", nombre:"Sin arroz y Hosomaki", tab:"Sin arroz", arte:"burger", grupos:[{ items:[
-    { id:"salmon-sin-arroz", nombre:"Salmón sin arroz", precio:595, desc:"Camarón y queso crema envuelto en salmón fresco.", img:"fotos/sin-arroz.jpg" },
-    { id:"jireh-signature", nombre:"Jireh Signature", tag:"DE LA CASA", precio:695, desc:"Atún, salmón y aguacate sin arroz, con cebollín y ajonjolí.", img:"fotos/signature.jpg" },
-    { id:"hosomaki-salmon", nombre:"Hosomaki de Salmón", precio:295, desc:"Rollito fino de alga con salmón.", img:"fotos/hosomaki.jpg" }
+    { id:"salmon-sin-arroz", oculto:true, nombre:"Salmón sin arroz", precio:595, desc:"Camarón y queso crema envuelto en salmón fresco.", img:"fotos/sin-arroz.jpg" },
+    { id:"jireh-signature", oculto:true, nombre:"Jireh Signature", tag:"DE LA CASA", precio:695, desc:"Atún, salmón y aguacate sin arroz, con cebollín y ajonjolí.", img:"fotos/signature.jpg" },
+    { id:"hosomaki-salmon", oculto:true, nombre:"Hosomaki de Salmón", precio:295, desc:"Rollito fino de alga con salmón.", img:"fotos/hosomaki.jpg" }
   ]}]},
   /* ---------- @@PARA-PICAR (precios reales) ---------- */
   { id:"para-picar", nombre:"Para picar", tab:"Para picar", arte:"pollo", sub:"Entradas crujientes para compartir.", grupos:[{ items:[
@@ -654,6 +654,11 @@ function seloRebaja(p){
   if (!p.precioAntes || p.precioAntes <= p.precio) return "";
   return `<span class="sello">-${Math.round((1 - p.precio / p.precioAntes) * 100)}%</span>`;
 }
+/* @@OCULTOS — los productos con oculto:true no se muestran (fotos que no son del negocio o sin precio).
+   Para mostrarlos: borra "oculto:true," de ese producto. Las secciones que quedan vacías desaparecen solas. */
+MENU.forEach(sec => sec.grupos.forEach(g => { g.items = g.items.filter(p => !p.oculto); }));
+MENU.forEach(sec => { sec.grupos = sec.grupos.filter(g => g.items.length); });
+for (let i = MENU.length - 1; i >= 0; i--) if (!MENU[i].grupos.length) MENU.splice(i, 1);
 const PRODUCTOS = {};
 MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => { PRODUCTOS[p.id] = { ...p, chico: !!sec.chico, arte: sec.arte }; })));
 
@@ -877,7 +882,7 @@ function htmlDatos(){
       <div class="campo"><span class="lbl">Ubicación para el delivery</span>
         <button class="btn-borde ubic-btn" data-acc="ubicacion">📍 ${ubic ? "Actualizar mi ubicación" : "Usar mi ubicación"}</button>
         ${ubicEstado ? `<small class="ubic-estado">${esc(ubicEstado)}</small>`
-          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${ubic.km} km. Te confirmamos el costo del delivery por WhatsApp.</small>`
+          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${ubic.km} km. Por la distancia, coordinamos el delivery contigo por WhatsApp.</small>`
           : ubic ? `<small class="ubic-estado ok">✓ Ubicación lista · aprox. ${ubic.km} km · Delivery ${dinero(ubic.costo)}</small>`
           : `<small class="ubic-estado">Tócalo para calcular el delivery (${NEGOCIO.moneda} ${NEGOCIO.deliveryPorKm} por km) y para que el repartidor te encuentre rápido.</small>`}
       </div>` : ""}

@@ -3,7 +3,7 @@
 Página web oficial de **Jireh Sushi** (Santo Domingo Este), con menú digital y pedidos por WhatsApp.
 *Frescura Sagrada.*
 
-> **Estado:** 🟡 En pruebas. Faltan los precios reales, el banco por confirmar y la ubicación exacta del local.
+> **Estado:** 🟡 En pruebas. Faltan los precios reales y la ubicación exacta del local.
 
 ---
 
@@ -86,7 +86,7 @@ Cada archivo tiene un **índice al inicio**. Para encontrar algo, busca con **Ct
 ## 🚀 Antes de publicar oficialmente
 
 - [ ] Poner los precios reales
-- [ ] Confirmar el banco de la primera cuenta
+- [x] Confirmar el banco de la primera cuenta
 - [ ] Poner la ubicación exacta del local
 - [ ] Cambiar el WhatsApp de pruebas por el del negocio (`18493604892`) en los dos `index.html`
 - [ ] Borrar la línea `@@AVISO-PRUEBAS` en los dos `index.html`
