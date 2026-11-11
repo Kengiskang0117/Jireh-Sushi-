@@ -72,7 +72,9 @@ a{color:inherit}
 .pasarela .diapo.activa{opacity:1}
 .pasarela{background:#000}
 .pasarela .diapo img{width:100%;height:100%;aspect-ratio:auto;object-fit:contain;display:block}   /* contain: se ve la foto completa, con su texto */
-.pasarela .diapo.llenar img{object-fit:cover}   /* llenar: la foto cubre todo el cuadro */
+.pasarela .diapo.llenar img{object-fit:cover}
+.pasarela .fondo-borroso{position:absolute;inset:-30px;background-size:cover;background-position:center;filter:blur(26px) brightness(.75);transform:scale(1.1)}   /* relleno: la misma foto, borrosa, detrás */
+.pasarela .diapo img{position:relative}   /* llenar: la foto cubre todo el cuadro */
 .pasarela .etiqueta{position:absolute;left:14px;top:14px;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);color:#fff;padding:6px 12px;border-radius:999px;font-weight:700;font-size:14px}
 .pasarela .etiqueta b{color:var(--rojo-claro);margin-left:6px}
 .pasarela .flecha{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2}
@@ -212,10 +214,10 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/mixta-16.jpg" alt="" loading="lazy"><b>Combos</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/fernando-rolls.jpg" alt="" loading="lazy"><b>Rolls de la casa</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/california-green.jpg" alt="" loading="lazy"><b>California</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Hot Rolls</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Empanizados</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/sushi-burger-pollo.jpg" alt="" loading="lazy"><b>Sushi Burger</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hand-rolls-pollo.jpg" alt="" loading="lazy"><b>Hand Rolls</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/tiritas-pollo.jpg" alt="" loading="lazy"><b>Entradas</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/tiritas-pollo.jpg" alt="" loading="lazy"><b>Para picar</b></a>
       </div>
       <div class="centro"><a class="btn rojo js-menu" href="menu/index.html">Ver el menú completo y ordenar</a></div>
     </div>
@@ -257,7 +259,7 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
       <div>
         <h2>Hecho al momento,<br>con <span>frescura sagrada</span></h2>
         <p>En Jireh Sushi preparamos cada roll al momento, con ingredientes frescos y porciones generosas. Nuestros clientes nos piden desde todo Santo Domingo Este para la casa, la oficina y cualquier celebración.</p>
-        <p>Desde los clásicos California hasta nuestros rolls aplatanados, el Sushi Burger y las entradas crujientes, hay algo para cada antojo.</p>
+        <p>Desde los clásicos California hasta nuestros rolls aplatanados, el Sushi Burger y algo crujiente para picar, hay algo para cada antojo.</p>
         <div class="acciones"><a class="btn rojo js-menu" href="menu/index.html">Ordenar ahora</a></div>
       </div>
     </div>
@@ -344,19 +346,21 @@ estado(); setInterval(estado, 60000);
 
 /* ================= @@PASARELA — fotos de la portada =================
    Para cambiar las fotos: agrega o quita líneas. "precio" es opcional.
-   llenar: true = la foto cubre todo el cuadro (para fotos anchas sin texto). */
+   llenar: true = la foto cubre todo el cuadro (para fotos anchas sin texto).
+   nombre: "" = no se muestra la etiqueta (para fotos que ya traen su texto). */
 const PASARELA = [
+  { img: "menu/fotos/pasarela/no-quieres-cocinar.jpg", nombre: "" },   // sin etiqueta: la foto ya trae su texto
   { img: "menu/fotos/portada.jpg",            nombre: "Frescura Sagrada", llenar: true },
-  { img: "menu/fotos/pasarela/mixta-16.jpg",           nombre: "16 Piezas Mixta",   precio: "RD$ 650" },
-  { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "Fernando Rolls",    precio: "RD$ 495" },
-  { img: "menu/fotos/pasarela/eby-banana.jpg",         nombre: "Eby Banana Rolls",  precio: "RD$ 525" },
-  { img: "menu/fotos/pasarela/sushi-burger-pollo.jpg", nombre: "Sushi Burger",      precio: "RD$ 550" },
-  { img: "menu/fotos/pasarela/california-green.jpg",   nombre: "California Green",  precio: "RD$ 395" }
+  { img: "menu/fotos/pasarela/mixta-16.jpg",           nombre: "" },
+  { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "" },
+  { img: "menu/fotos/pasarela/eby-banana.jpg",         nombre: "" },
+  { img: "menu/fotos/pasarela/sushi-burger-pollo.jpg", nombre: "" },
+  { img: "menu/fotos/pasarela/california-green.jpg",   nombre: "" }
 ];
 const SEGUNDOS = 4;   // cada cuántos segundos cambia la foto
 (function(){
   let actual = 0, temporizador;
-  $("#diapos").innerHTML = PASARELA.map((f, i) => `<div class="diapo${i === 0 ? " activa" : ""}${f.llenar ? " llenar" : ""}"><img src="${f.img}" alt="${f.nombre}" ${i ? 'loading="lazy"' : ""}><span class="etiqueta">${f.nombre}${f.precio ? `<b>${f.precio}</b>` : ""}</span></div>`).join("");
+  $("#diapos").innerHTML = PASARELA.map((f, i) => `<div class="diapo${i === 0 ? " activa" : ""}${f.llenar ? " llenar" : ""}">${f.llenar ? "" : `<div class="fondo-borroso" style="background-image:url('${f.img}')"></div>`}<img src="${f.img}" alt="${f.nombre}" ${i ? 'loading="lazy"' : ""}>${f.nombre ? `<span class="etiqueta">${f.nombre}${f.precio ? `<b>${f.precio}</b>` : ""}</span>` : ""}</div>`).join("");
   $("#puntos").innerHTML = PASARELA.map((f, i) => `<button class="${i === 0 ? "activo" : ""}" aria-label="Foto ${i + 1}"></button>`).join("");
   const diapos = document.querySelectorAll("#diapos .diapo"), puntos = document.querySelectorAll("#puntos button");
   function ir(n){

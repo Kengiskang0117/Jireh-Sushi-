@@ -22,8 +22,8 @@
   @@DESTACADO      Producto grande de arriba
   @@REBAJAS        Cómo poner rebaja a un producto
   @@MENU           Inicio de la lista de productos
-  @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@HOT-ROLLS
-  @@SUSHI-BURGER  @@SIN-ARROZ  @@ENTRADAS  @@BEBIDAS
+  @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@EMPANIZADOS
+  @@SUSHI-BURGER  @@SIN-ARROZ  @@PARA-PICAR  @@BEBIDAS
 
   APARIENCIA
   @@COLORES        Colores de la página
@@ -105,7 +105,10 @@ img{display:block;max-width:100%}
 .retiro small{color:var(--texto-suave);font-size:12px}
 
 .hero{margin-top:18px;display:grid;grid-template-columns:1fr;border-radius:24px;overflow:hidden;background:var(--tarjeta);border:1px solid var(--borde);cursor:pointer;text-align:left;padding:0;width:100%}
-.hero .foto{height:230px}
+.hero .foto{width:100%;aspect-ratio:1/1;height:auto;position:relative;overflow:hidden}   /* cuadro cuadrado = la foto cuadrada lo llena entero */
+.hero .foto img{object-fit:contain;z-index:1}   /* @@FOTO-HERO: la foto se ve completa, con su nombre */
+.hero-fondo{position:absolute;inset:-30px;background-size:cover;background-position:center;filter:blur(24px) brightness(.6)}   /* la misma foto, difuminada detrás */
+.hero p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .hero-txt{padding:18px 18px 20px;display:flex;flex-direction:column;gap:8px}
 .etiqueta{align-self:flex-start;background:var(--acento);color:var(--sobre-acento);font-size:11px;font-weight:700;letter-spacing:.08em;padding:6px 10px;border-radius:999px}
 .hero h1{font-size:42px}
@@ -176,6 +179,8 @@ img{display:block;max-width:100%}
 
 .detalle-foto{position:relative;margin:10px 16px 0}
 .detalle-foto .foto{height:280px;border-radius:22px;font-size:12px}
+.detalle-foto .foto{height:auto;aspect-ratio:1/1;max-height:62vh;margin:0 auto}   /* @@FOTO-GRANDE cuadrada: la foto llena el espacio y se ve completa */
+.detalle-foto .foto img{object-fit:contain}
 .detalle-foto .cerrar{position:absolute;top:12px;right:12px}
 .detalle-foto .etiqueta{position:absolute;top:14px;left:14px}
 .detalle-txt{padding:20px 20px 0;display:flex;flex-direction:column;gap:10px}
@@ -327,8 +332,8 @@ img{display:block;max-width:100%}
   .pestanas{top:var(--alto-header)}
   .seccion{scroll-margin-top:calc(var(--alto-header) + 70px)}
   .contenedor,.pestanas-in{padding-left:32px;padding-right:32px}
-  .hero{grid-template-columns:1fr 1.1fr}
-  .hero .foto{height:100%;min-height:380px;order:2}
+  .hero{grid-template-columns:1fr minmax(0,440px)}
+  .hero .foto{height:auto;min-height:0;aspect-ratio:1/1;order:2;align-self:center}
   .hero-txt{padding:44px;justify-content:center;gap:14px}
   .hero h1{font-size:84px}
   .hero p{font-size:18px;max-width:440px}
@@ -506,7 +511,7 @@ const NEGOCIO = {
 
   /* @@BANCOS — cuentas para transferencia. EJEMPLO: poner las reales del dueño */
   bancos: [
-    { banco: "CONFIRMAR BANCO", tipo: "Cuenta de ahorros", numero: "40868940018", titular: "Rosario Vasquez" },   // ⚠️ confirmar qué banco es
+    { banco: "Banco BHD",       tipo: "Cuenta de ahorros", numero: "40868940018", titular: "Rosario Vasquez" },
     { banco: "Banco Popular",   tipo: "Cuenta corriente",  numero: "844223636",   titular: "Rolando Nuñez" },
     { banco: "Banreservas",     tipo: "Cuenta corriente",  numero: "4260804914",  titular: "Rolando Nuñez" }
   ],
@@ -519,7 +524,7 @@ const NEGOCIO = {
   deliveryMaxKm: 15        // más lejos de esto: el delivery se confirma por WhatsApp
 };
 
-const DESTACADO = "mixta-16";     // @@DESTACADO  Producto que sale grande arriba (escribe su id)
+const DESTACADO = "eby-banana";     // @@DESTACADO  Producto que sale grande arriba (escribe su id)
 
 /* @@REBAJAS — dos formas, en cualquier producto:
    1) Por porcentaje:   precio:545, rebaja:15        → la página calcula RD$ 463 y tacha RD$ 545
@@ -530,31 +535,69 @@ const DESTACADO = "mixta-16";     // @@DESTACADO  Producto que sale grande arrib
 /* ================= @@MENU — PRODUCTOS ================= */
 const MENU = [
   /* PRECIOS DE EJEMPLO: cambiarlos por los reales del cliente */
-  /* ---------- @@CAJAS ---------- */
-  { id:"cajas", nombre:"Combos para compartir", tab:"Combos", arte:"burger", sub:"Perfectos para la familia, los amigos o la oficina.", grupos:[{ items:[
-    { id:"mixta-16", nombre:"16 Piezas Mixta", tag:"MÁS PEDIDA", precio:650, desc:"Dos rolls de la casa en una sola caja: lo mejor para probar de todo. Incluye salsa de soya.", img:"fotos/mixta-16.jpg" },
-    { id:"caja-32", nombre:"Caja 32 piezas", precio:1195, desc:"Elige 4 rolls de la casa. Grandes, frescos y con nuestras salsas especiales.", img:"fotos/portada.jpg" },
-    { id:"caja-48", nombre:"Caja 48 piezas", tag:"PARA EL GRUPO", precioAntes:1795, precio:1650, desc:"Elige 6 rolls de la casa. Ideal para reuniones y oficinas.", img:"fotos/hot-rolls.jpg" }
-  ]}]},
+  /* ---------- @@CAJAS (19 combos reales del catálogo, por piezas y precio) ---------- */
+  { id:"cajas", nombre:"Combos", tab:"Combos", arte:"burger", sub:"Combina tus rolls favoritos. Cada roll trae 8 piezas.", grupos:[
+    { titulo:"16 piezas", items:[
+      { id:"16-piezas-pollo", nombre:"16 Piezas Pollo", precio:870, desc:"8 Hot Pollo (pollo, queso crema y puerro, empanizado) · 8 Avocado Pollo (pollo, queso crema y puerro, envuelto en aguacate).", img:"fotos/16-piezas-pollo.jpg" },
+      { id:"mixta-16", nombre:"16 Piezas Mixta", precio:890, desc:"8 Hot Pollo (pollo empanizado, queso crema y puerro) · 8 Avocado Kani (palitos de cangrejo, queso crema y aguacate, envuelto en aguacate).", img:"fotos/mixta-16.jpg" },
+      { id:"combo-clasico", nombre:"Combo Clásico", precio:920, desc:"16 piezas: 8 Chicken Avocado (pollo empanizado, queso crema y puerro, envuelto en aguacate) · 8 Eby Hot (camarón empanizado, puerro y queso crema, empanizado).", img:"fotos/combo-clasico.jpg" },
+      { id:"combo-crunch", nombre:"Crunch Rolls", precio:920, desc:"16 piezas: 8 Kobe Roll (camarón empanizado, queso crema y aguacate) · 8 Hot Pollo Roll (pollo empanizado, queso crema y puerro).", img:"fotos/combo-crunch.jpg" },
+      { id:"combo-fusion", nombre:"Combo Fusión", precio:950, desc:"8 Avocado Salmón (salmón fresco, aguacate y queso crema, envuelto en aguacate) · 8 Hot Pollo (pollo empanizado, queso crema y puerro, empanizado).", img:"fotos/combo-fusion.jpg" }
+    ]},
+    { titulo:"24 piezas", items:[
+      { id:"antojo-24", nombre:"Antojo 24", precio:1050, desc:"8 Avocado Pollo (envuelto en aguacate) · 8 California Cheese Cangrejo · 8 Hot Pollo.", img:"fotos/antojo-24.jpg" },
+      { id:"combo-select", nombre:"Combo Select", precio:1090, desc:"8 Hot Pollo (pollo empanizado, queso crema y puerro, envuelto en panko) · 8 California Cheese Pollo (pollo, aguacate y queso crema, envuelto en sésamo) · 8 Avocado Camarón (camarón empanizado, queso crema y puerro, envuelto en aguacate).", img:"fotos/combo-select.jpg" },
+      { id:"combo-prestige", nombre:"Combo Prestige", precio:1180, desc:"8 Avocado Chicken (pollo, queso crema y aguacate, envuelto en aguacate) · 8 Eby Cheese (camarón empanizado, aguacate y puerro, envuelto en queso crema) · 8 Hot Pollo (pollo empanizado, queso crema y puerro, envuelto en panko).", img:"fotos/combo-prestige.jpg" },
+      { id:"combo-kani", nombre:"Combo Kani", precio:1180, desc:"8 Avocado Kani (palitos de cangrejo, queso crema y aguacate, envuelto en aguacate) · 8 Cheese Pollo (pollo y aguacate, envuelto en queso crema) · 8 Hot Camarón (camarones, queso crema y puerro, empanizado).", img:"fotos/combo-kani.jpg" },
+      { id:"combo-golden", nombre:"Combo Golden", precio:1250, desc:"8 Hot Pollo (pollo empanizado, puerro y queso crema) · 8 Hot Salmón (salmón, puerro y queso crema) · 8 Hot Camarón (camarón empanizado y aguacate). Todos envueltos en panko.", img:"fotos/combo-golden.jpg" },
+      { id:"hit-para-2", nombre:"Hit para 2", precio:1250, desc:"8 Avocado Teriyaki · 8 Avocado Camarón Acevichado · 8 Hot Pollo.", img:"fotos/hit-para-2.jpg" },
+      { id:"combo-vip", nombre:"Combo VIP", precio:1290, desc:"8 Avocado Sake (salmón, queso crema y aguacate, envuelto en aguacate) · 8 California Eby (camarón, aguacate y queso crema, envuelto en puerro y ajonjolí) · 8 Hot Pollo Acevichado (pollo empanizado, queso crema y puerro, bañado en salsa acevichada y togarashi).", img:"fotos/combo-vip.jpg" }
+    ]},
+    { titulo:"32 piezas", items:[
+      { id:"combo-clasico-32", nombre:"Combo Clásico", precio:1650, desc:"32 piezas: 8 Avocado Eby (camarón, queso crema y puerro, envuelto en aguacate) · 8 Chicken Cheese (pollo empanizado y aguacate, envuelto en queso crema) · 8 Camarón Hot (camarón, queso crema y puerro, empanizado) · 8 Pollo Hot (pollo, queso crema y puerro, empanizado).", img:"fotos/combo-clasico-32.jpg" },
+      { id:"32-mixta", nombre:"32 Piezas Mixta", tag:"NUEVO", precio:1750, desc:"8 Avocado Salmón · 8 California Camarón en Puerro · 8 California Pollo en Ajonjolí · 8 Hosomaki Cangrejo.", img:"fotos/32-mixta.jpg" },
+      { id:"32-hot", nombre:"32 Piezas Hot", precio:1850, desc:"8 Chicken Roll (pollo, puerro y queso crema) · 8 Kani Roll (kanikama, puerro y queso crema) · 8 Ebi (camarón, puerro y queso crema) · 8 Sake Roll (salmón, puerro y queso crema). Todos empanizados.", img:"fotos/32-hot.jpg" },
+      { id:"32-vip", nombre:"32 Piezas VIP", tag:"NUEVO", precio:1890, desc:"8 Avocado Salmón (envuelto en aguacate) · 8 Cheese Pollo (envuelto en queso crema) · 8 Sakeby Roll (envuelto en salmón) · 8 Hot Camarón.", img:"fotos/32-vip.jpg" }
+    ]},
+    { titulo:"40 piezas o más · para el grupo", items:[
+      { id:"combo-supremo", nombre:"Combo Supremo", precio:2100, desc:"40 piezas: 8 California Chicken (pollo empanizado, queso crema y puerro, envuelto en ajonjolí) · 8 Avocado Roll (salmón, queso crema y puerro, envuelto en aguacate) · 8 Chicken Roll (pollo empanizado, puerro y queso crema) · 8 Eby Roll (camarón empanizado, queso crema y puerro) · 8 Eby Cheese Roll (camarón empanizado y aguacate, envuelto en queso crema).", img:"fotos/combo-supremo.jpg" },
+      { id:"combo-mixta-48", nombre:"Combo Mixta", precio:2450, desc:"48 piezas: Avocado Camarón (envuelto en aguacate) · Cheese Camarón (envuelto en queso crema) · California Cangrejo (envuelto en ajonjolí) · Hot Camarón · Hot Pollo con aguacate · Hosomaki de salmón o aguacate, a elección.", img:"fotos/combo-mixta-48.jpg" },
+      { id:"combo-royal", nombre:"Combo Royal", tag:"PARA EL GRUPO", precio:2650, desc:"53 piezas: 16 empanizados (pollo, queso crema y puerro · salmón y camarón con queso crema) · 8 Avocado Roll (salmón, puerro y queso crema, envuelto en aguacate) · 8 Chicken Cheese (pollo empanizado, aguacate y ají morrón, envuelto en queso crema) · 8 Chicken Sake (pollo empanizado, queso crema y puerro, envuelto en salmón) · 8 Kanimaki (kanikama y aguacate) · 5 gyozas de pollo.", img:"fotos/combo-royal.jpg" }
+    ]}
+  ]},
   /* ---------- @@ROLLS-CASA ---------- */
   { id:"rolls-casa", nombre:"Rolls de la casa", tab:"De la casa", arte:"burger", sub:"Nuestras creaciones, con Frescura Sagrada.", grupos:[{ items:[
-    { id:"fernando-rolls", nombre:"Fernando Rolls", tag:"FAVORITO", precio:495, desc:"Empanizado y crujiente, con relleno cremoso y bañado en salsa de anguila.", img:"fotos/fernando-rolls.jpg" },
-    { id:"almond-rolls", nombre:"Almond Rolls", precio:495, desc:"Pollo crujiente y queso crema, empanizado al momento.", img:"fotos/almond-rolls.jpg" },
-    { id:"eby-banana", nombre:"Eby Banana Rolls", precio:525, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
-    { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:495, desc:"Pollo empanizado y queso crema, cubierto de plátano maduro.", img:"fotos/chicken-aplatanao.jpg" },
-    { id:"cheddar-roll", nombre:"Cheddar Roll", precio:525, desc:"Pollo, queso crema y plátano maduro, bañado en queso cheddar.", img:"fotos/cheddar-roll.jpg" }
+    { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:525, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
+    { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:495, desc:"Pollo empanizado y queso crema, cubierto de plátano maduro.", img:"fotos/chicken-aplatanao.jpg" }
   ]}]},
   /* ---------- @@CALIFORNIA ---------- */
   { id:"california", nombre:"California", tab:"California", arte:"burger", grupos:[{ items:[
+    { id:"california-camaron", nombre:"California Camarón", precio:null, desc:"Camarón y aguacate, cubierto de ajonjolí.", img:"fotos/california-camaron.jpg" },   // ⚠️ precio pendiente
     { id:"california-green", nombre:"California Green Roll", precio:395, desc:"Pollo crujiente, queso crema y aguacate, cubierto de cebollín.", img:"fotos/california-green.jpg" },
     { id:"california-roll", nombre:"California Roll", precio:350, desc:"Kani, aguacate y pepino, cubierto de ajonjolí.", img:"fotos/california.jpg" },
     { id:"avocado-roll", nombre:"Avocado Roll", precio:450, desc:"Camarón tempura y queso crema, cubierto de láminas de aguacate.", img:"fotos/avocado.jpg" }
   ]}]},
-  /* ---------- @@HOT-ROLLS ---------- */
-  { id:"hot-rolls", nombre:"Hot Rolls", tab:"Hot Rolls", arte:"burger", sub:"Empanizados y fritos al momento.", grupos:[{ items:[
-    { id:"hot-pollo", nombre:"Hot Pollo", precio:450, desc:"Pollo, queso crema y vegetales, empanizado y frito.", img:"fotos/hot-pollo.jpg" },
-    { id:"hand-rolls-pollo", nombre:"Hand Rolls de Pollo", precio:425, desc:"Roll entero empanizado, relleno de pollo y queso crema.", img:"fotos/hand-rolls-pollo.jpg" },
-    { id:"hot-philadelphia", nombre:"Hot Philadelphia", precio:495, desc:"Salmón y queso crema, empanizado, con salsa de anguila.", img:"fotos/hot-rolls.jpg" }
+  /* ---------- @@EMPANIZADOS (19 rolls reales del catálogo, por precio) ---------- */
+  { id:"empanizados", nombre:"Empanizados", tab:"Empanizados", arte:"burger", sub:"Rolls crujientes, empanizados al momento. 8 piezas cada uno.", grupos:[{ items:[
+    { id:"fernando-rolls", nombre:"Fernando Rolls", precio:475, desc:"Pollo y queso crema, envuelto en panko, con salsa teriyaki dulce. 8 unidades.", img:"fotos/fernando-rolls.jpg" },
+    { id:"almond-rolls", nombre:"Almond Rolls", precio:450, desc:"Pollo empanizado, queso crema y almendra tostada. 8 unidades.", img:"fotos/almond-rolls.jpg" },
+    { id:"hot-pollo", nombre:"Hot Pollo", precio:490, desc:"Pollo empanizado, queso crema y puerro. 8 unidades.", img:"fotos/hot-pollo.jpg" },
+    { id:"hot-cangrejo", nombre:"Hot Cangrejo", precio:495, desc:"Cangrejo, puerro y queso crema, empanizado. 8 unidades.", img:"fotos/hot-cangrejo.jpg" },
+    { id:"hot-toriyaki", nombre:"Hot Toriyaki", precio:520, desc:"Pollo, aguacate y queso crema, empanizado, con salsa teriyaki y chispa de ajonjolí. 8 unidades.", img:"fotos/hot-toriyaki.jpg" },
+    { id:"hot-pollo-acevichado", nombre:"Hot Pollo Acevichado", precio:540, desc:"Pollo empanizado, queso crema y puerro, en salsa acevichada con chispa de shichimi. 8 unidades.", img:"fotos/hot-pollo-acevichado.jpg" },
+    { id:"hot-camaron", nombre:"Hot Camarón", precio:575, desc:"Camarón empanizado, queso crema y puerro. 8 unidades.", img:"fotos/hot-camaron.jpg" },
+    { id:"barbacoa-bacon", nombre:"Barbacoa Bacon", precio:575, desc:"Relleno de pollo empanizado, bacon, queso crema y puerro, empanizado, bañado en salsa teriyaki y chispa de puerro. 8 unidades.", img:"fotos/barbacoa-bacon.jpg" },
+    { id:"hot-salmon", nombre:"Hot Salmon", precio:595, desc:"Salmón, queso crema y puerro, empanizado. 8 unidades.", img:"fotos/hot-salmon.jpg" },
+    { id:"hot-salmon-teriyaki", nombre:"Hot Salmón Teriyaki", precio:630, desc:"Salmón, queso crema y aguacate, envuelto en panko, con salsa teriyaki. 8 unidades.", img:"fotos/hot-salmon-teriyaki.jpg" },
+    { id:"hot-spicyyaki", nombre:"Hot Spicyyaki", precio:690, desc:"Camarón, queso crema y puerro, empanizado, con salsa spicy y teriyaki. 8 unidades.", img:"fotos/hot-spicyyaki.jpg" },
+    { id:"vip-hot", nombre:"VIP Hot", precio:700, desc:"Salmón, camarón empanizado, queso crema y puerro. 8 unidades.", img:"fotos/vip-hot.jpg" },
+    { id:"mar-y-tierra", nombre:"Mar y Tierra", precio:710, desc:"Camarón empanizado, queso crema y puerro, cubierto de pollo empanizado y salsa teriyaki. 8 unidades.", img:"fotos/mar-y-tierra.jpg" },
+    { id:"cheddar-roll", nombre:"Cheddar Roll", precio:720, desc:"Empanizado, relleno de pollo empanizado, queso crema y plátano maduro, bañado en queso cheddar y tocino. 8 unidades.", img:"fotos/cheddar-roll.jpg" },
+    { id:"duo-roll", nombre:"Dúo Roll", precio:720, desc:"Salmón, camarón y queso crema, empanizado, cubierto de salsa teriyaki. 8 unidades.", img:"fotos/duo-roll.jpg" },
+    { id:"felipe-roll", nombre:"Felipe Roll", precio:720, desc:"Salmón, queso crema, aguacate y puerro, envuelto en alga nori, empanizado, con salsa teriyaki. 8 unidades.", img:"fotos/felipe-roll.jpg" },
+    { id:"hot-camaron-acevichado", nombre:"Hot Camarón Acevichado", precio:725, desc:"Camarón, queso crema y aguacate, empanizado, bañado en salsa acevichada. 8 unidades.", img:"fotos/hot-camaron-acevichado.jpg" },
+    { id:"ebysake-acevichado", nombre:"Ebysake Acevichado", precio:750, desc:"Relleno de camarón, queso crema y puerro, empanizado, con topping de salmón, salsa acevichada y un toque de shichimi. 8 unidades.", img:"fotos/ebysake-acevichado.jpg" },
+    { id:"natali-roll", nombre:"Natali Roll", precio:750, desc:"Camarón empanizado y aguacate, envuelto en alga nori y empanizado, con topping de salmón y chispa de togarashi. 8 unidades.", img:"fotos/natali-roll.jpg" }
   ]}]},
   /* ---------- @@SUSHI-BURGER ---------- */
   { id:"sushi-burger", nombre:"Sushi Burger", tab:"Sushi Burger", arte:"burger", grupos:[{ items:[
@@ -567,10 +610,12 @@ const MENU = [
     { id:"jireh-signature", nombre:"Jireh Signature", tag:"DE LA CASA", precio:695, desc:"Atún, salmón y aguacate sin arroz, con cebollín y ajonjolí.", img:"fotos/signature.jpg" },
     { id:"hosomaki-salmon", nombre:"Hosomaki de Salmón", precio:295, desc:"Rollito fino de alga con salmón.", img:"fotos/hosomaki.jpg" }
   ]}]},
-  /* ---------- @@ENTRADAS ---------- */
-  { id:"entradas", nombre:"Entradas", tab:"Entradas", arte:"pollo", grupos:[{ items:[
-    { id:"tiritas-pollo", nombre:"Tiritas de Pollo", precio:350, desc:"Doradas y crujientes, con salsa ranch.", img:"fotos/tiritas-pollo.jpg" },
-    { id:"palitos-mozzarella", nombre:"Palitos de Queso Mozzarella", tag:"NUEVO", precio:325, desc:"Dorados, crujientes y acompañados de salsa ranch.", img:"fotos/palitos-mozzarella.jpg" }
+  /* ---------- @@PARA-PICAR (precios reales) ---------- */
+  { id:"para-picar", nombre:"Para picar", tab:"Para picar", arte:"pollo", sub:"Entradas crujientes para compartir.", grupos:[{ items:[
+    { id:"tiritas-pollo", nombre:"Tiritas de Pollo", precio:240, desc:"5 unidades de tiritas de pollo empanizadas.", img:"fotos/tiritas-pollo.jpg" },
+    { id:"palitos-mozzarella", nombre:"Palitos de Queso", tag:"NUEVO", precio:390, desc:"6 unidades. Palitos crujientes rellenos de queso mozzarella.", img:"fotos/palitos-mozzarella.jpg" },
+    { id:"camarones-empanizados", nombre:"Camarones Empanizados", precio:490, desc:"6 unidades. Entrada de camarones crujientes.", img:"fotos/camarones-empanizados.jpg" },
+    { id:"gyosas", nombre:"Gyosas Orientales", precio:350, desc:"5 unidades. Rellenas de pollo y verduras, al vapor o fritas.", img:"fotos/gyosas.jpg", opciones:["Fritas","Al vapor"] }
   ]}]},
   /* ---------- @@BEBIDAS ---------- */
   { id:"bebidas", nombre:"Bebidas y extras", tab:"Bebidas", arte:"bebida", chico:true, grupos:[{ items:[
@@ -664,7 +709,7 @@ function pintarPestanas(){
 
 function pintarHero(){
   const p = PRODUCTOS[DESTACADO];
-  $("#hero").innerHTML = `<div class="foto">${fotoHTML(p, "Foto grande · " + p.nombre)}${seloRebaja(p)}</div>
+  $("#hero").innerHTML = `<div class="foto">${p.img ? `<div class="hero-fondo" style="background-image:url('${p.img}')"></div>` : ""}${fotoHTML(p, "Foto grande · " + p.nombre)}${seloRebaja(p)}</div>
     <div class="hero-txt">
       <span class="etiqueta">LA ESTRELLA DE LA CASA</span>
       <h1 class="display">${esc(p.nombre)}</h1>
@@ -711,9 +756,12 @@ function guardar(){ try { localStorage.setItem("carrito-" + NEGOCIO.nombre, JSON
 const totalArticulos = () => carrito.reduce((a, l) => a + l.cant, 0);
 const totalDinero = () => carrito.reduce((a, l) => a + l.cant * PRODUCTOS[l.id].precio, 0);
 
-function agregar(id, cant, nota){
-  const linea = carrito.find(l => l.id === id && (l.nota || "") === (nota || ""));
-  if (linea) linea.cant += cant; else carrito.push({ id, cant, nota: nota || "" });
+/* @@OPCIONES — un producto puede tener opciones: opciones:["Fritas","Al vapor"].
+   La opción elegida se guarda en la línea del carrito (op) y sale junto al nombre. */
+function nombreLinea(l){ return PRODUCTOS[l.id].nombre + (l.op ? ` (${l.op})` : ""); }
+function agregar(id, cant, nota, op){
+  const linea = carrito.find(l => l.id === id && (l.nota || "") === (nota || "") && (l.op || "") === (op || ""));
+  if (linea) linea.cant += cant; else carrito.push({ id, cant, nota: nota || "", op: op || "" });
   guardar(); actualizarCarrito();
   avisar(`Agregado: ${PRODUCTOS[id].nombre}${cant > 1 ? " × " + cant : ""}`);
 }
@@ -778,7 +826,7 @@ function htmlCarrito(){
     return `<div class="item-carrito">
       <div class="foto">${fotoHTML(p)}</div>
       <div class="info">
-        <div class="arriba"><span>${esc(p.nombre)}</span><span class="precio">${dinero(p.precio * l.cant)}</span></div>
+        <div class="arriba"><span>${esc(nombreLinea(l))}</span><span class="precio">${dinero(p.precio * l.cant)}</span></div>
         ${l.nota ? `<div class="nota">Nota: ${esc(l.nota)}</div>` : ""}
         <div class="abajo">
           <div class="cantidad"><button data-acc="menos" data-i="${i}" aria-label="Quitar uno">−</button><span>${l.cant}</span><button data-acc="mas" data-i="${i}" aria-label="Agregar uno">+</button></div>
@@ -897,7 +945,7 @@ function enviarACocina(raiz){
   const d = validar(raiz, true); if (!d) return;
   const pedido = {
     id: Date.now().toString(36), mesa: d.mesa.trim(), nombre: d.nombre.trim(), pago, notas: d.notas.trim(),
-    items: carrito.map(l => ({ nombre: PRODUCTOS[l.id].nombre, cant: l.cant, nota: l.nota, precio: PRODUCTOS[l.id].precio })),
+    items: carrito.map(l => ({ nombre: nombreLinea(l), cant: l.cant, nota: l.nota, precio: PRODUCTOS[l.id].precio })),
     total: totalDinero(), creado: Date.now(), estado: "nuevo"
   };
   let lista = [];
@@ -913,7 +961,7 @@ function enviarPedido(raiz){
   const d = validar(raiz, false); if (!d) return;
   const lineas = carrito.map(l => {
     const p = PRODUCTOS[l.id];
-    return `• ${l.cant} x ${p.nombre} — ${dinero(p.precio * l.cant)}${l.nota ? `\n   Nota: ${l.nota}` : ""}`;
+    return `• ${l.cant} x ${nombreLinea(l)} — ${dinero(p.precio * l.cant)}${l.nota ? `\n   Nota: ${l.nota}` : ""}`;
   }).join("\n");
   const servicio = modo === "local" ? `para comer en el local${d.mesa.trim() ? " (mesa " + d.mesa.trim() + ")" : ""}` : modo === "delivery" ? "para delivery" : "para llevar";
   let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${lineas}\n\n`;
@@ -944,7 +992,7 @@ function enviarPedido(raiz){
     const b = NEGOCIO.bancos[bancoSel];
     const datos = new URLSearchParams({
       id: idPedido, n: d.nombre.trim(), t: d.tel.trim(), m: modo === "delivery" ? "delivery" : "llevar",
-      i: carrito.map(l => `${l.cant}x ${PRODUCTOS[l.id].nombre}`).join("; "),
+      i: carrito.map(l => `${l.cant}x ${nombreLinea(l)}`).join("; "),
       tt: dinero(totalConDelivery()) + (modo === "delivery" && !(ubic && !ubic.lejos) ? " + delivery" : ""),
       p: pago
     });
@@ -998,9 +1046,10 @@ function escribirDatos(e){ if (e.target.closest("#f-nombre,#f-tel,#f-cambio,#f-m
 $("#carrito-movil").addEventListener("click", clicCarrito);
 
 /* ---------- Ventana de detalle ---------- */
-let detalleCant = 1, ultimoFoco = null;
+let detalleCant = 1, detalleOp = "", ultimoFoco = null;
 function abrirDetalle(id){
   const p = PRODUCTOS[id]; detalleCant = 1; ultimoFoco = document.activeElement;
+  detalleOp = p.opciones ? p.opciones[0] : "";
   const sinPrecio = p.precio == null;
   $("#detalle").innerHTML = `
     <div class="agarre"><span></span></div>
@@ -1012,6 +1061,10 @@ function abrirDetalle(id){
     <div class="detalle-txt">
       <div class="fila"><h3 class="display" id="det-nombre">${esc(p.nombre)}</h3>${sinPrecio ? `<span class="pendiente">[Precio pendiente]</span>` : precioHTML(p, 24)}</div>
       ${p.desc ? `<p>${textoPendiente(p.desc)}</p>` : ""}
+      ${p.opciones ? `<div class="campo" style="margin-top:8px"><span class="lbl">Elige cómo lo quieres</span>
+        <div class="opciones" role="radiogroup" aria-label="Opciones" style="grid-template-columns:repeat(${Math.min(p.opciones.length, 3)},1fr)">
+          ${p.opciones.map(o => `<button class="opcion${o === detalleOp ? " activa" : ""}" role="radio" aria-checked="${o === detalleOp}" data-acc="op" data-v="${esc(o)}">${esc(o)}</button>`).join("")}
+        </div></div>` : ""}
       <div class="campo" style="margin-top:8px"><label for="det-nota">Notas para la cocina (opcional)</label><textarea id="det-nota" rows="2" placeholder="Ej.: sin cebolla, término medio…"></textarea></div>
     </div>
     <div class="detalle-pie">
@@ -1028,7 +1081,12 @@ $("#detalle").addEventListener("click", e => {
   if (b.dataset.acc === "cerrar") return cerrarTodo();
   if (b.dataset.acc === "mas") detalleCant++;
   if (b.dataset.acc === "menos") detalleCant = Math.max(1, detalleCant - 1);
-  if (b.dataset.acc === "agregar") { agregar(p.id, detalleCant, $("#det-nota").value.trim()); return cerrarTodo(); }
+  if (b.dataset.acc === "op") {
+    detalleOp = b.dataset.v;
+    $("#detalle").querySelectorAll('[data-acc="op"]').forEach(x => { const on = x.dataset.v === detalleOp; x.classList.toggle("activa", on); x.setAttribute("aria-checked", on); });
+    return;
+  }
+  if (b.dataset.acc === "agregar") { agregar(p.id, detalleCant, $("#det-nota").value.trim(), detalleOp); return cerrarTodo(); }
   $("#det-cant").textContent = detalleCant;
   if (p.precio != null) $("#det-agregar").textContent = "Agregar · " + dinero(p.precio * detalleCant);
 });
