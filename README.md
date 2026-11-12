@@ -66,6 +66,9 @@ Cada archivo tiene un **índice al inicio**. Para encontrar algo, busca con **Ct
 | Fotos de la pasarela | `index.html` | `@@PASARELA` |
 | Mensajes de aviso al cliente | `menu/aviso.html` | `@@AVISOS` |
 | Mensaje para el delivery | `menu/aviso.html` | `@@DELIVERY-MSG` |
+| Leer el pedido pegado de WhatsApp | `menu/aviso.html` | `@@PEGAR-PEDIDO` |
+| Enlace del panel en el mensaje (apagado) | `menu/index.html` | `@@PANEL-AVISOS` |
+| Ícono de la pestaña | los 3 archivos `.html` | `@@ICONO` (imágenes en `menu/fotos/favicon.png` e `icono-180.png`) |
 
 **Agregar un producto** (en `@@MENU`):
 

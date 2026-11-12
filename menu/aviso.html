@@ -13,7 +13,9 @@
   =========================================================
   PANEL DE PEDIDOS (para el negocio) · Kenmake Soluciones
   ---------------------------------------------------------
-  - Se abre desde el enlace que llega al final de cada pedido por WhatsApp.
+  - El negocio lo deja abierto en su celular o tablet.
+  - Cuando llega un pedido por WhatsApp: copiar el mensaje y tocar "Pegar pedido"
+    (@@PEGAR-PEDIDO). El panel lee el mensaje y saca todos los datos.
   - Abierto sin enlace (menu/aviso.html) muestra la LISTA DE PEDIDOS DEL DÍA.
   - Los datos del pedido viajan dentro del enlace (después del ?).
   - La lista y los estados se guardan EN ESTE TELÉFONO (localStorage):
@@ -23,6 +25,7 @@
   @@AVISOS        Mensajes que se le mandan al cliente
   @@MINUTOS       Opciones de "Llega en … minutos"
   @@DELIVERY-MSG  Mensaje que se manda al grupo de delivery
+  @@PEGAR-PEDIDO  Lee el mensaje del pedido copiado de WhatsApp
   @@COLORES       Colores
   =========================================================
 -->
@@ -33,7 +36,7 @@
 body{margin:0;background:radial-gradient(120% 60% at 50% 0%,#2A0E10 0%,var(--fondo) 55%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;font-size:17px}
 .caja{max-width:560px;margin:0 auto;padding:18px 16px 50px}
 .cab{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.cab img{width:52px;height:52px;border-radius:50%;background:#fff;object-fit:cover}
+.cab img{width:52px;height:52px;border-radius:50%;background:#0B0B0B;border:2px solid var(--rojo);object-fit:cover}
 .cab h1{margin:0;font-size:24px}
 .cab small{color:var(--suave);font-size:14px}
 .cab .ir{margin-left:auto;color:var(--rojo-claro);font-weight:700;text-decoration:none;font-size:15px;border:1px solid var(--rojo);border-radius:12px;padding:8px 12px;white-space:nowrap}
@@ -75,6 +78,9 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1px solid var(--bo
 .vacio{text-align:center;color:var(--suave);padding:40px 20px}
 .aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);white-space:nowrap;background:#132219;border:1px solid #1F5B37;color:#7BE3A0;padding:12px 18px;border-radius:14px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none}
 .aviso.ver{opacity:1}
+.pegar{margin-bottom:16px}
+.pegar textarea{min-height:120px;font-size:15px}
+.pegar .error{color:#FF8A8F;font-size:15px;margin:0 0 10px;min-height:1px}
 .pie{text-align:center;color:#6E6862;font-size:13px;margin-top:26px}
 </style>
 </head>
@@ -105,7 +111,7 @@ const q = new URLSearchParams(location.search);
 const P = {
   id: q.get("id") || "", nombre: q.get("n") || "", tel: q.get("t") || "", modo: q.get("m") || "llevar",
   items: q.get("i") || "", sub: q.get("s") || "", del: q.get("d") || "", km: q.get("k") || "", total: q.get("tt") || "",
-  dir: q.get("dir") || "", ref: q.get("ref") || "", ubic: q.get("u") || "", pago: q.get("p") || "", banco: q.get("b") || "", cambio: q.get("c") || ""
+  dir: q.get("dir") || "", ref: q.get("ref") || "", ubic: q.get("u") || "", pago: q.get("p") || "", banco: q.get("b") || "", cambio: q.get("c") || "", notas: q.get("no") || ""
 };
 const primerNombre = (P.nombre.trim().split(/\s+/)[0] || "");
 const rellenar = t => t.replace(/\{nombre\}/g, primerNombre).replace(/\{id\}/g, P.id).replace(/\{negocio\}/g, NEGOCIO.nombre);
@@ -150,6 +156,7 @@ function mensajeDelivery(){
   m += `\n${P.items.split(";").map(x => "• " + x.trim()).join("\n")}\n\n`;
   if (P.pago === "Efectivo") m += `💵 *COBRAR: ${P.total}* en efectivo${P.cambio ? ` (paga con ${P.cambio})` : ""}`;
   else m += `✅ Pago por transferencia${P.banco ? ` (${P.banco})` : ""}: verificar comprobante antes de salir`;
+  if (P.notas) m += `\nNotas del cliente: ${P.notas}`;
   m += `\n\nResponde "Lo tomo ✋" si vas tú.`;
   return m;
 }
@@ -169,6 +176,54 @@ function copiar(t){
   else prompt("Copia el texto:", t);
 }
 
+/* ================= @@PEGAR-PEDIDO — LEER EL MENSAJE COPIADO DE WHATSAPP =================
+   Lee el mensaje que arma el menú ("¡Hola Jireh Sushi! Quiero hacer este pedido (#ABCD)…")
+   y lo convierte en los mismos datos que antes viajaban en el enlace. */
+function leerMensaje(texto){
+  // Si se copiaron varios mensajes, WhatsApp agrega "[10:33 p. m., 11/11/2026] Nombre: " al inicio: se quita
+  const t = String(texto).replace(/^\[[^\]\n]{3,40}\]\s*[^:\n]{1,40}:\s*/gm, "").replace(/\r/g, "");
+  const linea = et => { const m = t.match(new RegExp("^\\s*" + et + ":[ \\t]*(.+)$", "mi")); return m ? m[1].trim() : ""; };
+  const id = (t.match(/\(#([A-Z0-9]{3,8})\)/i) || [])[1];
+  const nombre = linea("Nombre");
+  if (!id || !nombre) return null;
+  const datos = new URLSearchParams({ id: id.toUpperCase(), n: nombre, t: linea("Teléfono"), m: /para delivery/i.test(t) ? "delivery" : "llevar" });
+  // Productos: "• 1 x Eby Banana Rolls — RD$ 710" (+ "   Nota: …" debajo)
+  const items = [];
+  t.split("\n").forEach(l => {
+    const p = l.match(/^\s*•\s*(\d+)\s*x\s*(.+?)\s+—\s+/);
+    if (p) { items.push(`${p[1]}x ${p[2]}`); return; }
+    const n = l.match(/^\s+Nota:\s*(.+)$/);
+    if (n && items.length) items[items.length - 1] += ` (${n[1].trim()})`;
+  });
+  datos.set("i", items.join("; "));
+  const tot = t.match(/Total a pagar:\s*([^*\n]+?)\s*\*?\s*(\+ delivery)?\s*$/mi);
+  if (tot) datos.set("tt", tot[1].trim() + (tot[2] ? " + delivery" : ""));
+  const sub = linea("Subtotal"); if (sub) datos.set("s", sub);
+  const del = t.match(/^\s*Delivery \(([\d.]+) km\):\s*(.+)$/mi);
+  if (del) { datos.set("k", del[1]); datos.set("d", del[2].trim()); }
+  const dir = linea("Dirección"); if (dir) datos.set("dir", dir);
+  const ref = linea("Referencia"); if (ref) datos.set("ref", ref);
+  const u = t.match(/maps\.google\.com\/\?q=(-?[\d.]+),(-?[\d.]+)/);
+  if (u) datos.set("u", `${u[1]},${u[2]}`);
+  const pago = linea("Pago");
+  if (/^Transferencia/i.test(pago)) {
+    datos.set("p", "Transferencia");
+    const b = pago.match(/^Transferencia\s+a\s+(.+?)\s*\(/i); if (b) datos.set("b", b[1]);
+  } else if (pago) {
+    datos.set("p", pago.replace(/\s*\(.*$/, ""));
+    const c = pago.match(/pago con\s+([^)]+)/i); if (c) datos.set("c", c[1].trim());
+  }
+  const notas = linea("Notas"); if (notas) datos.set("no", notas);
+  return datos;
+}
+function abrirPedidoPegado(texto){
+  const datos = leerMensaje(texto);
+  if (!datos) return false;
+  const ya = leerLista().find(x => x.id === datos.get("id"));
+  location.href = ya ? ya.url : "aviso.html?" + datos.toString();
+  return true;
+}
+
 let minutosSel = 20;
 
 /* ================= PANTALLA: LISTA DE PEDIDOS DEL DÍA ================= */
@@ -178,6 +233,14 @@ function pintarLista(){
   const vendido = entregados.reduce((s, x) => s + (x.monto || 0), 0);
   $("#app").innerHTML = `
     <div class="cab"><img src="${NEGOCIO.logo}" alt=""><div><h1>Pedidos de hoy</h1><small>${esc(NEGOCIO.nombre)} · Panel de pedidos</small></div></div>
+    <div class="botones pegar">
+      <button class="btn rojo" data-acc="pegar">📥 Pegar pedido nuevo</button>
+    </div>
+    <div class="pegar" id="caja-pegar" hidden>
+      <textarea id="texto-pegado" placeholder="Mantén presionado aquí y toca Pegar…"></textarea>
+      <p class="error" id="error-pegar"></p>
+      <div class="botones"><button class="btn rojo" data-acc="leer">Abrir pedido</button></div>
+    </div>
     <div class="resumen">
       <div><b>${delDia.length}</b><small>Pedidos hoy</small></div>
       <div><b>RD$ ${vendido.toLocaleString("en-US")}</b><small>Vendido (entregados: ${entregados.length})</small></div>
@@ -186,7 +249,7 @@ function pintarLista(){
         <span class="num">#${esc(x.id)}</span>
         <span class="info"><b>${esc(x.nombre)}</b><small>${x.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${esc(x.hora)} · ${esc(x.total)}</small></span>
         <span class="est">${esc(x.estado)}</span></a>`).join("")
-      : `<div class="vacio">Todavía no hay pedidos hoy.<br>Cada pedido aparece aquí cuando abres su enlace del WhatsApp.</div>`}
+      : `<div class="vacio">Todavía no hay pedidos hoy.<br>Cuando llegue uno por WhatsApp: mantén presionado el mensaje, toca <b>Copiar</b> y luego <b>Pegar pedido nuevo</b>.</div>`}
     ${delDia.length ? `<div class="botones" style="margin-top:18px"><button class="btn borde" data-acc="borrar">🗑️ Borrar la lista de hoy</button></div>` : ""}
     <div class="pie">La lista se guarda en este teléfono. Usa siempre el mismo para el panel.<br>Kenmake Soluciones</div>`;
 }
@@ -200,6 +263,12 @@ function pintarPedido(){
   $("#app").innerHTML = `
     <div class="cab"><img src="${NEGOCIO.logo}" alt=""><div><h1>Pedido #${esc(P.id)}</h1><small>${esc(NEGOCIO.nombre)}</small></div>
       <a class="ir" href="aviso.html">📋 Pedidos de hoy</a></div>
+    <div class="botones pegar"><button class="btn borde" data-acc="pegar">📥 Pegar otro pedido</button></div>
+    <div class="pegar" id="caja-pegar" hidden>
+      <textarea id="texto-pegado" placeholder="Mantén presionado aquí y toca Pegar…"></textarea>
+      <p class="error" id="error-pegar"></p>
+      <div class="botones"><button class="btn rojo" data-acc="leer">Abrir pedido</button></div>
+    </div>
     <div class="tarjeta">
       <span class="chip">${P.modo === "delivery" ? "🛵 DELIVERY" : "🥡 PARA LLEVAR"}</span><span class="chip estado">${esc(ped.estado)}</span>
       <div class="fila"><span>Cliente</span><span>${esc(P.nombre)}</span></div>
@@ -208,6 +277,7 @@ function pintarPedido(){
       ${P.ref ? `<div class="fila"><span>Referencia</span><span>${esc(P.ref)}</span></div>` : ""}
       ${P.ubic ? `<div class="fila"><span>Ubicación</span><span><a class="enlace" href="https://maps.google.com/?q=${esc(P.ubic)}" target="_blank" rel="noopener">Ver en el mapa</a></span></div>` : ""}` : ""}
       <div class="fila"><span>Pago</span><span>${esc(P.pago)}${P.banco ? " · " + esc(P.banco) : ""}${P.cambio ? " · paga con " + esc(P.cambio) : ""}</span></div>
+      ${P.notas ? `<div class="fila"><span>Notas</span><span>${esc(P.notas)}</span></div>` : ""}
       <ul class="items">${P.items.split(";").filter(Boolean).map(x => `<li>${esc(x.trim())}</li>`).join("")}</ul>
       ${P.modo === "delivery" ? `<div class="fila"><span>Subtotal</span><span>${esc(P.sub)}</span></div><div class="fila"><span>Delivery${P.km ? " (" + esc(P.km) + " km)" : ""}</span><span>${esc(P.del || "Por confirmar")}</span></div>` : ""}
       <div class="fila"><span>Total</span><span class="total">${esc(P.total)}</span></div>
@@ -271,6 +341,17 @@ document.addEventListener("click", e => {
     }
     case "delivery": marcarHecho("delivery", P.modo === "delivery" ? "En camino" : null); pintar(); abrirWA("", mensajeDelivery()); break;
     case "copiar": copiar(textoPedido()); break;
+    case "pegar": {
+      // Intenta leer lo copiado directo; si el teléfono no lo permite, muestra el cuadro para pegar a mano
+      const mostrarCaja = () => { $("#caja-pegar").hidden = false; $("#texto-pegado").focus(); };
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(t => { if (!abrirPedidoPegado(t)) { mostrarCaja(); if (t) $("#error-pegar").textContent = "Lo copiado no parece un pedido. Copia el mensaje completo del pedido y pégalo aquí."; } }, mostrarCaja);
+      } else mostrarCaja();
+      break;
+    }
+    case "leer":
+      if (!abrirPedidoPegado($("#texto-pegado").value)) $("#error-pegar").textContent = "No reconozco ese mensaje. Copia el mensaje completo del pedido (el que empieza con «¡Hola Jireh Sushi!»).";
+      break;
     case "entregado": actualizar({ estado: "Entregado" }); pintar(); avisar("Pedido entregado ✓"); break;
     case "reabrir": actualizar({ estado: "En preparación" }); pintar(); break;
     case "borrar":
