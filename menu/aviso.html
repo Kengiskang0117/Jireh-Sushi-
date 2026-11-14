@@ -23,7 +23,7 @@
 
   Para cambiar algo, busca con Ctrl+F:
   @@AVISOS        Mensajes que se le mandan al cliente
-  @@MINUTOS       Opciones de "Llega en … minutos"
+  @@MINUTOS       Opciones del tiempo de preparación (máximo 50)
   @@DELIVERY-MSG  Mensaje que se manda al grupo de delivery
   @@PEGAR-PEDIDO  Lee el mensaje del pedido copiado de WhatsApp
   @@COLORES       Colores
@@ -58,7 +58,15 @@ h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--suav
 .btn.verde{background:#1E7A45;border-color:#1E7A45;justify-content:center}
 .btn.borde{background:transparent;justify-content:center}
 .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.minutos{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.minutos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.items li{margin-bottom:6px}
+.items li small{display:block;color:var(--suave);font-size:14px;line-height:1.4}
+.items li small.cambio{color:#FFD27A;font-weight:700}
+.reloj{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#2A0E10;border:1px solid #5E1A1E;margin-bottom:14px}
+.reloj b{font-size:34px;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.02em}
+.reloj small{display:block;color:#FFB4B8;font-size:14px}
+.reloj.listo{background:#132219;border-color:#1F5B37}.reloj.listo small{color:#7BE3A0}
+.pedido .tiempo{display:block;margin-top:3px;font-size:13px;font-weight:800;color:#FFD27A;font-variant-numeric:tabular-nums}
 .minutos button{height:52px;border-radius:12px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:17px;font-weight:700;cursor:pointer}
 .minutos button.activo{background:var(--rojo);border-color:var(--rojo)}
 textarea{width:100%;min-height:90px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:12px;margin-bottom:10px;resize:vertical}
@@ -102,8 +110,8 @@ const AVISOS = [
   { clave: "pago",       boton: "💰 Pago recibido",        para: ["delivery","llevar"], estado: null,             texto: "¡Gracias {nombre}! Recibimos tu pago del pedido #{id} ✅" },
   { clave: "gracias",    boton: "❤️ Gracias por tu compra", para: ["delivery","llevar"], estado: null,             texto: "¡Gracias por tu compra, {nombre}! Esperamos que lo disfrutes 🍣 ¡Te esperamos pronto en {negocio}!" }
 ];
-/* @@MINUTOS — opciones del botón "Llega en … minutos" */
-const MINUTOS = [10, 15, 20, 30, 45];
+/* @@MINUTOS — tiempo de preparación que elige el negocio (máximo 50 minutos) */
+const MINUTOS = [10, 15, 20, 25, 30, 35, 40, 50];
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -153,19 +161,23 @@ function mensajeDelivery(){
   m += `Dirección: ${P.dir}${P.ref ? `\nReferencia: ${P.ref}` : ""}\n`;
   if (P.ubic) m += `Ubicación: https://maps.google.com/?q=${P.ubic}\n`;
   if (P.km) m += `Distancia aprox.: ${P.km} km\n`;
-  m += `\n${P.items.split(";").map(x => "• " + x.trim()).join("\n")}\n\n`;
+  m += `\n${listaItems()}\n\n`;
   if (P.pago === "Efectivo") m += `💵 *COBRAR: ${P.total}* en efectivo${P.cambio ? ` (paga con ${P.cambio})` : ""}`;
   else m += `✅ Pago por transferencia${P.banco ? ` (${P.banco})` : ""}: verificar comprobante antes de salir`;
   if (P.notas) m += `\nNotas del cliente: ${P.notas}`;
   m += `\n\nResponde "Lo tomo ✋" si vas tú.`;
   return m;
 }
+/* Productos con sus detalles (cambio de proteína, salsas, notas) uno debajo del otro */
+function listaItems(){
+  return P.items.split(";").filter(Boolean).map(x => { const [nom, det] = x.trim().split(" → "); return "• " + nom + (det ? det.split(" · ").map(d => "\n   " + d).join("") : ""); }).join("\n");
+}
 /* Texto completo del pedido, para el botón "Copiar datos" */
 function textoPedido(){
   let m = `Pedido #${P.id} · ${P.modo === "delivery" ? "Delivery" : "Para llevar"}\n`;
   m += `Cliente: ${P.nombre} · ${P.tel}\n`;
   if (P.modo === "delivery") { m += `Dirección: ${P.dir}${P.ref ? ` (${P.ref})` : ""}\n`; if (P.ubic) m += `Mapa: https://maps.google.com/?q=${P.ubic}\n`; }
-  m += P.items.split(";").map(x => "• " + x.trim()).join("\n") + "\n";
+  m += listaItems() + "\n";
   if (P.modo === "delivery") m += `Subtotal: ${P.sub} · Delivery: ${P.del || "por confirmar"}\n`;
   m += `Total: ${P.total} · Pago: ${P.pago}${P.banco ? " (" + P.banco + ")" : ""}${P.cambio ? " · paga con " + P.cambio : ""}`;
   return m;
@@ -192,8 +204,9 @@ function leerMensaje(texto){
   t.split("\n").forEach(l => {
     const p = l.match(/^\s*•\s*(\d+)\s*x\s*(.+?)\s+—\s+/);
     if (p) { items.push(`${p[1]}x ${p[2]}`); return; }
-    const n = l.match(/^\s+Nota:\s*(.+)$/);
-    if (n && items.length) items[items.length - 1] += ` (${n[1].trim()})`;
+    // Líneas con sangría debajo del producto: cambio de proteína, salsas extra y notas
+    const n = l.match(/^\s{2,}(\S.*)$/);
+    if (n && items.length) { const k = items.length - 1; items[k] += (items[k].includes(" → ") ? " · " : " → ") + n[1].trim(); }
   });
   datos.set("i", items.join("; "));
   const tot = t.match(/Total a pagar:\s*([^*\n]+?)\s*\*?\s*(\+ delivery)?\s*$/mi);
@@ -247,7 +260,7 @@ function pintarLista(){
     </div>
     ${delDia.length ? delDia.map(x => `<a class="pedido${x.estado === "Entregado" ? " entregado" : ""}" href="${esc(x.url)}">
         <span class="num">#${esc(x.id)}</span>
-        <span class="info"><b>${esc(x.nombre)}</b><small>${x.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${esc(x.hora)} · ${esc(x.total)}</small></span>
+        <span class="info"><b>${esc(x.nombre)}</b><small>${x.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${esc(x.hora)} · ${esc(x.total)}</small>${x.fin && x.estado !== "Entregado" ? `<span class="tiempo">⏱️ <span data-fin="${x.fin}">--:--</span></span>` : ""}</span>
         <span class="est">${esc(x.estado)}</span></a>`).join("")
       : `<div class="vacio">Todavía no hay pedidos hoy.<br>Cuando llegue uno por WhatsApp: mantén presionado el mensaje, toca <b>Copiar</b> y luego <b>Pegar pedido nuevo</b>.</div>`}
     ${delDia.length ? `<div class="botones" style="margin-top:18px"><button class="btn borde" data-acc="borrar">🗑️ Borrar la lista de hoy</button></div>` : ""}
@@ -278,19 +291,23 @@ function pintarPedido(){
       ${P.ubic ? `<div class="fila"><span>Ubicación</span><span><a class="enlace" href="https://maps.google.com/?q=${esc(P.ubic)}" target="_blank" rel="noopener">Ver en el mapa</a></span></div>` : ""}` : ""}
       <div class="fila"><span>Pago</span><span>${esc(P.pago)}${P.banco ? " · " + esc(P.banco) : ""}${P.cambio ? " · paga con " + esc(P.cambio) : ""}</span></div>
       ${P.notas ? `<div class="fila"><span>Notas</span><span>${esc(P.notas)}</span></div>` : ""}
-      <ul class="items">${P.items.split(";").filter(Boolean).map(x => `<li>${esc(x.trim())}</li>`).join("")}</ul>
+      <ul class="items">${P.items.split(";").filter(Boolean).map(x => {
+        const [nom, det] = x.trim().split(" → ");
+        return `<li>${esc(nom)}${det ? det.split(" · ").map(d => `<small class="${/^Cambio a/i.test(d) ? "cambio" : ""}">${/^Cambio a/i.test(d) ? "🔁 " : /^Extra/i.test(d) ? "➕ " : ""}${esc(d)}</small>`).join("") : ""}</li>`;
+      }).join("")}</ul>
       ${P.modo === "delivery" ? `<div class="fila"><span>Subtotal</span><span>${esc(P.sub)}</span></div><div class="fila"><span>Delivery${P.km ? " (" + esc(P.km) + " km)" : ""}</span><span>${esc(P.del || "Por confirmar")}</span></div>` : ""}
       <div class="fila"><span>Total</span><span class="total">${esc(P.total)}</span></div>
     </div>
 
+    ${ped.fin ? `<div class="reloj" data-reloj="${ped.fin}"><span style="font-size:30px">⏱️</span><div><b data-fin="${ped.fin}">--:--</b><small>Tiempo de preparación (${ped.minutos} min)</small></div></div>` : ""}
     <h2>Avisar al cliente · se abre su WhatsApp (${esc(P.tel)})</h2>
     <div class="botones">
       ${lista.map(a => `<button class="btn${hechos[a.clave] ? " hecho" : ""}" data-aviso="${a.clave}"><span>${a.boton}</span><span class="ok">✓ Enviado</span></button>`).join("")}
     </div>
 
-    <h2>Tiempo de llegada</h2>
+    <h2>Tiempo de preparación (máximo 50 min)</h2>
     <div class="minutos">${MINUTOS.map(m => `<button class="${m === minutosSel ? "activo" : ""}" data-min="${m}">${m}</button>`).join("")}</div>
-    <div class="botones"><button class="btn${hechos.minutos ? " hecho" : ""}" data-acc="minutos"><span>⏱️ ${P.modo === "delivery" ? "Llega" : "Listo"} en ${minutosSel} minutos</span><span class="ok">✓ Enviado</span></button></div>
+    <div class="botones"><button class="btn${hechos.minutos ? " hecho" : ""}" data-acc="minutos"><span>⏱️ Preparación: ${minutosSel} minutos</span><span class="ok">✓ Enviado</span></button></div>
 
     <h2>Mensaje propio</h2>
     <textarea id="propio" placeholder="Escribe aquí lo que quieras decirle al cliente…"></textarea>
@@ -331,8 +348,12 @@ document.addEventListener("click", e => {
   }
   switch (b.dataset.acc) {
     case "minutos": {
-      const t = P.modo === "delivery" ? `¡${primerNombre}, tu pedido #${P.id} llega en aproximadamente ${minutosSel} minutos! 🛵` : `${primerNombre}, tu pedido #${P.id} estará listo en aproximadamente ${minutosSel} minutos 🍣`;
-      marcarHecho("minutos", null); pintar(); abrirWA(telWA(P.tel), t); break;
+      // Guarda la hora en que debe estar listo y le manda al cliente el enlace del reloj (tiempo.html)
+      const fin = Date.now() + minutosSel * 60000;
+      const reloj = new URL("tiempo.html", location.href).href + "?" + new URLSearchParams({ id: P.id, n: primerNombre, m: P.modo, t: minutosSel, f: Math.round(fin / 1000) }).toString();
+      const t = `¡Hola ${primerNombre}! 🍣 Tu pedido #${P.id} estará listo en aproximadamente ${minutosSel} minutos${P.modo === "delivery" ? " y luego sale para tu casa 🛵" : "."}\n\n⏱️ Mira el tiempo aquí: ${reloj}`;
+      actualizar({ fin, minutos: minutosSel });
+      marcarHecho("minutos", "En preparación"); pintar(); abrirWA(telWA(P.tel), t); break;
     }
     case "propio": {
       const t = $("#propio").value.trim();
@@ -360,6 +381,20 @@ document.addEventListener("click", e => {
   }
 });
 pintar();
+
+/* Reloj en vivo: actualiza cada segundo los tiempos que faltan (sin volver a pintar la página) */
+function mmss(ms){ const t = Math.max(0, Math.round(ms / 1000)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
+setInterval(() => {
+  document.querySelectorAll("[data-fin]").forEach(el => {
+    const falta = Number(el.dataset.fin) - Date.now();
+    el.textContent = falta > 0 ? mmss(falta) : "¡Listo!";
+  });
+  document.querySelectorAll("[data-reloj]").forEach(el => {
+    const listo = Number(el.dataset.reloj) <= Date.now();
+    el.classList.toggle("listo", listo);
+    el.querySelector("small").textContent = listo ? "Ya debe estar listo" : el.querySelector("small").textContent;
+  });
+}, 1000);
 </script>
 </body>
 </html>

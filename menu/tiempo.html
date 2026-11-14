@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tu pedido · Jireh Sushi</title>
+<link rel="icon" type="image/png" sizes="64x64" href="fotos/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="fotos/icono-180.png">
+<meta name="theme-color" content="#0B0B0C">
+<!--
+  =========================================================
+  RELOJ DEL PEDIDO (para el cliente) · Kenmake Soluciones
+  ---------------------------------------------------------
+  - El cliente lo abre desde el mensaje "Tu pedido estará listo en X minutos"
+    que el negocio le manda desde el panel.
+  - Los datos viajan en el enlace: id (pedido), n (nombre), m (delivery/llevar),
+    t (minutos elegidos), f (hora en que debe estar listo).
+  - No necesita base de datos.
+
+  Para cambiar algo, busca con Ctrl+F:
+  @@TEXTOS-RELOJ   Frases que ve el cliente
+  @@COLORES        Colores
+  =========================================================
+-->
+<style>
+/* @@COLORES */
+:root{--fondo:#0B0B0C;--tarjeta:#17171A;--borde:#2A2A2E;--rojo:#E3121B;--rojo-claro:#FF4D55;--texto:#F4F1EC;--suave:#A9A39A;--verde:#2FD47A}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(120% 70% at 50% 0%,#3A0D10 0%,var(--fondo) 60%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px 18px}
+.caja{width:100%;max-width:420px;text-align:center}
+.logo{width:96px;height:96px;border-radius:50%;background:#0B0B0B;border:2px solid var(--rojo);object-fit:cover;box-shadow:0 0 0 6px rgba(227,18,27,.12)}
+h1{font-size:22px;margin:16px 0 4px;font-weight:800}
+.sub{color:var(--suave);margin:0 0 22px;font-size:15px}
+.anillo{position:relative;width:260px;height:260px;margin:0 auto 22px}
+.anillo svg{width:100%;height:100%;transform:rotate(-90deg)}
+.anillo circle{fill:none;stroke-width:14}
+.anillo .base{stroke:#2A2A2E}
+.anillo .barra{stroke:var(--rojo);stroke-linecap:round;transition:stroke-dashoffset 1s linear,stroke .4s}
+.anillo.listo .barra{stroke:var(--verde)}
+.centro{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.centro b{font-size:58px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em;line-height:1}
+.centro small{color:var(--suave);font-size:14px;margin-top:8px}
+.anillo.listo .centro b{font-size:40px;color:var(--verde)}
+.pasos{display:flex;justify-content:space-between;gap:6px;margin:0 0 20px;padding:14px;border-radius:16px;background:var(--tarjeta);border:1px solid var(--borde)}
+.paso{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;color:var(--suave)}
+.paso i{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#222226;font-style:normal;font-size:16px}
+.paso.on{color:var(--texto);font-weight:700}
+.paso.on i{background:var(--rojo)}
+.paso.ok i{background:#1E7A45}
+.nota{color:var(--suave);font-size:14px;line-height:1.5;margin:0}
+.pie{color:#6E6862;font-size:12px;margin-top:22px}
+.error{padding:30px 10px;color:var(--suave)}
+</style>
+</head>
+<body>
+<main class="caja" id="app"></main>
+
+<script>
+/* @@TEXTOS-RELOJ */
+const TEXTOS = {
+  negocio: "Jireh Sushi",
+  preparando: "Estamos preparando tu pedido",
+  listoLlevar: "¡Tu pedido está listo! Puedes pasar a buscarlo 🙌",
+  listoDelivery: "¡Tu pedido está listo! Ya sale para tu casa 🛵",
+  nota: "Te avisaremos por WhatsApp cualquier novedad. El tiempo es aproximado."
+};
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const q = new URLSearchParams(location.search);
+const id = q.get("id") || "", nombre = q.get("n") || "", delivery = q.get("m") === "delivery";
+const total = Math.min(50, Math.max(1, Number(q.get("t")) || 30)) * 60000;   // minutos elegidos (máximo 50)
+const fin = Number(q.get("f")) * 1000;                                          // hora en que debe estar listo
+
+const R = 116, C = 2 * Math.PI * R;
+if (!id || !fin) {
+  document.getElementById("app").innerHTML = `<img class="logo" src="fotos/logo.png" alt=""><p class="error">Este enlace no tiene un pedido. Pídele al negocio que te lo envíe de nuevo.</p>`;
+} else {
+  document.getElementById("app").innerHTML = `
+    <img class="logo" src="fotos/logo.png" alt="${esc(TEXTOS.negocio)}">
+    <h1>${nombre ? esc(nombre) + ", t" : "T"}u pedido #${esc(id)}</h1>
+    <p class="sub" id="frase">${esc(TEXTOS.preparando)}</p>
+    <div class="anillo" id="anillo">
+      <svg viewBox="0 0 260 260" aria-hidden="true"><circle class="base" cx="130" cy="130" r="${R}"/><circle class="barra" id="barra" cx="130" cy="130" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
+      <div class="centro"><b id="tiempo">--:--</b><small id="debajo">minutos aprox.</small></div>
+    </div>
+    <div class="pasos">
+      <div class="paso ok"><i>✓</i>Recibido</div>
+      <div class="paso on" id="p2"><i>👨‍🍳</i>Preparando</div>
+      <div class="paso" id="p3"><i>${delivery ? "🛵" : "🙌"}</i>${delivery ? "En camino" : "Listo"}</div>
+    </div>
+    <p class="nota">${esc(TEXTOS.nota)}</p>
+    <div class="pie">${esc(TEXTOS.negocio)} · Kenmake Soluciones</div>`;
+
+  const $ = s => document.getElementById(s);
+  function tick(){
+    const falta = fin - Date.now();
+    if (falta <= 0) {
+      $("anillo").classList.add("listo");
+      $("barra").style.strokeDashoffset = 0;
+      $("tiempo").textContent = "¡Listo!";
+      $("debajo").textContent = "";
+      $("frase").textContent = delivery ? TEXTOS.listoDelivery : TEXTOS.listoLlevar;
+      $("p2").className = "paso ok"; $("p2").querySelector("i").textContent = "✓";
+      $("p3").className = "paso on";
+      return;
+    }
+    const seg = Math.ceil(falta / 1000);
+    $("tiempo").textContent = String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0");
+    const avance = Math.min(1, Math.max(0, 1 - falta / total));
+    $("barra").style.strokeDashoffset = C * (1 - avance);
+    setTimeout(tick, 1000);
+  }
+  tick();
+}
+</script>
+</body>
+</html>

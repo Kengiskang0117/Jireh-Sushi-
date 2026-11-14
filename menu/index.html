@@ -23,7 +23,9 @@
   @@REBAJAS        Cómo poner rebaja a un producto
   @@MENU           Inicio de la lista de productos
   @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@EMPANIZADOS
-  @@SUSHI-BURGER  @@SIN-ARROZ  @@PARA-PICAR  @@BEBIDAS
+  @@HAND-ROLLS  @@SUSHI-BURGER  @@SIN-ARROZ  @@PARA-PICAR  @@BEBIDAS
+  @@CAMBIO-PROTEINA  Cambios de proteína y su precio (salmón, camarón…)
+  @@SALSAS-EXTRA     Salsas extra y su precio
 
   APARIENCIA
   @@COLORES        Colores de la página
@@ -224,6 +226,11 @@ img{display:block;max-width:100%}
 .opciones{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .opcion{height:48px;border-radius:12px;border:1px solid var(--borde);background:var(--tarjeta);color:#C9C3B8;font-weight:700;font-size:14px}
 .opcion.activa{border-color:var(--acento-texto);background:var(--acento-oscuro);color:var(--acento-texto)}
+/* @@ESTILO-EXTRAS — cambio de proteína y salsas */
+.opciones.extras{grid-template-columns:repeat(3,1fr)}
+.opciones.extras .opcion{height:auto;min-height:54px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.2;cursor:pointer}
+.opciones.extras .opcion small{font-size:11.5px;font-weight:600;opacity:.8}
+@media (max-width:360px){.opciones.extras{grid-template-columns:repeat(2,1fr)}}
 /* @@ESTILO-PAGOS — bancos y ubicación */
 .bancos{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--tarjeta);border:1px solid var(--borde)}
 .bancos-tit{margin:0;font-size:13px;color:#C9C3B8}
@@ -425,8 +432,6 @@ img{display:block;max-width:100%}
 </header>
 
 <main>
-  <!-- @@AVISO-PRUEBAS: borrar esta línea el día que se publique oficialmente -->
-  <div style="background:#2A0E10;border-bottom:1px solid #5E1A1E;color:#FFB4B8;text-align:center;font-size:12.5px;padding:8px 16px">Página en pruebas · Precios por confirmar</div>
   <div class="contenedor">
     <div class="retiro">
       <span id="modo-icono"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4D55" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg></span>
@@ -536,9 +541,38 @@ const DESTACADO = "eby-banana";     // @@DESTACADO  Producto que sale grande arr
    Para quitar la rebaja, borra "rebaja" o "precioAntes". La etiqueta "-15%" sale sola. */
 /* Para poner una foto: guarda la imagen en la carpeta "fotos" y escribe img: "fotos/nombre.jpg"
    Mientras no haya foto, se muestra una ilustración de la categoría (arte: burger, parrilla, pollo, papas, bebida, postre) */
+/* ================= @@CAMBIO-PROTEINA =================
+   El cliente puede cambiar la proteína del roll. Se suma el precio del cambio.
+   "secciones": en qué categorías sale la opción (los id de las secciones de abajo). */
+const CAMBIO_PROTEINA = {
+  secciones: ["rolls-casa", "california", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz"],
+  opciones: [
+    { nombre: "Salmón",   precio: 250 },
+    { nombre: "Camarón",  precio: 250 },
+    { nombre: "Pollo",    precio: 170 },
+    { nombre: "Cangrejo", precio: 200 }
+  ]
+};
+/* ================= @@SALSAS-EXTRA =================
+   Salsas y extras (wasabi, jengibre). Salen para elegir dentro de cada producto
+   y también solas en "Bebidas y extras", con su foto y descripción. */
+const SALSAS_EXTRA = {
+  secciones: ["cajas", "rolls-casa", "california", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz", "para-picar"],
+  opciones: [
+    { nombre: "Soya (3 und)",     precio: 50, img: "fotos/salsa-soya.jpg",       desc: "3 unidades de soya premium." },
+    { nombre: "Salsa teriyaki",   precio: 40, img: "fotos/salsa-teriyaki.jpg",   desc: "Salsa dulce para rolls empanizados y langostinos." },
+    { nombre: "Salsa spicy",      precio: 50, img: "fotos/salsa-spicy.jpg",      desc: "Salsa mayo picante." },
+    { nombre: "Salsa fuji",       precio: 50, img: "fotos/salsa-fuji.jpg",       desc: "Salsa de miel para rolls empanizados." },
+    { nombre: "Salsa acevichada", precio: 60, img: "fotos/salsa-acevichada.jpg", desc: "Salsa de la casa, ideal para rolls acevichados." },
+    { nombre: "Salsa anguila",    precio: 60,                                    desc: "Salsa dulce de anguila." },
+    { nombre: "Wasabi",           precio: 50, img: "fotos/wasabi.jpg",           desc: "Condimento picante japonés, ideal para el sushi." },
+    { nombre: "Jengibre",         precio: 50, img: "fotos/jengibre.jpg",         desc: "Limpia el paladar entre bocado y bocado para apreciar cada sabor." }
+  ]
+};
+
 /* ================= @@MENU — PRODUCTOS ================= */
 const MENU = [
-  /* PRECIOS DE EJEMPLO: cambiarlos por los reales del cliente */
+  /* Precios reales del negocio */
   /* ---------- @@CAJAS (19 combos reales del catálogo, por piezas y precio) ---------- */
   { id:"cajas", nombre:"Combos", tab:"Combos", arte:"burger", sub:"Combina tus rolls favoritos. Cada roll trae 8 piezas.", grupos:[
     { titulo:"16 piezas", items:[
@@ -572,12 +606,13 @@ const MENU = [
   /* ---------- @@ROLLS-CASA ---------- */
   { id:"rolls-casa", nombre:"Rolls de la casa", tab:"De la casa", arte:"burger", sub:"Nuestras creaciones, con Frescura Sagrada.", grupos:[{ items:[
     { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:710, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
-    { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:495, desc:"Pollo empanizado y queso crema, cubierto de plátano maduro.", img:"fotos/chicken-aplatanao.jpg" }
+    { id:"cheddar-roll", nombre:"Cheddar Roll", precio:720, desc:"Empanizado, relleno de pollo empanizado, queso crema y plátano maduro, bañado en queso cheddar y tocino. 8 unidades.", img:"fotos/cheddar-roll.jpg" },
+    { id:"chicken-aplatanao", nombre:"Chicken Banana Roll", tag:"NUEVO", precio:610, desc:"Pollo empanizado, queso crema y puerro, envuelto en plátano maduro. 8 unidades.", img:"fotos/chicken-aplatanao.jpg" }
   ]}]},
   /* ---------- @@CALIFORNIA ---------- */
   { id:"california", nombre:"California", tab:"California", arte:"burger", grupos:[{ items:[
     { id:"california-camaron", oculto:true, nombre:"California Camarón", precio:null, desc:"Camarón y aguacate, cubierto de ajonjolí.", img:"fotos/california-camaron.jpg" },   // ⚠️ precio pendiente
-    { id:"california-green", nombre:"California Green Roll", precio:395, desc:"Pollo crujiente, queso crema y aguacate, cubierto de cebollín.", img:"fotos/california-green.jpg" },
+    { id:"california-green", nombre:"Green Roll", precio:470, desc:"Pollo empanizado, queso crema y aguacate, envuelto en puerro. 8 unidades.", img:"fotos/california-green.jpg" },
     { id:"california-roll", oculto:true, nombre:"California Roll", precio:350, desc:"Kani, aguacate y pepino, cubierto de ajonjolí.", img:"fotos/california.jpg" },
     { id:"avocado-roll", oculto:true, nombre:"Avocado Roll", precio:450, desc:"Camarón tempura y queso crema, cubierto de láminas de aguacate.", img:"fotos/avocado.jpg" }
   ]}]},
@@ -596,17 +631,25 @@ const MENU = [
     { id:"hot-spicyyaki", nombre:"Hot Spicyyaki", precio:690, desc:"Camarón, queso crema y puerro, empanizado, con salsa spicy y teriyaki. 8 unidades.", img:"fotos/hot-spicyyaki.jpg" },
     { id:"vip-hot", nombre:"VIP Hot", precio:700, desc:"Salmón, camarón empanizado, queso crema y puerro. 8 unidades.", img:"fotos/vip-hot.jpg" },
     { id:"mar-y-tierra", nombre:"Mar y Tierra", precio:710, desc:"Camarón empanizado, queso crema y puerro, cubierto de pollo empanizado y salsa teriyaki. 8 unidades.", img:"fotos/mar-y-tierra.jpg" },
-    { id:"cheddar-roll", nombre:"Cheddar Roll", precio:720, desc:"Empanizado, relleno de pollo empanizado, queso crema y plátano maduro, bañado en queso cheddar y tocino. 8 unidades.", img:"fotos/cheddar-roll.jpg" },
     { id:"duo-roll", nombre:"Dúo Roll", precio:720, desc:"Salmón, camarón y queso crema, empanizado, cubierto de salsa teriyaki. 8 unidades.", img:"fotos/duo-roll.jpg" },
     { id:"felipe-roll", nombre:"Felipe Roll", precio:720, desc:"Salmón, queso crema, aguacate y puerro, envuelto en alga nori, empanizado, con salsa teriyaki. 8 unidades.", img:"fotos/felipe-roll.jpg" },
     { id:"hot-camaron-acevichado", nombre:"Hot Camarón Acevichado", precio:725, desc:"Camarón, queso crema y aguacate, empanizado, bañado en salsa acevichada. 8 unidades.", img:"fotos/hot-camaron-acevichado.jpg" },
     { id:"ebysake-acevichado", nombre:"Ebysake Acevichado", precio:750, desc:"Relleno de camarón, queso crema y puerro, empanizado, con topping de salmón, salsa acevichada y un toque de shichimi. 8 unidades.", img:"fotos/ebysake-acevichado.jpg" },
     { id:"natali-roll", nombre:"Natali Roll", precio:750, desc:"Camarón empanizado y aguacate, envuelto en alga nori y empanizado, con topping de salmón y chispa de togarashi. 8 unidades.", img:"fotos/natali-roll.jpg" }
   ]}]},
+  /* ---------- @@HAND-ROLLS (precios reales) ---------- */
+  { id:"hand-rolls", nombre:"Hand Rolls", tab:"Hand Rolls", arte:"burger", sub:"Rolls empanizados enteros, sin cortar.", grupos:[{ items:[
+    { id:"hand-roll-pollo", nombre:"Hand Roll Pollo", precio:380, desc:"Pollo empanizado, queso crema y puerro. Empanizado, sin corte.", img:"fotos/hand-roll-pollo.jpg" },
+    { id:"hand-roll-cangrejo", nombre:"Hand Roll Cangrejo", precio:450, desc:"Palito de cangrejo, puerro y queso crema. Empanizado, sin corte.", img:"fotos/hand-roll-cangrejo.jpg" },
+    { id:"hand-roll-camaron", nombre:"Hand Roll Camarón", precio:495, desc:"Camarón, puerro y queso crema. Empanizado, sin corte.", img:"fotos/hand-roll-camaron.jpg" },
+    { id:"hand-roll-salmon", nombre:"Hand Roll Salmón", precio:530, desc:"Salmón, queso crema y puerro. Empanizado, sin corte.", img:"fotos/hand-roll-salmon.jpg" }
+  ]}]},
   /* ---------- @@SUSHI-BURGER ---------- */
-  { id:"sushi-burger", nombre:"Sushi Burger", tab:"Sushi Burger", arte:"burger", grupos:[{ items:[
-    { id:"sushi-burger-pollo", nombre:"Sushi Burger de Pollo", tag:"NUEVO", precio:550, desc:"Pan de arroz empanizado con pollo crujiente, aguacate y queso crema.", img:"fotos/sushi-burger-pollo.jpg" },
-    { id:"sushi-burger-salmon", oculto:true, nombre:"Sushi Burger de Salmón", precio:595, desc:"Pan de arroz crujiente con salmón, aguacate y queso crema.", img:"fotos/sushi-burger.jpg" }
+  { id:"sushi-burger", nombre:"Sushi Burger", tab:"Sushi Burger", arte:"burger", sub:"Burger de arroz empanizada, bien rellena.", grupos:[{ items:[
+    { id:"burger-pollo", nombre:"Burger Pollo", precio:730, desc:"Rellena de pollo empanizado, aguacate, puerro, cebolla morada y queso crema.", img:"fotos/burger-pollo.jpg" },
+    { id:"burger-pollo-camaron", nombre:"Burger Pollo-Camarón", precio:780, desc:"Queso crema, puerro, cebolla morada, pollo, camarón y aguacate.", img:"fotos/burger-pollo-camaron.jpg" },
+    { id:"burger-salmon", nombre:"Burger Salmón", precio:780, desc:"Queso crema, puerro, cebolla, salmón fresco y aguacate.", img:"fotos/burger-salmon.jpg" },
+    { id:"burger-mixta", nombre:"Burger Mixta", precio:795, desc:"Camarón empanizado, salmón, puerro, aguacate, queso crema y cebolla morada.", img:"fotos/burger-mixta.jpg" }
   ]}]},
   /* ---------- @@SIN-ARROZ ---------- */
   { id:"sin-arroz", nombre:"Sin arroz y Hosomaki", tab:"Sin arroz", arte:"burger", grupos:[{ items:[
@@ -623,10 +666,12 @@ const MENU = [
   ]}]},
   /* ---------- @@BEBIDAS ---------- */
   { id:"bebidas", nombre:"Bebidas y extras", tab:"Bebidas", arte:"bebida", chico:true, grupos:[{ items:[
-    { id:"coca-cola", nombre:"Coca-Cola", precio:75, img:"fotos/coca-cola.jpg" },
-    { id:"agua", nombre:"Agua", precio:50, img:"fotos/agua.jpg" },
-    { id:"soya-extra", nombre:"Salsa de soya extra", precio:25, img:"fotos/soya.jpg" }
-  ]}]}
+    { id:"coca-cola", nombre:"Coca-Cola 591 ml", precio:100, desc:"Refresco Coca-Cola original.", img:"fotos/coca-cola.jpg" },
+    { id:"7up", nombre:"Refresco 7 Up", precio:60, desc:"Refresco de lima-limón." },
+    { id:"agua", nombre:"Agua Planeta Azul", precio:30, desc:"Agua purificada.", img:"fotos/agua.jpg" }
+  ]},
+  { titulo:"Salsas y extras", items: SALSAS_EXTRA.opciones.map(o => ({ id: "extra-" + o.nombre.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""), nombre: o.nombre, precio: o.precio, desc: o.desc, img: o.img })) }
+  ]}
 ];
 
 /* Ilustraciones que se muestran mientras no haya foto */
@@ -664,6 +709,11 @@ MENU.forEach(sec => sec.grupos.forEach(g => { g.items = g.items.filter(p => !p.o
 MENU.forEach(sec => { sec.grupos = sec.grupos.filter(g => g.items.length); });
 for (let i = MENU.length - 1; i >= 0; i--) if (!MENU[i].grupos.length) MENU.splice(i, 1);
 const PRODUCTOS = {};
+// Qué productos tienen cambio de proteína y salsas extra (según la sección)
+MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => {
+  p.cambioProteina = CAMBIO_PROTEINA.secciones.includes(sec.id);
+  p.salsasExtra = SALSAS_EXTRA.secciones.includes(sec.id);
+})));
 MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => { PRODUCTOS[p.id] = { ...p, chico: !!sec.chico, arte: sec.arte }; })));
 
 const ICONO_MAS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
@@ -763,14 +813,28 @@ let carrito = [];
 try { carrito = JSON.parse(localStorage.getItem("carrito-" + NEGOCIO.nombre) || "[]").filter(l => PRODUCTOS[l.id]); } catch(e) { carrito = []; }
 function guardar(){ try { localStorage.setItem("carrito-" + NEGOCIO.nombre, JSON.stringify(carrito)); } catch(e) {} }
 const totalArticulos = () => carrito.reduce((a, l) => a + l.cant, 0);
-const totalDinero = () => carrito.reduce((a, l) => a + l.cant * PRODUCTOS[l.id].precio, 0);
+/* Precio de una unidad con su cambio de proteína y sus salsas extra */
+function precioCambio(nombre){ const o = CAMBIO_PROTEINA.opciones.find(x => x.nombre === nombre); return o ? o.precio : 0; }
+function precioSalsa(nombre){ const o = SALSAS_EXTRA.opciones.find(x => x.nombre === nombre); return o ? o.precio : 0; }
+function precioUnidad(l){ return PRODUCTOS[l.id].precio + precioCambio(l.prot) + (l.salsas || []).reduce((a, x) => a + precioSalsa(x), 0); }
+/* Detalles de la línea (para el carrito, el mensaje y el panel) */
+function detallesLinea(l){
+  const p = PRODUCTOS[l.id], d = [];
+  if (p.cambioProteina) d.push(l.prot ? `Cambio a ${l.prot.toLowerCase()} (+${dinero(precioCambio(l.prot))})` : "Proteína normal (sin cambio)");
+  (l.salsas || []).forEach(x => d.push(`Extra: ${x} (+${dinero(precioSalsa(x))})`));
+  if (l.nota) d.push(`Nota: ${l.nota}`);
+  return d;
+}
+const totalDinero = () => carrito.reduce((a, l) => a + l.cant * precioUnidad(l), 0);
 
 /* @@OPCIONES — un producto puede tener opciones: opciones:["Fritas","Al vapor"].
    La opción elegida se guarda en la línea del carrito (op) y sale junto al nombre. */
 function nombreLinea(l){ return PRODUCTOS[l.id].nombre + (l.op ? ` (${l.op})` : ""); }
-function agregar(id, cant, nota, op){
-  const linea = carrito.find(l => l.id === id && (l.nota || "") === (nota || "") && (l.op || "") === (op || ""));
-  if (linea) linea.cant += cant; else carrito.push({ id, cant, nota: nota || "", op: op || "" });
+function agregar(id, cant, nota, op, prot, salsas){
+  salsas = salsas || [];
+  const igual = l => l.id === id && (l.nota || "") === (nota || "") && (l.op || "") === (op || "") && (l.prot || "") === (prot || "") && (l.salsas || []).join("|") === salsas.join("|");
+  const linea = carrito.find(igual);
+  if (linea) linea.cant += cant; else carrito.push({ id, cant, nota: nota || "", op: op || "", prot: prot || "", salsas });
   guardar(); actualizarCarrito();
   avisar(`Agregado: ${PRODUCTOS[id].nombre}${cant > 1 ? " × " + cant : ""}`);
 }
@@ -835,8 +899,8 @@ function htmlCarrito(){
     return `<div class="item-carrito">
       <div class="foto">${fotoHTML(p)}</div>
       <div class="info">
-        <div class="arriba"><span>${esc(nombreLinea(l))}</span><span class="precio">${dinero(p.precio * l.cant)}</span></div>
-        ${l.nota ? `<div class="nota">Nota: ${esc(l.nota)}</div>` : ""}
+        <div class="arriba"><span>${esc(nombreLinea(l))}</span><span class="precio">${dinero(precioUnidad(l) * l.cant)}</span></div>
+        ${detallesLinea(l).map(x => `<div class="nota">${esc(x)}</div>`).join("")}
         <div class="abajo">
           <div class="cantidad"><button data-acc="menos" data-i="${i}" aria-label="Quitar uno">−</button><span>${l.cant}</span><button data-acc="mas" data-i="${i}" aria-label="Agregar uno">+</button></div>
           <button class="quitar" data-acc="quitar" data-i="${i}">Eliminar</button>
@@ -954,7 +1018,7 @@ function enviarACocina(raiz){
   const d = validar(raiz, true); if (!d) return;
   const pedido = {
     id: Date.now().toString(36), mesa: d.mesa.trim(), nombre: d.nombre.trim(), pago, notas: d.notas.trim(),
-    items: carrito.map(l => ({ nombre: nombreLinea(l), cant: l.cant, nota: l.nota, precio: PRODUCTOS[l.id].precio })),
+    items: carrito.map(l => ({ nombre: nombreLinea(l), cant: l.cant, nota: detallesLinea(l).join(" · "), precio: precioUnidad(l) })),
     total: totalDinero(), creado: Date.now(), estado: "nuevo"
   };
   let lista = [];
@@ -970,7 +1034,7 @@ function enviarPedido(raiz){
   const d = validar(raiz, false); if (!d) return;
   const lineas = carrito.map(l => {
     const p = PRODUCTOS[l.id];
-    return `• ${l.cant} x ${nombreLinea(l)} — ${dinero(p.precio * l.cant)}${l.nota ? `\n   Nota: ${l.nota}` : ""}`;
+    return `• ${l.cant} x ${nombreLinea(l)} — ${dinero(precioUnidad(l) * l.cant)}` + detallesLinea(l).map(x => `\n   ${x}`).join("");
   }).join("\n");
   const servicio = modo === "local" ? `para comer en el local${d.mesa.trim() ? " (mesa " + d.mesa.trim() + ")" : ""}` : modo === "delivery" ? "para delivery" : "para llevar";
   let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${lineas}\n\n`;
@@ -1001,7 +1065,7 @@ function enviarPedido(raiz){
     const b = NEGOCIO.bancos[bancoSel];
     const datos = new URLSearchParams({
       id: idPedido, n: d.nombre.trim(), t: d.tel.trim(), m: modo === "delivery" ? "delivery" : "llevar",
-      i: carrito.map(l => `${l.cant}x ${nombreLinea(l)}`).join("; "),
+      i: carrito.map(l => `${l.cant}x ${nombreLinea(l)}` + (detallesLinea(l).length ? " → " + detallesLinea(l).join(" · ") : "")).join("; "),
       tt: dinero(totalConDelivery()) + (modo === "delivery" && !(ubic && !ubic.lejos) ? " + delivery" : ""),
       p: pago
     });
@@ -1055,10 +1119,11 @@ function escribirDatos(e){ if (e.target.closest("#f-nombre,#f-tel,#f-cambio,#f-m
 $("#carrito-movil").addEventListener("click", clicCarrito);
 
 /* ---------- Ventana de detalle ---------- */
-let detalleCant = 1, detalleOp = "", ultimoFoco = null;
+let detalleCant = 1, detalleOp = "", detalleProt = "", detalleSalsas = [], ultimoFoco = null;
+function precioDetalle(p){ return p.precio + precioCambio(detalleProt) + detalleSalsas.reduce((a, x) => a + precioSalsa(x), 0); }
 function abrirDetalle(id){
   const p = PRODUCTOS[id]; detalleCant = 1; ultimoFoco = document.activeElement;
-  detalleOp = p.opciones ? p.opciones[0] : "";
+  detalleOp = p.opciones ? p.opciones[0] : ""; detalleProt = ""; detalleSalsas = [];
   const sinPrecio = p.precio == null;
   $("#detalle").innerHTML = `
     <div class="agarre"><span></span></div>
@@ -1073,6 +1138,15 @@ function abrirDetalle(id){
       ${p.opciones ? `<div class="campo" style="margin-top:8px"><span class="lbl">Elige cómo lo quieres</span>
         <div class="opciones" role="radiogroup" aria-label="Opciones" style="grid-template-columns:repeat(${Math.min(p.opciones.length, 3)},1fr)">
           ${p.opciones.map(o => `<button class="opcion${o === detalleOp ? " activa" : ""}" role="radio" aria-checked="${o === detalleOp}" data-acc="op" data-v="${esc(o)}">${esc(o)}</button>`).join("")}
+        </div></div>` : ""}
+      ${p.cambioProteina && !sinPrecio ? `<div class="campo" style="margin-top:8px"><span class="lbl">¿Quieres cambiar la proteína?</span>
+        <div class="opciones extras" role="radiogroup" aria-label="Cambio de proteína">
+          <button class="opcion activa" role="radio" aria-checked="true" data-acc="prot" data-v="">Normal<small>Sin cambio</small></button>
+          ${CAMBIO_PROTEINA.opciones.map(o => `<button class="opcion" role="radio" aria-checked="false" data-acc="prot" data-v="${esc(o.nombre)}">${esc(o.nombre)}<small>+${dinero(o.precio)}</small></button>`).join("")}
+        </div></div>` : ""}
+      ${p.salsasExtra && !sinPrecio ? `<div class="campo" style="margin-top:8px"><span class="lbl">Salsas y extras (opcional)</span>
+        <div class="opciones extras">
+          ${SALSAS_EXTRA.opciones.map(o => `<button class="opcion" aria-pressed="false" data-acc="salsa" data-v="${esc(o.nombre)}">${esc(o.nombre)}<small>+${dinero(o.precio)}</small></button>`).join("")}
         </div></div>` : ""}
       <div class="campo" style="margin-top:8px"><label for="det-nota">Notas para la cocina (opcional)</label><textarea id="det-nota" rows="2" placeholder="Ej.: sin cebolla, término medio…"></textarea></div>
     </div>
@@ -1095,9 +1169,19 @@ $("#detalle").addEventListener("click", e => {
     $("#detalle").querySelectorAll('[data-acc="op"]').forEach(x => { const on = x.dataset.v === detalleOp; x.classList.toggle("activa", on); x.setAttribute("aria-checked", on); });
     return;
   }
-  if (b.dataset.acc === "agregar") { agregar(p.id, detalleCant, $("#det-nota").value.trim(), detalleOp); return cerrarTodo(); }
+  if (b.dataset.acc === "prot") {
+    detalleProt = b.dataset.v;
+    $("#detalle").querySelectorAll('[data-acc="prot"]').forEach(x => { const on = x.dataset.v === detalleProt; x.classList.toggle("activa", on); x.setAttribute("aria-checked", on); });
+  }
+  if (b.dataset.acc === "salsa") {
+    const v = b.dataset.v, i = detalleSalsas.indexOf(v);
+    if (i >= 0) detalleSalsas.splice(i, 1); else detalleSalsas.push(v);
+    detalleSalsas = SALSAS_EXTRA.opciones.map(o => o.nombre).filter(n => detalleSalsas.includes(n));   // siempre en el mismo orden
+    b.classList.toggle("activa", i < 0); b.setAttribute("aria-pressed", i < 0);
+  }
+  if (b.dataset.acc === "agregar") { agregar(p.id, detalleCant, $("#det-nota").value.trim(), detalleOp, detalleProt, detalleSalsas.slice()); return cerrarTodo(); }
   $("#det-cant").textContent = detalleCant;
-  if (p.precio != null) $("#det-agregar").textContent = "Agregar · " + dinero(p.precio * detalleCant);
+  if (p.precio != null) $("#det-agregar").textContent = "Agregar · " + dinero(precioDetalle(p) * detalleCant);
 });
 
 /* ---------- Abrir y cerrar ventanas ---------- */

@@ -67,6 +67,10 @@ Cada archivo tiene un **índice al inicio**. Para encontrar algo, busca con **Ct
 | Mensajes de aviso al cliente | `menu/aviso.html` | `@@AVISOS` |
 | Mensaje para el delivery | `menu/aviso.html` | `@@DELIVERY-MSG` |
 | Leer el pedido pegado de WhatsApp | `menu/aviso.html` | `@@PEGAR-PEDIDO` |
+| Cambios de proteína y precios | `menu/index.html` | `@@CAMBIO-PROTEINA` |
+| Salsas extra y precios | `menu/index.html` | `@@SALSAS-EXTRA` |
+| Tiempos de preparación (máx. 50) | `menu/aviso.html` | `@@MINUTOS` |
+| Reloj del pedido para el cliente | `menu/tiempo.html` | `@@TEXTOS-RELOJ` |
 | Enlace del panel en el mensaje (apagado) | `menu/index.html` | `@@PANEL-AVISOS` |
 | Ícono de la pestaña | los 3 archivos `.html` | `@@ICONO` (imágenes en `menu/fotos/favicon.png` e `icono-180.png`) |
 
