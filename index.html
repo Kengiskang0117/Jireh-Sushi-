@@ -213,12 +213,12 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
     <div class="contenedor">
       <div class="titulo-seccion"><h2>Nuestro <em>Menú</em></h2><div class="raya"></div><p>Toca una categoría para ver los productos y armar tu pedido.</p></div>
       <div class="categorias">
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/mixta-16.jpg" alt="" loading="lazy"><b>Combos</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/eby-banana.jpg" alt="" loading="lazy"><b>Rolls de la casa</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hand-roll-salmon.jpg" alt="" loading="lazy"><b>Hand Rolls</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Empanizados</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/burger-pollo.jpg" alt="" loading="lazy"><b>Sushi Burger</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/tiritas-pollo.jpg" alt="" loading="lazy"><b>Para picar</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/mixta-16.jpg" alt="" loading="lazy"><b>Combos Sagrados</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/eby-banana.jpg" alt="" loading="lazy"><b>Rolls de la casa</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Colección HOT</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hand-roll-salmon.jpg" alt="" loading="lazy"><b>Hand Rolls</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/burger-pollo.jpg" alt="" loading="lazy"><b>Sushi Burger</b></a>
       </div>
       <div class="centro"><a class="btn rojo js-menu" href="menu/index.html">Ver el menú completo y ordenar</a></div>
     </div>
@@ -296,13 +296,14 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
 /* @@NEGOCIO */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
-  whatsapp: "19785664534",          // PRUEBAS: llega al número de Kenmake. Al publicar, cambiar a 18493604892
+  whatsapp: "19785664534",          // PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
   telefono: "(849) 360-4892",
-  direccion: "Carretera Mella, Hainamosa · SDE",
+  direccion: "Calle Central #18, Ana Teresa Balaguer",
+  direccionCompleta: "Calle Central #18, Ana Teresa Balaguer, Hainamosa, Santo Domingo Este",
   mapa: "https://www.google.com/maps/search/?api=1&query=Jireh+sushi+Rd&query_place_id=ChIJx40rD8SHr44R7_ZfhKZl_YU",
   menu: "menu/index.html",
-  horario: { abre: "13:00", cierra: "20:30", cierraDia: { 0: "19:45" } },   // Mar–Sáb hasta 8:30 PM · domingo hasta 7:45 PM
-  diasCerrado: [1]                  // 1 = lunes
+  horario: { abre: "13:00", cierra: "20:00", cierraDia: {} },   // martes a domingo 1:00–8:00 PM
+  diasCerrado: [1]                  // 1 = lunes cerrado
 };
 
 const $ = s => document.querySelector(s);
@@ -311,7 +312,7 @@ document.querySelectorAll(".js-wa").forEach(a => a.href = wa(`¡Hola ${NEGOCIO.n
 document.querySelectorAll(".js-menu").forEach(a => a.href = NEGOCIO.menu);
 $("#c-direccion").textContent = NEGOCIO.direccion;
 $("#c-telefono").textContent = NEGOCIO.telefono;
-$("#mapa").href = NEGOCIO.mapa || "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(NEGOCIO.nombre + " " + NEGOCIO.direccion);
+$("#mapa").href = NEGOCIO.mapa || "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(NEGOCIO.nombre + " " + (NEGOCIO.direccionCompleta || NEGOCIO.direccion));
 $("#anio").textContent = new Date().getFullYear();
 
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];

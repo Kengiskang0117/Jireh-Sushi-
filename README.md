@@ -71,6 +71,7 @@ Cada archivo tiene un **índice al inicio**. Para encontrar algo, busca con **Ct
 | Salsas extra y precios | `menu/index.html` | `@@SALSAS-EXTRA` |
 | Tiempos de preparación (máx. 50) | `menu/aviso.html` | `@@MINUTOS` |
 | Reloj del pedido para el cliente | `menu/tiempo.html` | `@@TEXTOS-RELOJ` |
+| Sugerencias de dirección (lista de sectores) | `menu/index.html` | `@@SUGERENCIAS-DIRECCION` |
 | Enlace del panel en el mensaje (apagado) | `menu/index.html` | `@@PANEL-AVISOS` |
 | Ícono de la pestaña | los 3 archivos `.html` | `@@ICONO` (imágenes en `menu/fotos/favicon.png` e `icono-180.png`) |
 
@@ -120,3 +121,15 @@ HTML, CSS y JavaScript, sin librerías ni servidor. Funciona en cualquier hostin
 
 **Diseño y desarrollo:** [Kenmake Soluciones](https://github.com/Kengiskang0117) · Menús digitales · Páginas web · Edición de video
 © 2026 Jireh Sushi. Todos los derechos reservados.
+
+
+## Etapa 2: pedidos en vivo con Firebase
+| Archivo | Para qué |
+|---|---|
+| `menu/fb.js` | Conexión con Firebase (`@@CONFIG`). La usan las 3 páginas |
+| `menu/panel.html` | Panel en vivo del negocio (entra con correo y contraseña). Atajo: `/panel` |
+| `menu/pedido.html` | Seguimiento en vivo para el cliente (`pedido.html?id=...`) |
+| `firestore.rules` | Reglas de seguridad: se pegan en Firebase → Firestore → Reglas |
+| `menu/aviso.html` | Panel viejo de "pegar pedido" (respaldo). Atajo: `/panel-viejo` |
+
+En `menu/index.html`: `@@FIREBASE` (activar/desactivar) y `@@GUARDAR-FIREBASE` (qué se guarda de cada pedido).

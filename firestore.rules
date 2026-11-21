@@ -1,0 +1,61 @@
+rules_version = '2';
+// =========================================================
+// REGLAS DE SEGURIDAD · Jireh Sushi · Kenmake Soluciones
+// Se pegan en: Firebase → Firestore → pestaña "Reglas" → Publicar
+// ---------------------------------------------------------
+// - Cualquier cliente puede CREAR un pedido nuevo (sin cuenta), pero no puede
+//   ver ni cambiar los pedidos de nadie.
+// - El cliente solo puede VER el estado de SU pedido (con su enlace largo y único).
+// - Solo el equipo (usuarios creados por Kengis con correo @jirehsushi.com)
+//   ve todos los pedidos y los cambia.
+// =========================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Equipo del negocio: sesión iniciada con un correo @jirehsushi.com
+    function esEquipo() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.matches('.*@jirehsushi[.]com$');
+    }
+
+    function textoCorto(campo, max) {
+      return !(campo in request.resource.data)
+        || (request.resource.data[campo] is string && request.resource.data[campo].size() <= max);
+    }
+
+    // ---------- Pedido completo (privado) ----------
+    match /pedidos/{id} {
+      allow read, update, delete: if esEquipo();
+
+      allow create: if request.resource.data.estado == 'nuevo'
+        && request.resource.data.creado == request.time
+        && request.resource.data.keys().hasOnly([
+             'codigo', 'dia', 'estado', 'creado', 'modo', 'nombre', 'tel', 'dir', 'ref',
+             'ubic', 'items', 'subtotal', 'delivery', 'km', 'total', 'totalTexto',
+             'pago', 'banco', 'cambio', 'notas', 'comprobante'])
+        && request.resource.data.codigo is string && request.resource.data.codigo.size() <= 8
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() >= 2
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0 && request.resource.data.items.size() <= 60
+        && request.resource.data.total is number
+        && textoCorto('nombre', 80) && textoCorto('tel', 30) && textoCorto('dir', 200)
+        && textoCorto('ref', 200) && textoCorto('notas', 500) && textoCorto('pago', 30)
+        && textoCorto('banco', 60) && textoCorto('cambio', 30) && textoCorto('totalTexto', 60)
+        && textoCorto('modo', 20) && textoCorto('dia', 10);
+    }
+
+    // ---------- Seguimiento (lo que ve el cliente) ----------
+    match /seguimiento/{id} {
+      allow get: if true;                 // con el enlace exacto
+      allow list: if esEquipo();          // nadie de afuera puede listar todos
+      allow update, delete: if esEquipo();
+
+      // Solo se crea junto con su pedido (en el mismo envío)
+      allow create: if request.resource.data.estado == 'nuevo'
+        && request.resource.data.creado == request.time
+        && request.resource.data.keys().hasOnly(['codigo', 'nombre', 'modo', 'estado', 'creado'])
+        && existsAfter(/databases/$(database)/documents/pedidos/$(id));
+    }
+  }
+}
