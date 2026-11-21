@@ -22,7 +22,7 @@
   @@DESTACADO      Producto grande de arriba
   @@REBAJAS        Cómo poner rebaja a un producto
   @@MENU           Inicio de la lista de productos
-  @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@EMPANIZADOS
+  @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@AVOCADO  @@QUESO-CREMA  @@EMPANIZADOS
   @@HAND-ROLLS  @@SUSHI-BURGER  @@SIN-ARROZ  @@PARA-PICAR  @@BEBIDAS
   @@CAMBIO-PROTEINA  Cambios de proteína y su precio (salmón, camarón…)
   @@SALSAS-EXTRA     Salsas extra y su precio
@@ -194,6 +194,16 @@ img{display:block;max-width:100%}
 .detalle-txt h3{font-size:44px}
 .detalle-txt p{margin:0;color:#C9C3B8;font-size:15px;line-height:1.55}
 .campo{display:flex;flex-direction:column;gap:6px}
+/* @@SUGERENCIAS-DIRECCION */
+.campo-dir{position:relative}
+.sugerencias{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:30;background:#1B1B1F;border:1px solid #34343A;border-radius:14px;box-shadow:0 14px 30px rgba(0,0,0,.55);overflow:hidden;max-height:300px;overflow-y:auto}
+.sugerencias button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #2A2A2F;color:inherit;padding:11px 14px;font:inherit;cursor:pointer}
+.sugerencias button:last-child{border-bottom:0}
+.sugerencias button:hover,.sugerencias button:focus{background:#26262B;outline:none}
+.sugerencias .ico{flex:none;font-size:16px;line-height:1.3}
+.sugerencias b{display:block;font-size:14.5px;font-weight:700}
+.sugerencias small{display:block;font-size:12.5px;color:#A9A39A;margin-top:1px}
+.sugerencias .titulo-sug{padding:8px 14px 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7E786F}
 .campo label,.campo .lbl{font-size:13px;font-weight:700;color:#C9C3B8}
 .campo input,.campo textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--borde);background:var(--tarjeta);font-size:15px;outline:none;resize:none}
 .campo input{height:50px}
@@ -496,13 +506,14 @@ img{display:block;max-width:100%}
    ========================================================= */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
-  whatsapp: "19785664534",           // @@WHATSAPP  PRUEBAS: llega al número de Kenmake. Al publicar, cambiar a 18493604892
+  whatsapp: "19785664534",           // @@WHATSAPP  PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
   telefono: "(849) 360-4892",         // @@TELEFONO
-  direccion: "Carretera Mella, Hainamosa · SDE",    // @@DIRECCION
+  direccion: "Calle Central #18, Ana Teresa Balaguer",    // @@DIRECCION  (versión corta que se ve en la página)
+  direccionCompleta: "Calle Central #18, Ana Teresa Balaguer, Hainamosa, Santo Domingo Este",   // la completa, para el mapa y los mensajes
   mapa: "https://www.google.com/maps/search/?api=1&query=Jireh+sushi+Rd&query_place_id=ChIJx40rD8SHr44R7_ZfhKZl_YU",                           // @@MAPA
-  horario: { abre: "13:00", cierra: "20:30",            // @@HORARIO  hora normal de abrir y cerrar
-             cierraDia: { 0: "19:45" },                  // días que cierran a otra hora (0 = domingo cierra 7:45 PM)
-             texto: "Mar–Sáb 1:00–8:30 PM · Dom 1:00–7:45 PM · Lunes cerrado" },
+  horario: { abre: "13:00", cierra: "20:00",            // @@HORARIO  hora normal de abrir y cerrar
+             cierraDia: {},                              // días que cierran a otra hora (ej.: { 0: "19:00" } = domingo 7 PM)
+             texto: "Mar–Dom 1:00–8:00 PM · Lunes cerrado" },
   diasCerrado: [1],                   // @@DIAS-CERRADO  0 domingo · 1 lunes · … · 6 sábado
   delivery: true,                     // @@DELIVERY
   redes: { instagram: "https://www.instagram.com/jirehsushird", facebook: "", tiktok: "" },   // @@REDES
@@ -512,6 +523,7 @@ const NEGOCIO = {
   rebajaTodo: 0,                      // @@REBAJA-TODO
   llamadas: false,                    // @@LLAMADAS
   panelDemo: false,
+  firebase: true,                    // @@FIREBASE  true = cada pedido se guarda en Firebase y entra solo al panel (menu/panel.html)
   panelAvisos: false,                 // @@PANEL-AVISOS  false = el cliente NO ve enlace; el negocio pega el mensaje en el panel (botón "Pegar pedido"). true = vuelve a poner el enlace al final
   comprobante: false,                 // @@COMPROBANTE  true = mostrar "Necesito comprobante fiscal"
 
@@ -528,7 +540,7 @@ const NEGOCIO = {
   /* @@DELIVERY-KM — cálculo del delivery por distancia */
   local: { lat: 18.5253433, lng: -69.8228972 },  // @@UBICACION-LOCAL  Jireh Sushi (Google Maps), cerca de la bomba Credigas, Carr. Mella
   deliveryPorKm: 30,       // RD$ por cada kilómetro
-  deliveryMinimo: 60,      // lo mínimo que se cobra de delivery
+  deliveryMinimo: 100,      // lo mínimo que se cobra de delivery
   factorCalles: 1.3,       // distancia en línea recta × 1.3 ≈ distancia por las calles
   deliveryMaxKm: 20        // más lejos de esto: el delivery se coordina con el cliente por WhatsApp
 };
@@ -545,7 +557,7 @@ const DESTACADO = "eby-banana";     // @@DESTACADO  Producto que sale grande arr
    El cliente puede cambiar la proteína del roll. Se suma el precio del cambio.
    "secciones": en qué categorías sale la opción (los id de las secciones de abajo). */
 const CAMBIO_PROTEINA = {
-  secciones: ["rolls-casa", "california", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz"],
+  secciones: ["rolls-casa", "california", "avocado", "queso-crema", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz"],
   opciones: [
     { nombre: "Salmón",   precio: 250 },
     { nombre: "Camarón",  precio: 250 },
@@ -557,14 +569,14 @@ const CAMBIO_PROTEINA = {
    Salsas y extras (wasabi, jengibre). Salen para elegir dentro de cada producto
    y también solas en "Bebidas y extras", con su foto y descripción. */
 const SALSAS_EXTRA = {
-  secciones: ["cajas", "rolls-casa", "california", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz", "para-picar"],
+  secciones: ["cajas", "rolls-casa", "california", "avocado", "queso-crema", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz", "para-picar"],
   opciones: [
     { nombre: "Soya (3 und)",     precio: 50, img: "fotos/salsa-soya.jpg",       desc: "3 unidades de soya premium." },
     { nombre: "Salsa teriyaki",   precio: 40, img: "fotos/salsa-teriyaki.jpg",   desc: "Salsa dulce para rolls empanizados y langostinos." },
     { nombre: "Salsa spicy",      precio: 50, img: "fotos/salsa-spicy.jpg",      desc: "Salsa mayo picante." },
     { nombre: "Salsa fuji",       precio: 50, img: "fotos/salsa-fuji.jpg",       desc: "Salsa de miel para rolls empanizados." },
     { nombre: "Salsa acevichada", precio: 60, img: "fotos/salsa-acevichada.jpg", desc: "Salsa de la casa, ideal para rolls acevichados." },
-    { nombre: "Salsa anguila",    precio: 60,                                    desc: "Salsa dulce de anguila." },
+    { nombre: "Salsa anguila",    precio: 60, img: "fotos/salsa-anguila.jpg",    desc: "Salsa dulce de anguila." },
     { nombre: "Wasabi",           precio: 50, img: "fotos/wasabi.jpg",           desc: "Condimento picante japonés, ideal para el sushi." },
     { nombre: "Jengibre",         precio: 50, img: "fotos/jengibre.jpg",         desc: "Limpia el paladar entre bocado y bocado para apreciar cada sabor." }
   ]
@@ -573,8 +585,15 @@ const SALSAS_EXTRA = {
 /* ================= @@MENU — PRODUCTOS ================= */
 const MENU = [
   /* Precios reales del negocio */
+  /* ---------- @@PARA-PICAR (precios reales) ---------- */
+  { id:"para-picar", nombre:"Para picar", tab:"Para picar", arte:"pollo", sub:"Entradas crujientes para compartir.", grupos:[{ items:[
+    { id:"tiritas-pollo", nombre:"Tiritas de Pollo", precio:240, desc:"5 unidades de tiritas de pollo empanizadas.", img:"fotos/tiritas-pollo.jpg" },
+    { id:"palitos-mozzarella", nombre:"Palitos de Queso", tag:"NUEVO", precio:390, desc:"6 unidades. Palitos crujientes rellenos de queso mozzarella.", img:"fotos/palitos-mozzarella.jpg" },
+    { id:"camarones-empanizados", nombre:"Camarones Empanizados", precio:490, desc:"6 unidades. Entrada de camarones crujientes.", img:"fotos/camarones-empanizados.jpg" },
+    { id:"gyosas", nombre:"Gyosas Orientales", precio:350, desc:"5 unidades. Rellenas de pollo y verduras, al vapor o fritas.", img:"fotos/gyosas.jpg", opciones:["Fritas","Al vapor"] }
+  ]}]},
   /* ---------- @@CAJAS (19 combos reales del catálogo, por piezas y precio) ---------- */
-  { id:"cajas", nombre:"Combos", tab:"Combos", arte:"burger", sub:"Combina tus rolls favoritos. Cada roll trae 8 piezas.", grupos:[
+  { id:"cajas", nombre:"Combos Sagrados", tab:"Combos Sagrados", arte:"burger", sub:"Combina tus rolls favoritos. Cada roll trae 8 piezas.", grupos:[
     { titulo:"16 piezas", items:[
       { id:"16-piezas-pollo", nombre:"16 Piezas Pollo", precio:870, desc:"8 Hot Pollo (pollo, queso crema y puerro, empanizado) · 8 Avocado Pollo (pollo, queso crema y puerro, envuelto en aguacate).", img:"fotos/16-piezas-pollo.jpg" },
       { id:"mixta-16", nombre:"16 Piezas Mixta", precio:890, desc:"8 Hot Pollo (pollo empanizado, queso crema y puerro) · 8 Avocado Kani (palitos de cangrejo, queso crema y aguacate, envuelto en aguacate).", img:"fotos/mixta-16.jpg" },
@@ -610,14 +629,52 @@ const MENU = [
     { id:"chicken-aplatanao", nombre:"Chicken Banana Roll", tag:"NUEVO", precio:610, desc:"Pollo empanizado, queso crema y puerro, envuelto en plátano maduro. 8 unidades.", img:"fotos/chicken-aplatanao.jpg" }
   ]}]},
   /* ---------- @@CALIFORNIA ---------- */
-  { id:"california", nombre:"California", tab:"California", arte:"burger", grupos:[{ items:[
-    { id:"california-camaron", oculto:true, nombre:"California Camarón", precio:null, desc:"Camarón y aguacate, cubierto de ajonjolí.", img:"fotos/california-camaron.jpg" },   // ⚠️ precio pendiente
+  { id:"california", nombre:"California", tab:"California", arte:"burger", sub:"Rolls envueltos en ajonjolí o en puerro.", grupos:[{ items:[
     { id:"california-green", nombre:"Green Roll", precio:470, desc:"Pollo empanizado, queso crema y aguacate, envuelto en puerro. 8 unidades.", img:"fotos/california-green.jpg" },
-    { id:"california-roll", oculto:true, nombre:"California Roll", precio:350, desc:"Kani, aguacate y pepino, cubierto de ajonjolí.", img:"fotos/california.jpg" },
-    { id:"avocado-roll", oculto:true, nombre:"Avocado Roll", precio:450, desc:"Camarón tempura y queso crema, cubierto de láminas de aguacate.", img:"fotos/avocado.jpg" }
+    { id:"cali-cheese-pollo", nombre:"California Cheese Pollo", precio:470, desc:"Pollo, queso crema y aguacate, envuelto en ajonjolí. 8 unidades.", img:"fotos/cali-cheese-pollo.jpg" },
+    { id:"cali-pollo", nombre:"California Pollo", precio:400, desc:"Aguacate y pollo empanizado, envuelto en ajonjolí. 8 unidades.", img:"fotos/cali-pollo.jpg" },
+    { id:"cali-cangrejo", nombre:"California Cangrejo", precio:490, desc:"Queso crema, aguacate y palitos de cangrejo, envuelto en ajonjolí. 8 unidades.", img:"fotos/cali-cangrejo.jpg" },
+    { id:"cali-fuji", nombre:"California Fuji", precio:490, desc:"Pollo empanizado, queso crema y aguacate, envuelto en ajonjolí, con salsa fuji de miel. 8 unidades.", img:"fotos/cali-fuji.jpg" },
+    { id:"cali-acevichado-pollo", nombre:"Acevichado Pollo", precio:490, desc:"Pollo y aguacate, envuelto en ajonjolí tostado, con salsa acevichada y chispa de shichimi.", img:"fotos/cali-acevichado-pollo.jpg" },
+    { id:"cali-camaron", nombre:"California Camarón", precio:525, desc:"Camarón empanizado y aguacate, envuelto en semillas de sésamo. 8 unidades.", img:"fotos/cali-camaron.jpg" },
+    { id:"cali-acevichado-camaron", nombre:"California Acevichado Camarón", precio:570, desc:"Camarón empanizado, aguacate y puerro, envuelto en ajonjolí, bañado en salsa acevichada con un toque de shichimi.", img:"fotos/cali-acevichado-camaron.jpg" },
+    { id:"cali-camaron-puerro", nombre:"California Camarón en Puerro", precio:550, desc:"Camarón empanizado, aguacate y queso crema, envuelto en puerro. 8 unidades.", img:"fotos/cali-camaron-puerro.jpg" },
+    { id:"cali-cheese-salmon", nombre:"California Cheese Salmón", precio:570, desc:"Salmón, puerro y queso crema, envuelto en ajonjolí. 8 unidades.", img:"fotos/cali-cheese-salmon.jpg" },
+    { id:"cali-sake-puerro", nombre:"California Sake Cheese en Puerro", precio:550, desc:"Salmón fresco, queso crema y aguacate, envuelto en puerro. 8 unidades.", img:"fotos/cali-sake-puerro.jpg" },
+    { id:"cali-salmon", nombre:"California Salmón", precio:530, desc:"Salmón y aguacate, envuelto en ajonjolí. 8 unidades.", img:"fotos/cali-salmon.jpg" },
+    { id:"cali-salmon-furai", nombre:"California Salmón Furai", precio:690, desc:"Salmón empanizado, queso crema y aguacate, envuelto en ajonjolí, con salsa teriyaki. 8 unidades.", img:"fotos/cali-salmon-furai.jpg" },
+    { id:"cali-camaron-salmon", nombre:"California Camarón Salmón", precio:650, desc:"Salmón fresco, camarón empanizado y aguacate, envuelto en ajonjolí. 8 unidades.", img:"fotos/cali-camaron-salmon.jpg" },
+    { id:"cali-spicy", nombre:"California Spicy", precio:620, desc:"Salmón, puerro y aguacate, envuelto en ajonjolí, con chispa de picante. 8 unidades.", img:"fotos/cali-spicy.jpg" }
+  ]}]},
+  /* ---------- @@AVOCADO (rolls envueltos en aguacate, precios reales) ---------- */
+  { id:"avocado", nombre:"Avocado Rolls", tab:"Avocado", arte:"burger", sub:"Rolls envueltos en aguacate.", grupos:[{ items:[
+    { id:"avocado-salmon", nombre:"Avocado Salmón", precio:595, desc:"Envuelto en aguacate, relleno de salmón, queso crema y puerro. 8 unidades.", img:"fotos/avocado-salmon.jpg" },
+    { id:"avocado-sake", nombre:"Avocado Sake", precio:650, desc:"Salmón fresco, queso crema y aguacate, envuelto en aguacate. 8 unidades.", img:"fotos/avocado-sake.jpg" },
+    { id:"avocado-camaron", nombre:"Avocado Camarón", precio:570, desc:"Camarón, puerro y queso crema, envuelto en aguacate. 8 unidades.", img:"fotos/avocado-camaron.jpg" },
+    { id:"avocado-sakeby", nombre:"Avocado Sakeby", precio:710, desc:"Salmón, camarón, puerro y queso crema, envuelto en aguacate. 8 unidades.", img:"fotos/avocado-sakeby.jpg" },
+    { id:"avocado-mar", nombre:"Avocado Mar", precio:710, desc:"Salmón, camarón y puerro, envuelto en aguacate. 8 unidades.", img:"fotos/avocado-mar.jpg" },
+    { id:"avocado-pollo", nombre:"Avocado Pollo", precio:525, desc:"Pollo empanizado, puerro y queso crema, envuelto en aguacate. 8 unidades.", img:"fotos/avocado-pollo.jpg" },
+    { id:"tori-avocado", nombre:"Tori Avocado", precio:580, desc:"Pollo empanizado, queso crema, aguacate y puerro, envuelto en aguacate con ajonjolí. 8 unidades.", img:"fotos/tori-avocado.jpg" },
+    { id:"toriyaki-roll", nombre:"Toriyaki Roll", precio:580, desc:"Pollo empanizado, queso crema y puerro, envuelto en aguacate con salsa teriyaki de la casa. 8 unidades.", img:"fotos/toriyaki-roll.jpg" },
+    { id:"pollo-acevichado", nombre:"Pollo Acevichado", precio:550, desc:"Pollo empanizado y aguacate, envuelto en aguacate, con salsa acevichada y un toque de shichimi. 8 unidades.", img:"fotos/pollo-acevichado.jpg" },
+    { id:"avocado-arcoiris", nombre:"Avocado Arcoíris", precio:735, desc:"Camarón, salmón empanizado y queso crema, envuelto en aguacate y salmón. 8 unidades.", img:"fotos/avocado-arcoiris.jpg" },
+    { id:"avocado-mar-nikkei", nombre:"Avocado Mar Nikkei", precio:725, desc:"Camarones cocidos, aguacate y puerro, envuelto en aguacate, con topping de salmón, salsa acevichada y puerro picado.", img:"fotos/avocado-mar-nikkei.jpg" },
+    { id:"acevichado-camaron", nombre:"Acevichado Camarón", precio:690, desc:"Relleno de camarón y aguacate, con salsa acevichada y un toque de shichimi. 8 unidades.", img:"fotos/acevichado-camaron.jpg" },
+    { id:"avocado-spicy", nombre:"Avocado Spicy", precio:710, desc:"Envuelto en aguacate, relleno de camarón, queso crema y puerro, con salsa spicy picante.", img:"fotos/avocado-spicy.jpg" },
+    { id:"avocado-nikkey", nombre:"Avocado Nikkey", precio:770, desc:"Relleno de salmón, puerro y queso crema, envuelto en aguacate, con topping de camarones empanizados y salsa acevichada.", img:"fotos/avocado-nikkey.jpg" },
+    { id:"avocado-acevichado", nombre:"Avocado Acevichado", precio:770, desc:"Relleno de camarones, queso crema y puerro, envuelto en aguacate, con topping de salmón en salsa picante, puerro y shichimi.", img:"fotos/avocado-acevichado.jpg" },
+    { id:"eby-nikkei", nombre:"Eby Nikkei", precio:770, desc:"Relleno de camarones, queso crema y puerro, envuelto en aguacate, con topping de salmón, salsa acevichada y togarashi. 8 unidades.", img:"fotos/eby-nikkei.jpg" }
+  ]}]},
+  /* ---------- @@QUESO-CREMA (rolls envueltos en queso crema, precios reales) ---------- */
+  { id:"queso-crema", nombre:"Envuelto en Queso Crema", tab:"Queso Crema", arte:"burger", sub:"Rolls envueltos en queso crema Philadelphia.", grupos:[{ items:[
+    { id:"eby-cheese-teri", nombre:"Eby Cheese Teri", precio:699, desc:"Camarón, aguacate y puerro, envuelto en queso crema, con un toque de salsa teriyaki. 8 unidades.", img:"fotos/eby-cheese-teri.jpg" },
+    { id:"almond-white", nombre:"Almond White", precio:630, desc:"Pollo empanizado, aguacate y puerro, envuelto en queso crema, con chispas de almendra tostada. 8 unidades.", img:"fotos/almond-white.jpg" },
+    { id:"cheese-pollo", nombre:"Cheese Pollo", precio:590, desc:"Pollo empanizado y aguacate, envuelto en queso crema Philadelphia. 8 unidades.", img:"fotos/cheese-pollo.jpg" },
+    { id:"cheese-camaron", nombre:"Cheese Camarón", precio:699, desc:"Camarón empanizado, aguacate y puerro, envuelto en queso crema Philadelphia. 8 unidades.", img:"fotos/cheese-camaron.jpg" },
+    { id:"cheese-salmon", nombre:"Cheese Salmón", precio:730, desc:"Salmón, aguacate y puerro, envuelto en queso crema Philadelphia. 8 unidades.", img:"fotos/cheese-salmon.jpg" }
   ]}]},
   /* ---------- @@EMPANIZADOS (19 rolls reales del catálogo, por precio) ---------- */
-  { id:"empanizados", nombre:"Empanizados", tab:"Empanizados", arte:"burger", sub:"Rolls crujientes, empanizados al momento. 8 piezas cada uno.", grupos:[{ items:[
+  { id:"empanizados", nombre:"Colección HOT", tab:"Colección HOT", arte:"burger", sub:"Rolls crujientes, empanizados al momento. 8 piezas cada uno.", grupos:[{ items:[
     { id:"fernando-rolls", nombre:"Fernando Rolls", precio:475, desc:"Pollo y queso crema, envuelto en panko, con salsa teriyaki dulce. 8 unidades.", img:"fotos/fernando-rolls.jpg" },
     { id:"almond-rolls", nombre:"Almond Rolls", precio:450, desc:"Pollo empanizado, queso crema y almendra tostada. 8 unidades.", img:"fotos/almond-rolls.jpg" },
     { id:"hot-pollo", nombre:"Hot Pollo", precio:490, desc:"Pollo empanizado, queso crema y puerro. 8 unidades.", img:"fotos/hot-pollo.jpg" },
@@ -656,13 +713,6 @@ const MENU = [
     { id:"salmon-sin-arroz", oculto:true, nombre:"Salmón sin arroz", precio:595, desc:"Camarón y queso crema envuelto en salmón fresco.", img:"fotos/sin-arroz.jpg" },
     { id:"jireh-signature", oculto:true, nombre:"Jireh Signature", tag:"DE LA CASA", precio:695, desc:"Atún, salmón y aguacate sin arroz, con cebollín y ajonjolí.", img:"fotos/signature.jpg" },
     { id:"hosomaki-salmon", oculto:true, nombre:"Hosomaki de Salmón", precio:295, desc:"Rollito fino de alga con salmón.", img:"fotos/hosomaki.jpg" }
-  ]}]},
-  /* ---------- @@PARA-PICAR (precios reales) ---------- */
-  { id:"para-picar", nombre:"Para picar", tab:"Para picar", arte:"pollo", sub:"Entradas crujientes para compartir.", grupos:[{ items:[
-    { id:"tiritas-pollo", nombre:"Tiritas de Pollo", precio:240, desc:"5 unidades de tiritas de pollo empanizadas.", img:"fotos/tiritas-pollo.jpg" },
-    { id:"palitos-mozzarella", nombre:"Palitos de Queso", tag:"NUEVO", precio:390, desc:"6 unidades. Palitos crujientes rellenos de queso mozzarella.", img:"fotos/palitos-mozzarella.jpg" },
-    { id:"camarones-empanizados", nombre:"Camarones Empanizados", precio:490, desc:"6 unidades. Entrada de camarones crujientes.", img:"fotos/camarones-empanizados.jpg" },
-    { id:"gyosas", nombre:"Gyosas Orientales", precio:350, desc:"5 unidades. Rellenas de pollo y verduras, al vapor o fritas.", img:"fotos/gyosas.jpg", opciones:["Fritas","Al vapor"] }
   ]}]},
   /* ---------- @@BEBIDAS ---------- */
   { id:"bebidas", nombre:"Bebidas y extras", tab:"Bebidas", arte:"bebida", chico:true, grupos:[{ items:[
@@ -874,6 +924,94 @@ function pedirUbicacion(){
     actualizarCarrito();
   }, { enableHighAccuracy: true, timeout: 15000 });
 }
+/* ================= @@SUGERENCIAS-DIRECCION =================
+   Mientras el cliente escribe su dirección le sugerimos:
+   1) Sectores de la zona (lista fija, siempre funciona).
+   2) Calles y lugares del mapa (Photon / OpenStreetMap, gratis y sin clave). Si elige uno,
+      se calcula el delivery con ese punto aunque no comparta su ubicación. */
+const SECTORES = ["Hainamosa","Ana Teresa Balaguer","Los Solares del Perla","El Perla","Brisa del Perla","Los Pinos de Hainamosa","Villa Tropicalia","Invivienda","Invi Cea",
+  "Ciudad Juan Bosch","El Almirante","Ciudad del Almirante","Los Frailes I","Los Frailes II","San Bartolo","La Ureña","El Tamarindo","Mendoza","Villa Carmen",
+  "Cancino I","Cancino II","Cancino Adentro","Los Mina","Los Mina Viejo","Los Mina Norte","Los Mina Sur","Invi de Los Mina","Los Tres Brazos","Alma Rosa I",
+  "Alma Rosa II","Ensanche Ozama","Villa Duarte","Lucerna","Sans Souci","Ralma","Urbanización Italia","San Isidro","Los Trinitarios","Brisas del Este",
+  "Ciudad del Este","Valle del Este","Tropical del Este","Residencial del Este","Paraíso Oriental","Villa Faro","Villa Olímpica","Villa Eloisa","Villa Cumbre",
+  "Vista Hermosa","Los Mameyes","Isabelita","Ensanche Isabelita","Las Américas","Los Tres Ojos","Katanga","Mi Sueño","Los Alpes","Bello Campo",
+  "Ramón Matías Mella","Riviera del Ozama","Nuevo Amanecer","Prados del Cachón","Cachón de la Rubia","Las Enfermeras","Ensanche Felicidad","La Fe",
+  "Juan Pablo II","La Milagrosa","Pidoca","San Lorenzo","San Antonio","La Javilla","Villa Adela","Buenaventura","Ámbar","Laura Mariel","Orquídea I",
+  "Orquídea II","Vista del Sol","Villa Liberación","Charles de Gaulle","Sabana Larga","Mandinga","El Brisal","Ciudad de los Trabajadores","Urbanización San Cirilo",
+  "Urbanización Mi Hogar","Residencial Don Oscar","Residencial Doña Hilaria","Villa Panamericana","Issfapol","San Luis","Los Molinos","Jardines del Este"];
+const sinTildes = t => String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+let sugTimer = null, sugPedido = 0, sugLista = [];
+function sugerenciasLocales(texto){
+  const pal = texto.trim().split(/\s+/);
+  for (let n = Math.min(4, pal.length); n >= 1; n--) {          // prueba con las últimas 4, 3, 2 o 1 palabras
+    const cola = sinTildes(pal.slice(-n).join(" ")).replace(/[,.#]/g, "").trim();
+    if (cola.length < 3) continue;
+    const hay = SECTORES.filter(sec => sinTildes(sec).split(" ").some((_, i, arr) => arr.slice(i).join(" ").startsWith(cola)));
+    if (hay.length) return hay.slice(0, 5).map(sec => ({ tipo: "sector", titulo: sec, sub: "Santo Domingo Este", cola: pal.slice(-n).join(" ") }));
+  }
+  return [];
+}
+function pintarSugerencias(caja){
+  if (!sugLista.length) { caja.hidden = true; caja.innerHTML = ""; return; }
+  caja.innerHTML = sugLista.map((x, i) => `<button type="button" data-sug="${i}" role="option"><span class="ico">${x.tipo === "sector" ? "🏘️" : "📍"}</span><span><b>${esc(x.titulo)}</b><small>${esc(x.sub)}</small></span></button>`).join("");
+  caja.hidden = false;
+}
+function buscarDireccion(input){
+  const caja = input.parentElement.querySelector(".sugerencias"), texto = input.value;
+  const locales = sugerenciasLocales(texto);
+  sugLista = locales; pintarSugerencias(caja);
+  clearTimeout(sugTimer);
+  if (texto.trim().length < 4) return;
+  const n = ++sugPedido;
+  sugTimer = setTimeout(() => {
+    const url = "https://photon.komoot.io/api/?limit=6&lat=" + NEGOCIO.local.lat + "&lon=" + NEGOCIO.local.lng + "&bbox=-70.15,18.38,-69.55,18.72&q=" + encodeURIComponent(texto + ", Santo Domingo");
+    fetch(url).then(r => r.json()).then(j => {
+      if (n !== sugPedido) return;                               // ya escribió otra cosa
+      const vistos = new Set(locales.map(x => sinTildes(x.titulo)));
+      const mapa = (j.features || []).filter(f => /Dominican|Dominicana/i.test(f.properties.country || "")).map(f => {
+        const pr = f.properties;
+        const titulo = [pr.name || pr.street, pr.name ? "" : pr.housenumber].filter(Boolean).join(" ");
+        const sub = [pr.name && pr.street ? pr.street : "", pr.district || pr.locality, pr.city].filter(Boolean).join(", ");
+        return { tipo: "mapa", titulo, sub: sub || "República Dominicana", lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+      }).filter(x => x.titulo && !vistos.has(sinTildes(x.titulo)) && (vistos.add(sinTildes(x.titulo)) || true));
+      sugLista = locales.concat(mapa).slice(0, 8);
+      if (document.activeElement === input) pintarSugerencias(caja);
+    }).catch(() => {});                                          // sin internet o sin respuesta: quedan los sectores
+  }, 350);
+}
+function elegirSugerencia(input, x){
+  if (x.tipo === "sector") {
+    const base = input.value.slice(0, input.value.length - x.cola.length).replace(/[\s,]+$/, "");
+    input.value = (base ? base + ", " : "") + x.titulo;
+  } else {
+    const numero = (input.value.match(/#\s*\d+[a-z]?/i) || [""])[0].replace(/\s+/g, "");   // conserva el número de casa que escribió
+    input.value = [x.titulo + (numero && !x.titulo.includes(numero) ? " " + numero : ""), x.sub.split(",")[0]].filter(Boolean).join(", ");
+    // punto del mapa: calcula el delivery como si compartiera su ubicación (aproximado)
+    if (!ubic || ubic.aprox) {
+      const punto = { lat: x.lat, lng: x.lng };
+      const km = Math.max(1, Math.ceil(distanciaKm(NEGOCIO.local, punto) * NEGOCIO.factorCalles));
+      ubic = { ...punto, km, lejos: km > NEGOCIO.deliveryMaxKm, costo: Math.max(NEGOCIO.deliveryMinimo, km * NEGOCIO.deliveryPorKm), aprox: true };
+      ubicEstado = "";
+    }
+  }
+  const raiz = input.closest("#carrito-lateral,#carrito-movil");
+  leerDatos(raiz); sugLista = [];
+  const caja = input.parentElement.querySelector(".sugerencias"); caja.hidden = true;
+  if (x.tipo === "mapa") { actualizarCarrito(); const nuevo = raiz.querySelector("#f-dir"); if (nuevo) nuevo.blur(); }
+  else input.focus();
+}
+["#carrito-lateral","#carrito-movil"].forEach(sel => {
+  const raiz = $(sel);
+  raiz.addEventListener("input", e => { if (e.target.id === "f-dir") buscarDireccion(e.target); });
+  raiz.addEventListener("focusout", e => { if (e.target.id === "f-dir") setTimeout(() => { const c = e.target.parentElement && e.target.parentElement.querySelector(".sugerencias"); if (c && !c.contains(document.activeElement)) c.hidden = true; }, 180); });
+  raiz.addEventListener("mousedown", e => { if (e.target.closest(".sugerencias")) e.preventDefault(); });   // que no se cierre antes de tocar
+  raiz.addEventListener("click", e => {
+    const b = e.target.closest("[data-sug]"); if (!b) return;
+    e.stopPropagation();
+    elegirSugerencia(b.closest(".campo-dir").querySelector("#f-dir"), sugLista[Number(b.dataset.sug)]);
+  });
+});
+
 function copiarTexto(t){
   const listo = () => avisar("Número copiado");
   if (navigator.clipboard) navigator.clipboard.writeText(t).then(listo, () => avisar(t));
@@ -881,6 +1019,14 @@ function copiarTexto(t){
 }
 
 function htmlCarrito(){
+  if (vistaCarrito === "registrado") return `<div class="carrito-cab"><h2 class="display">Pedido enviado</h2>${cerrarBtn()}</div>
+    <div class="carrito-cuerpo"><div class="enviado">
+      <div class="ok"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
+      <h3 class="display">¡Recibimos tu pedido #${esc(miPedido.codigo)}!</h3>
+      <p>Ya llegó al negocio. Puedes ver cómo va tu pedido en vivo.</p>
+      <a class="btn-acento" href="pedido.html?id=${encodeURIComponent(miPedido.id)}" style="height:52px;width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;text-decoration:none">Ver mi pedido</a>
+      <button class="btn-borde" data-acc="seguir" style="height:48px;width:100%;margin-top:10px">Seguir viendo el menú</button>
+    </div></div>`;
   if (vistaCarrito === "enviado") return `<div class="carrito-cab"><h2 class="display">Pedido enviado</h2>${cerrarBtn()}</div>
     <div class="carrito-cuerpo"><div class="enviado">
       <div class="ok"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
@@ -945,13 +1091,13 @@ function htmlDatos(){
           <button class="copiar" data-acc="copiar" data-v="${esc(b.numero)}">Copiar</button>
         </div>`).join("")}
       </div>` : ""}
-      ${modo === "delivery" ? `<div class="campo"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Calle, número, sector" value="${esc(d.dir)}" autocomplete="street-address"></div>
+      ${modo === "delivery" ? `<div class="campo campo-dir"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Calle, número, sector" value="${esc(d.dir)}" autocomplete="off" aria-autocomplete="list"><div class="sugerencias" role="listbox" hidden></div></div>
       <div class="campo"><label for="f-ref">Referencia (opcional)</label><input id="f-ref" type="text" placeholder="Ej.: casa blanca, al lado del colmado" value="${esc(d.ref)}"></div>
       <div class="campo"><span class="lbl">Ubicación para el delivery</span>
         <button class="btn-borde ubic-btn" data-acc="ubicacion">📍 ${ubic ? "Actualizar mi ubicación" : "Usar mi ubicación"}</button>
         ${ubicEstado ? `<small class="ubic-estado">${esc(ubicEstado)}</small>`
           : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${ubic.km} km. Por la distancia, coordinamos el delivery contigo por WhatsApp.</small>`
-          : ubic ? `<small class="ubic-estado ok">✓ Ubicación lista · aprox. ${ubic.km} km · Delivery ${dinero(ubic.costo)}</small>`
+          : ubic ? `<small class="ubic-estado ok">✓ ${ubic.aprox ? "Dirección encontrada" : "Ubicación lista"} · aprox. ${ubic.km} km · Delivery ${dinero(ubic.costo)}</small>`
           : `<small class="ubic-estado">Tócalo para calcular el delivery (${NEGOCIO.moneda} ${NEGOCIO.deliveryPorKm} por km) y para que el repartidor te encuentre rápido.</small>`}
       </div>` : ""}
       ${modo === "local" ? `<div class="campo"><label for="f-mesa">Número de mesa</label><input id="f-mesa" type="text" inputmode="numeric" placeholder="Ej.: 5" value="${esc(d.mesa)}" ${mesaQR ? "readonly" : ""}>${mesaQR ? `<small style="color:var(--texto-suave)">Detectada por el código QR de tu mesa</small>` : ""}</div>` : ""}
@@ -995,7 +1141,7 @@ function actualizarCarrito(){
   $("#barra-carrito").hidden = n === 0;
   $("#barra-texto").textContent = `${n} ${n === 1 ? "artículo" : "artículos"} · Ver pedido`;
   $("#barra-total").textContent = dinero(totalDinero());
-  if (!carrito.length && vistaCarrito !== "enviado") vistaCarrito = "lista";
+  if (!carrito.length && vistaCarrito !== "enviado" && vistaCarrito !== "registrado") vistaCarrito = "lista";
   [$("#carrito-lateral"), $("#carrito-movil")].forEach(el => { el.innerHTML = htmlCarrito(); });
   document.querySelectorAll("#carrito-lateral .solo-movil").forEach(b => b.remove());
 }
@@ -1030,7 +1176,9 @@ function enviarACocina(raiz){
 }
 
 /* ================= @@MENSAJE — MENSAJE QUE LLEGA POR WHATSAPP ================= */
-function enviarPedido(raiz){
+let enviando = false, miPedido = { id: "", codigo: "" };
+async function enviarPedido(raiz){
+  if (enviando) return;                      // evita pedidos repetidos por tocar dos veces
   const d = validar(raiz, false); if (!d) return;
   const lineas = carrito.map(l => {
     const p = PRODUCTOS[l.id];
@@ -1046,7 +1194,9 @@ function enviarPedido(raiz){
   msg += `Nombre: ${d.nombre}\nTeléfono: ${d.tel}`;
   if (modo === "delivery") {
     msg += `\nDirección: ${d.dir}${d.ref.trim() ? `\nReferencia: ${d.ref}` : ""}`;
-    if (ubic) msg += `\nUbicación: https://maps.google.com/?q=${ubic.lat.toFixed(6)},${ubic.lng.toFixed(6)}`;
+    // @@MAPA-PEDIDO: con ubicación del cliente va el punto exacto; sin ella, un mapa que busca la dirección escrita
+    if (ubic) msg += `\n${ubic.aprox ? "Ubicación (por dirección, aprox.)" : "Ubicación"}: https://maps.google.com/?q=${ubic.lat.toFixed(6)},${ubic.lng.toFixed(6)}`;
+    else if (d.dir.trim()) msg += `\nMapa (por dirección): https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.dir.trim() + ", Santo Domingo Este")}`;
   }
   msg += `\nPago: ${pago}`;
   if (pago === "Efectivo" && d.cambio.trim()) msg += ` (pago con ${d.cambio})`;
@@ -1080,6 +1230,42 @@ function enviarPedido(raiz){
     const enlace = new URL("aviso.html", location.href).href + "?" + datos.toString();
     msg += `\n\n🔧 Panel del pedido (para el negocio):\n${enlace}`;
   }
+  /* @@GUARDAR-FIREBASE — guarda el pedido para que entre solo al panel del negocio.
+     Si no hay internet o Firebase falla, el pedido igual sale por WhatsApp como siempre. */
+  if (NEGOCIO.firebase && window.JirehFB) {
+    enviando = true;
+    const boton = raiz.querySelector('[data-acc="enviar"]');
+    if (boton) { boton.disabled = true; boton.dataset.texto = boton.innerHTML; boton.textContent = "Enviando pedido…"; }
+    const b = NEGOCIO.bancos[bancoSel];
+    const entrega = modo === "delivery";
+    const pedido = {
+      codigo: idPedido, modo: entrega ? "delivery" : (modo === "local" ? "local" : "llevar"),
+      nombre: d.nombre.trim(), tel: d.tel.trim(),
+      dir: entrega ? d.dir.trim() : "", ref: entrega ? d.ref.trim() : "",
+      ubic: entrega && ubic ? { lat: +ubic.lat.toFixed(6), lng: +ubic.lng.toFixed(6), aprox: !!ubic.aprox } : null,
+      items: carrito.map(l => ({ cant: l.cant, nombre: nombreLinea(l), precio: precioUnidad(l), detalles: detallesLinea(l) })),
+      subtotal: totalDinero(),
+      delivery: entrega && ubic && !ubic.lejos ? ubic.costo : null,
+      km: entrega && ubic && !ubic.lejos ? ubic.km : null,
+      total: totalConDelivery(),
+      totalTexto: dinero(totalConDelivery()) + (entrega && !(ubic && !ubic.lejos) ? " + delivery" : ""),
+      pago, banco: pago === "Transferencia" && b ? b.banco : "", cambio: pago === "Efectivo" ? d.cambio.trim() : "",
+      notas: d.notas.trim(), comprobante: !!d.comprobante
+    };
+    const primer = pedido.nombre.split(/\s+/)[0];
+    try {
+      const espera = new Promise((_, no) => setTimeout(() => no(new Error("sin respuesta")), 8000));
+      const id = await Promise.race([window.JirehFB.crearPedido(pedido, { codigo: idPedido, nombre: primer, modo: pedido.modo }), espera]);
+      miPedido = { id, codigo: idPedido };
+      try { localStorage.setItem("jireh-mi-pedido", JSON.stringify({ id, codigo: idPedido, t: Date.now() })); } catch(e) {}
+      carrito = []; guardar(); vistaCarrito = "registrado"; actualizarCarrito();
+    } catch (e) {
+      console.warn("No se pudo guardar en Firebase; el pedido sale solo por WhatsApp.", e);
+    }
+    enviando = false;
+    if (boton && boton.isConnected) { boton.disabled = false; boton.innerHTML = boton.dataset.texto; }
+  }
+
   const numero = String(NEGOCIO.whatsapp).replace(/\D/g, "");          // deja solo los números
   const texto = encodeURIComponent(msg);
   const esCelular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -1107,7 +1293,7 @@ function clicCarrito(e){
     case "copiar": e.stopPropagation(); copiarTexto(b.dataset.v); break;
     case "banco": leerDatos(raiz); bancoSel = i; actualizarCarrito(); break;
     case "ubicacion": leerDatos(raiz); pedirUbicacion(); break;
-    case "enviar": enviarPedido(raiz); break;
+    case "enviar": enviarPedido(raiz); break;   // (async: guarda en Firebase y luego abre WhatsApp)
     case "cocina": enviarACocina(raiz); break;
     case "seguir": vistaCarrito = "lista"; actualizarCarrito(); cerrarTodo(); break;
     case "cerrar": cerrarTodo(); break;
@@ -1307,7 +1493,7 @@ function pintarInfo(){
   const num = String(NEGOCIO.whatsapp).replace(/\D/g, "");
   $("#direccion").textContent = NEGOCIO.direccion;
   const m = (NEGOCIO.mapa || "").trim();
-  $("#mapa").href = m.startsWith("http") ? m : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(m || NEGOCIO.direccion);   // también acepta coordenadas: "18.4861,-69.9312"
+  $("#mapa").href = m.startsWith("http") ? m : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(m || NEGOCIO.direccionCompleta || NEGOCIO.direccion);   // también acepta coordenadas: "18.4861,-69.9312"
   $("#telefono").textContent = NEGOCIO.telefono;
   $("#llamar").href = "tel:+" + num;
   if (!NEGOCIO.llamadas) $("#llamar").remove();
@@ -1332,6 +1518,25 @@ actualizarPaso3();
 actualizarCarrito();
 // Al abrir la página (por ejemplo, al escanear el QR): logo cargando → lobby
 mostrarSplash(1300, () => { if (!modo) mostrarLobby(); });
+</script>
+<!-- @@FIREBASE: conecta el menú con Firebase (archivo fb.js). Si no carga, el menú sigue funcionando solo con WhatsApp. -->
+<script type="module">
+import { crearPedido } from "./fb.js";
+window.JirehFB = { crearPedido };
+</script>
+<script>
+/* @@MI-PEDIDO: si el cliente hizo un pedido en las últimas 8 horas, le mostramos un botón para verlo */
+(function(){
+  try {
+    const p = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null");
+    if (!p || Date.now() - p.t > 8 * 3600000) return;
+    const a = document.createElement("a");
+    a.href = "pedido.html?id=" + encodeURIComponent(p.id);
+    a.textContent = "🍣 Ver mi pedido #" + p.codigo;
+    a.style.cssText = "position:fixed;left:14px;bottom:86px;z-index:40;background:#E1262D;color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:999px;text-decoration:none;box-shadow:0 10px 24px rgba(0,0,0,.45)";
+    document.body.appendChild(a);
+  } catch(e) {}
+})();
 </script>
 </body>
 </html>

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panel en vivo · Jireh Sushi</title>
+<link rel="icon" type="image/png" sizes="64x64" href="fotos/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="fotos/icono-180.png">
+<meta name="theme-color" content="#0B0B0C">
+<!--
+  =========================================================
+  PANEL EN VIVO (para el negocio) · Kenmake Soluciones
+  ---------------------------------------------------------
+  - Los pedidos del menú entran solos (Firebase), con sonido.
+  - Se entra con correo y contraseña (los crea Kengis en la consola de Firebase).
+  - Pensado para el celular de la cocina: queda abierto y la pantalla no se apaga.
+  - Si algún día falla internet, el panel viejo de "pegar pedido" sigue en menu/aviso.html.
+
+  Para cambiar algo, busca con Ctrl+F:
+  @@MINUTOS       Opciones del tiempo de preparación (máximo 50)
+  @@MENSAJES      Mensajes que se le mandan al cliente por WhatsApp
+  @@DELIVERY-MSG  Mensaje para el grupo de delivery
+  @@SONIDO        Sonido de pedido nuevo
+  @@COLORES       Colores
+  =========================================================
+-->
+<style>
+/* @@COLORES */
+:root{--fondo:#0E0E0E;--tarjeta:#1A1A1A;--borde:#2E2E2E;--rojo:#E3121B;--rojo-claro:#FF4D55;--texto:#F4F1EC;--suave:#A9A39A;--verde:#1E7A45;--verde-claro:#7BE3A0;--amarillo:#FFD27A}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(120% 60% at 50% 0%,#2A0E10 0%,var(--fondo) 55%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;font-size:17px}
+.caja{max-width:620px;margin:0 auto;padding:16px 14px 60px}
+.cab{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.cab img{width:50px;height:50px;border-radius:50%;background:#0B0B0B;border:2px solid var(--rojo);object-fit:cover}
+.cab h1{margin:0;font-size:22px}
+.cab small{display:flex;align-items:center;gap:6px;color:var(--suave);font-size:14px}
+.punto{width:9px;height:9px;border-radius:50%;background:#666}
+.punto.on{background:#2FD47A;box-shadow:0 0 0 4px rgba(47,212,122,.18)}
+.cab button{margin-left:auto}
+button{font:inherit;cursor:pointer}
+.chico{background:transparent;border:1px solid var(--borde);color:var(--suave);border-radius:12px;padding:8px 12px;font-size:14px}
+.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.resumen div{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:12px}
+.resumen b{display:block;font-size:24px;color:var(--rojo-claro)}
+.resumen small{color:var(--suave);font-size:13px}
+.filtros{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px}
+.filtros button{flex:none;height:42px;padding:0 14px;border-radius:999px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:15px;font-weight:700}
+.filtros button.activo{background:var(--rojo);border-color:var(--rojo)}
+.filtros .n{display:inline-block;min-width:22px;margin-left:6px;padding:1px 6px;border-radius:999px;background:rgba(255,255,255,.18);font-size:13px}
+.pedido{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px;border-radius:16px;background:var(--tarjeta);border:1px solid var(--borde);color:inherit;margin-bottom:10px}
+.pedido.nuevo{border-color:var(--rojo);background:#2A0E10;animation:latir 1.4s ease-in-out infinite}
+@keyframes latir{50%{box-shadow:0 0 0 6px rgba(227,18,27,.25)}}
+.pedido .num{font-weight:800;font-size:18px;min-width:68px}
+.pedido .info{flex:1;min-width:0}
+.pedido .info b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pedido .info small{color:var(--suave);font-size:14px}
+.pedido .tiempo{display:block;margin-top:2px;font-size:13px;font-weight:800;color:var(--amarillo);font-variant-numeric:tabular-nums}
+.est{flex:none;font-size:12px;font-weight:800;padding:5px 10px;border-radius:999px;background:#222;color:var(--suave);text-transform:uppercase;letter-spacing:.04em}
+.est.nuevo{background:var(--rojo);color:#fff}.est.preparando{background:#3A2A0A;color:var(--amarillo)}
+.est.listo,.est.en_camino{background:#0F2A3A;color:#8FD3FF}.est.entregado{background:#132219;color:var(--verde-claro)}.est.rechazado{background:#222;color:#888}
+.vacio{text-align:center;color:var(--suave);padding:40px 10px;line-height:1.6}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:18px;padding:16px;margin-bottom:14px}
+.fila{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:16px}
+.fila span:first-child{color:var(--suave)}
+.fila span:last-child{text-align:right;font-weight:600}
+.total{font-size:24px;font-weight:800;color:var(--rojo-claro)}
+.items{margin:8px 0 4px;padding-left:20px;font-size:16px;line-height:1.5}
+.items li{margin-bottom:6px}
+.items small{display:block;color:var(--suave);font-size:14px}
+.items small.cambio{color:var(--amarillo);font-weight:700}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);margin:20px 0 10px}
+.botones{display:flex;flex-direction:column;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:58px;padding:0 16px;border-radius:16px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:17px;font-weight:700;text-decoration:none}
+.btn.rojo{background:var(--rojo);border-color:var(--rojo)}
+.btn.verde{background:var(--verde);border-color:var(--verde)}
+.btn.borde{background:transparent}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.minutos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.minutos button{height:52px;border-radius:12px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:17px;font-weight:700}
+.minutos button.activo{background:var(--rojo);border-color:var(--rojo)}
+.reloj{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#2A0E10;border:1px solid #5E1A1E;margin-bottom:14px}
+.reloj b{font-size:34px;font-variant-numeric:tabular-nums}
+.reloj small{display:block;color:#FFB4B8;font-size:14px}
+.reloj.tarde{background:#3A0A0A;border-color:var(--rojo)}
+.volver{background:none;border:0;color:var(--rojo-claro);font-weight:700;font-size:16px;padding:6px 0;margin-bottom:8px}
+.login{max-width:380px;margin:12vh auto 0;text-align:center}
+.login img{width:96px;height:96px;border-radius:50%;border:2px solid var(--rojo);background:#0B0B0B}
+.login h1{font-size:24px;margin:14px 0 4px}
+.login p{color:var(--suave);margin:0 0 20px}
+label{display:block;text-align:left;font-size:14px;color:var(--suave);margin:12px 0 6px}
+input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:0 14px}
+.error{color:#FF8A8F;min-height:22px;font-size:15px;margin:10px 0}
+.aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#1E7A45;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;transition:transform .25s;z-index:20;max-width:90vw;text-align:center}
+.aviso.ver{transform:translateX(-50%) translateY(0)}
+.sonido{background:#3A2A0A;border:1px solid #6A4E14;color:var(--amarillo);border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:700;width:100%}
+textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:12px}
+</style>
+</head>
+<body>
+<div class="caja" id="app"><p class="vacio">Cargando…</p></div>
+<div class="aviso" id="aviso" role="status" aria-live="polite"></div>
+
+<script type="module">
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos } from "./fb.js";
+
+const NEGOCIO = { nombre: "Jireh Sushi" };
+/* @@MINUTOS */
+const MINUTOS = [10, 15, 20, 25, 30, 35, 40, 50];
+/* @@MENSAJES — {nombre}, {id}, {min} y {enlace} se rellenan solos */
+const MSG = {
+  aceptado: "¡Hola {nombre}! 🍣 Recibimos tu pedido #{id}. Estará listo en aproximadamente {min} minutos.\n\n⏱️ Síguelo en vivo aquí: {enlace}",
+  listoLlevar: "¡{nombre}, tu pedido #{id} está listo! 🙌 Puedes pasar a buscarlo.",
+  enCamino: "¡{nombre}, tu pedido #{id} va en camino! 🛵",
+  pago: "¡Gracias {nombre}! Recibimos tu pago del pedido #{id} ✅",
+  gracias: "¡Gracias por tu compra, {nombre}! Esperamos que lo disfrutes 🍣 ¡Te esperamos pronto en Jireh Sushi!",
+  rechazado: "Hola {nombre}, lo sentimos mucho: no podemos preparar tu pedido #{id} en este momento. {motivo}"
+};
+const ESTADOS = { nuevo: "Nuevo", preparando: "En cocina", listo: "Listo", en_camino: "En camino", entregado: "Entregado", rechazado: "Rechazado" };
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const dinero = n => "RD$ " + Number(n || 0).toLocaleString("en-US");
+const ms = t => t && t.toMillis ? t.toMillis() : (t || 0);
+const hora = t => ms(t) ? new Date(ms(t)).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" }) : "";
+const mmss = x => { const s = Math.max(0, Math.round(x / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+function avisar(t){ const a = $("#aviso"); a.textContent = t; a.classList.add("ver"); clearTimeout(avisar.t); avisar.t = setTimeout(() => a.classList.remove("ver"), 2400); }
+function telWA(t){ let n = String(t).replace(/\D/g, ""); if (n.length === 10) n = "1" + n; return n; }
+// Abre WhatsApp en otra pestaña para que el panel siga abierto y escuchando pedidos
+function abrirWA(numero, texto){
+  const movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = `${movil ? "https://api.whatsapp.com/send" : "https://web.whatsapp.com/send"}?${numero ? "phone=" + numero + "&" : ""}text=${encodeURIComponent(texto)}`;
+  if (!window.open(url, "_blank")) location.href = url;
+}
+const enlaceSeguimiento = id => new URL("pedido.html?id=" + encodeURIComponent(id), location.href).href;
+const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").split(/\s+/)[0]).replace(/\{id\}/g, p.codigo)
+  .replace(/\{min\}/g, extra.min ?? p.minutos ?? "").replace(/\{enlace\}/g, enlaceSeguimiento(p.id)).replace(/\{motivo\}/g, extra.motivo || "");
+
+/* ---------- Estado de la pantalla ---------- */
+let pedidos = [], filtro = "activos", abierto = null, minutosSel = 20, conectado = false, vistos = new Set(), primeraCarga = true;
+
+/* ---------- @@SONIDO: campanita con el navegador (sin archivos) ---------- */
+let audio = null, sonidoListo = false;
+function activarSonido(){ try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); sonidoListo = true; } catch(e) {} }
+function campana(){
+  if (!audio) return;
+  const t = audio.currentTime;
+  [[880, 0], [1175, .18], [1568, .36]].forEach(([f, d]) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(0, t + d); g.gain.linearRampToValueAtTime(.35, t + d + .02); g.gain.exponentialRampToValueAtTime(.001, t + d + .6);
+    o.start(t + d); o.stop(t + d + .65);
+  });
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+// Mientras haya pedidos nuevos sin aceptar, la campana suena cada 20 segundos
+setInterval(() => { if (pedidos.some(p => p.estado === "nuevo")) campana(); }, 20000);
+
+/* ---------- Pantalla siempre encendida ---------- */
+let wake = null;
+async function pantallaEncendida(){ try { if ("wakeLock" in navigator && document.visibilityState === "visible") wake = await navigator.wakeLock.request("screen"); } catch(e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pantallaEncendida(); });
+
+/* ---------- Inicio de sesión ---------- */
+function pintarLogin(error = ""){
+  $("#app").innerHTML = `<form class="login" id="form-login">
+    <img src="fotos/logo.png" alt="Jireh Sushi">
+    <h1>Panel de pedidos</h1><p>Entra con el usuario del negocio</p>
+    <label for="correo">Correo</label><input id="correo" type="email" autocomplete="username" required>
+    <label for="clave">Contraseña</label><input id="clave" type="password" autocomplete="current-password" required>
+    <div class="error">${esc(error)}</div>
+    <button class="btn rojo" type="submit">Entrar</button>
+  </form>`;
+  $("#form-login").addEventListener("submit", async e => {
+    e.preventDefault(); activarSonido();
+    const b = e.target.querySelector("button"); b.disabled = true; b.textContent = "Entrando…";
+    try { await entrar($("#correo").value.trim(), $("#clave").value); }
+    catch (err) { pintarLogin("Correo o contraseña incorrectos."); }
+  });
+}
+
+let dejarDeEscuchar = null;
+alCambiarSesion(usuario => {
+  if (dejarDeEscuchar) { dejarDeEscuchar(); dejarDeEscuchar = null; }
+  if (!usuario) { pedidos = []; pintarLogin(); return; }
+  pantallaEncendida();
+  primeraCarga = true;
+  dejarDeEscuchar = escucharPedidosDeHoy((lista, nuevos) => {
+    conectado = true;
+    pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
+    if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); }
+    primeraCarga = false;
+    pintar();
+  }, err => { conectado = false; console.error(err); avisar("Sin conexión con los pedidos. Revisa el internet."); pintar(); });
+});
+
+/* ---------- Lista ---------- */
+const GRUPOS = {
+  activos: p => ["nuevo", "preparando", "listo", "en_camino"].includes(p.estado),
+  nuevo: p => p.estado === "nuevo",
+  preparando: p => p.estado === "preparando",
+  salida: p => ["listo", "en_camino"].includes(p.estado),
+  entregado: p => ["entregado", "rechazado"].includes(p.estado)
+};
+function pintar(){
+  if (abierto) { const p = pedidos.find(x => x.id === abierto); if (p) return pintarPedido(p); abierto = null; }
+  const entregados = pedidos.filter(p => p.estado === "entregado");
+  const vendido = entregados.reduce((a, p) => a + (p.total || 0), 0);
+  const lista = pedidos.filter(GRUPOS[filtro]);
+  const cuenta = k => pedidos.filter(GRUPOS[k]).length;
+  $("#app").innerHTML = `
+    <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Pedidos de hoy</h1>
+      <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"}</small></div>
+      <button class="chico" data-acc="salir">Salir</button></div>
+    ${sonidoListo ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido de pedidos nuevos</button>`}
+    <div class="resumen">
+      <div><b>${pedidos.filter(p => p.estado !== "rechazado").length}</b><small>Pedidos</small></div>
+      <div><b>${cuenta("activos")}</b><small>En curso</small></div>
+      <div><b style="font-size:19px">${dinero(vendido)}</b><small>Vendido (entregados)</small></div>
+    </div>
+    <div class="filtros">
+      ${[["activos","En curso"],["nuevo","Nuevos"],["preparando","En cocina"],["salida","Para salir"],["entregado","Terminados"]]
+        .map(([k, t]) => `<button class="${filtro === k ? "activo" : ""}" data-filtro="${k}">${t}<span class="n">${cuenta(k)}</span></button>`).join("")}
+    </div>
+    ${lista.length ? lista.map(p => `
+      <button class="pedido ${p.estado === "nuevo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}">
+        <span class="num">#${esc(p.codigo)}</span>
+        <span class="info"><b>${esc(p.nombre)}</b>
+          <small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)} · ${dinero(p.total)}</small>
+          ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}</span>
+        <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
+      </button>`).join("")
+      : `<div class="vacio">${filtro === "activos" ? "No hay pedidos en curso.<br>Cuando un cliente pida desde el menú, aparecerá aquí con sonido 🔔" : "Nada por aquí."}</div>`}
+  `;
+  relojes();
+}
+
+/* ---------- Detalle de un pedido ---------- */
+function itemsHTML(p){
+  return (p.items || []).map(it => `<li>${it.cant} x ${esc(it.nombre)} <span style="color:var(--suave)">· ${dinero(it.precio * it.cant)}</span>
+    ${(it.detalles || []).map(d => `<small class="${/^Cambio a/i.test(d) ? "cambio" : ""}">${/^Cambio a/i.test(d) ? "🔁 " : /^Extra/i.test(d) ? "➕ " : ""}${esc(d)}</small>`).join("")}</li>`).join("");
+}
+function mapa(p){
+  if (p.ubic) return "https://maps.google.com/?q=" + p.ubic.lat + "," + p.ubic.lng;
+  if (p.dir) return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p.dir + ", Santo Domingo Este");
+  return "";
+}
+function pintarPedido(p){
+  const entrega = p.modo === "delivery";
+  let acciones = "";
+  if (p.estado === "nuevo") acciones = `
+    <h2>Aceptar · tiempo de preparación (máximo 50 min)</h2>
+    <div class="minutos">${MINUTOS.map(m => `<button class="${m === minutosSel ? "activo" : ""}" data-min="${m}">${m}</button>`).join("")}</div>
+    <div class="botones"><button class="btn verde" data-acc="aceptar">✅ Aceptar · listo en ${minutosSel} min</button>
+      <button class="btn borde" data-acc="rechazar">No se puede preparar</button></div>
+    <div id="caja-rechazo" hidden style="margin-top:10px"><textarea id="motivo" placeholder="Motivo para el cliente (ej.: se nos acabó el salmón)"></textarea>
+      <div class="botones" style="margin-top:8px"><button class="btn rojo" data-acc="confirmar-rechazo">Rechazar y avisar al cliente</button></div></div>`;
+  if (p.estado === "preparando") acciones = `
+    <div class="botones"><button class="btn verde" data-acc="listo">${entrega ? "✅ Listo para salir" : "✅ Listo para buscar"}</button>
+      ${entrega ? `<button class="btn" data-acc="grupo">🛵 Mandar al grupo de delivery</button>` : ""}</div>`;
+  if (p.estado === "listo") acciones = `
+    <div class="botones">${entrega ? `<button class="btn rojo" data-acc="camino">🛵 Salió · va en camino</button><button class="btn" data-acc="grupo">Mandar al grupo de delivery</button>` : ""}
+      <button class="btn verde" data-acc="entregado">📦 Entregado</button></div>`;
+  if (p.estado === "en_camino") acciones = `<div class="botones"><button class="btn verde" data-acc="entregado">📦 Entregado</button></div>`;
+  if (p.estado === "entregado" || p.estado === "rechazado") acciones = `<div class="botones"><button class="btn borde" data-acc="reabrir">Reabrir pedido</button></div>`;
+
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="volver">← Pedidos de hoy</button>
+    <div class="tarjeta">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1 style="margin:0;font-size:26px">#${esc(p.codigo)}</h1><span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
+      <div class="fila"><span>Cliente</span><span>${esc(p.nombre)}</span></div>
+      <div class="fila"><span>Teléfono</span><span>${esc(p.tel)}</span></div>
+      <div class="fila"><span>Tipo</span><span>${entrega ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)}</span></div>
+      ${entrega ? `<div class="fila"><span>Dirección</span><span>${esc(p.dir)}</span></div>
+        ${p.ref ? `<div class="fila"><span>Referencia</span><span>${esc(p.ref)}</span></div>` : ""}
+        ${mapa(p) ? `<div class="fila"><span>Ubicación</span><span><a href="${esc(mapa(p))}" target="_blank" rel="noopener" style="color:var(--rojo-claro)">${p.ubic && !p.ubic.aprox ? "Ver en el mapa" : "Buscar en el mapa"}</a>${p.ubic && !p.ubic.aprox ? "" : `<br><small style="color:var(--amarillo)">Dirección aproximada: confirmar</small>`}</span></div>` : ""}` : ""}
+      <ul class="items">${itemsHTML(p)}</ul>
+      ${p.notas ? `<div class="fila"><span>Notas</span><span>${esc(p.notas)}</span></div>` : ""}
+      ${entrega ? `<div class="fila"><span>Subtotal</span><span>${dinero(p.subtotal)}</span></div>
+        <div class="fila"><span>Delivery</span><span>${p.delivery != null ? dinero(p.delivery) + " (" + p.km + " km)" : "Por confirmar"}</span></div>` : ""}
+      <div class="fila"><span>Total</span><span class="total">${esc(p.totalTexto || dinero(p.total))}</span></div>
+      <div class="fila"><span>Pago</span><span>${esc(p.pago)}${p.banco ? " · " + esc(p.banco) : ""}${p.cambio ? " (paga con " + esc(p.cambio) + ")" : ""}${p.pagado ? " ✅ recibido" : ""}</span></div>
+    </div>
+    ${p.estado === "preparando" && p.listoEn ? `<div class="reloj" data-reloj="${ms(p.listoEn)}"><span style="font-size:30px">⏱️</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Tiempo de preparación (${p.minutos} min)</small></div></div>` : ""}
+    ${acciones}
+    <h2>Cliente</h2>
+    <div class="dos"><a class="btn" href="tel:${esc(String(p.tel).replace(/\D/g, ""))}">📞 Llamar</a><button class="btn" data-acc="wa">💬 WhatsApp</button></div>
+    <div class="dos" style="margin-top:10px"><button class="btn" data-acc="pago">${p.pagado ? "✅ Pago recibido" : "💰 Pago recibido"}</button><button class="btn" data-acc="seguimiento">📍 Enviar seguimiento</button></div>
+  `;
+  relojes();
+}
+
+/* ---------- Relojes en vivo ---------- */
+function relojes(){
+  document.querySelectorAll("[data-fin]").forEach(el => { const f = +el.dataset.fin - Date.now(); el.textContent = f > 0 ? mmss(f) : "¡Ya!"; });
+  document.querySelectorAll("[data-reloj]").forEach(el => el.classList.toggle("tarde", +el.dataset.reloj < Date.now()));
+}
+setInterval(relojes, 1000);
+
+/* ---------- Acciones ---------- */
+async function cambiar(p, cambios, cambiosCli, texto){
+  try { await actualizarPedido(p.id, cambios, cambiosCli); if (texto) avisar(texto); }
+  catch (e) { console.error(e); avisar("No se pudo guardar. Revisa el internet."); }
+}
+/* @@DELIVERY-MSG */
+function mensajeDelivery(p){
+  let m = `🛵 PEDIDO #${p.codigo} · ${p.nombre}\n📞 ${p.tel}\n📍 ${p.dir}${p.ref ? "\nReferencia: " + p.ref : ""}`;
+  if (mapa(p)) m += `\nMapa: ${mapa(p)}`;
+  m += "\n\n" + (p.items || []).map(it => `• ${it.cant} x ${it.nombre}` + (it.detalles || []).map(d => "\n   " + d).join("")).join("\n");
+  if (p.notas) m += `\nNotas: ${p.notas}`;
+  m += p.pago === "Transferencia" ? `\n\n💳 Pagó por transferencia${p.pagado ? " ✅" : " (verificar comprobante)"}` : `\n\n💵 COBRAR: ${p.totalTexto || dinero(p.total)}${p.cambio ? " · paga con " + p.cambio : ""}`;
+  return m + `\n\nResponde "Lo tomo ✋" si vas tú.`;
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button, [data-abrir]"); if (!b) return;
+  activarSonido();
+  if (b.dataset.filtro) { filtro = b.dataset.filtro; return pintar(); }
+  if (b.dataset.abrir) { abierto = b.dataset.abrir; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.min) { minutosSel = +b.dataset.min; return pintar(); }
+  const p = pedidos.find(x => x.id === abierto);
+  switch (b.dataset.acc) {
+    case "sonido": campana(); pintar(); break;
+    case "salir": salir(); break;
+    case "volver": abierto = null; pintar(); break;
+    case "aceptar":
+      cambiar(p, { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel), aceptado: new Date() },
+        { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel) }, "Pedido aceptado");
+      abrirWA(telWA(p.tel), llenar(MSG.aceptado, p, { min: minutosSel }));
+      break;
+    case "rechazar": $("#caja-rechazo").hidden = false; $("#motivo").focus(); break;
+    case "confirmar-rechazo": {
+      const motivo = $("#motivo").value.trim();
+      cambiar(p, { estado: "rechazado", motivo }, { estado: "rechazado", motivo }, "Pedido rechazado");
+      abrirWA(telWA(p.tel), llenar(MSG.rechazado, p, { motivo }));
+      break;
+    }
+    case "listo":
+      cambiar(p, { estado: "listo" }, { estado: "listo" }, "Marcado como listo");
+      if (p.modo !== "delivery") abrirWA(telWA(p.tel), llenar(MSG.listoLlevar, p));
+      break;
+    case "camino":
+      cambiar(p, { estado: "en_camino" }, { estado: "en_camino" }, "Va en camino");
+      abrirWA(telWA(p.tel), llenar(MSG.enCamino, p));
+      break;
+    case "entregado": cambiar(p, { estado: "entregado" }, { estado: "entregado" }, "Pedido entregado"); break;
+    case "reabrir": cambiar(p, { estado: "preparando" }, { estado: "preparando" }, "Pedido reabierto"); break;
+    case "grupo": abrirWA("", mensajeDelivery(p)); break;
+    case "wa": abrirWA(telWA(p.tel), `Hola ${(p.nombre || "").split(/\s+/)[0]}, te escribimos de Jireh Sushi sobre tu pedido #${p.codigo}. `); break;
+    case "seguimiento": abrirWA(telWA(p.tel), `Sigue tu pedido #${p.codigo} en vivo aquí: ${enlaceSeguimiento(p.id)}`); break;
+    case "pago":
+      if (!p.pagado) { cambiar(p, { pagado: true }, null, "Pago marcado"); abrirWA(telWA(p.tel), llenar(MSG.pago, p)); }
+      else cambiar(p, { pagado: false }, null, "Pago desmarcado");
+      break;
+  }
+});
+</script>
+</body>
+</html>

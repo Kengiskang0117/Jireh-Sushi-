@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tu pedido · Jireh Sushi</title>
+<link rel="icon" type="image/png" sizes="64x64" href="fotos/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="fotos/icono-180.png">
+<meta name="theme-color" content="#0B0B0C">
+<!--
+  =========================================================
+  SEGUIMIENTO DEL PEDIDO EN VIVO (para el cliente) · Kenmake Soluciones
+  ---------------------------------------------------------
+  - Se abre con pedido.html?id=XXXX (el enlace largo y único de cada pedido).
+  - Lee el estado desde Firebase y cambia solo cuando el negocio toca un botón.
+  - El cliente solo ve: número de pedido, su nombre, el estado y el tiempo.
+
+  Para cambiar algo, busca con Ctrl+F:
+  @@TEXTOS   Frases que ve el cliente en cada estado
+  @@COLORES  Colores
+  =========================================================
+-->
+<style>
+/* @@COLORES */
+:root{--fondo:#0B0B0C;--tarjeta:#17171A;--borde:#2A2A2E;--rojo:#E3121B;--texto:#F4F1EC;--suave:#A9A39A;--verde:#2FD47A}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3A0D10 0%,var(--fondo) 60%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px 18px}
+.caja{width:100%;max-width:420px;text-align:center}
+.logo{width:92px;height:92px;border-radius:50%;background:#0B0B0B;border:2px solid var(--rojo);object-fit:cover}
+h1{font-size:22px;margin:14px 0 4px}
+.frase{color:var(--suave);margin:0 0 22px;font-size:16px;min-height:22px}
+.anillo{position:relative;width:240px;height:240px;margin:0 auto 22px}
+.anillo svg{width:100%;height:100%;transform:rotate(-90deg)}
+.anillo circle{fill:none;stroke-width:14}
+.anillo .base{stroke:#2A2A2E}
+.anillo .barra{stroke:var(--rojo);stroke-linecap:round;transition:stroke-dashoffset 1s linear,stroke .4s}
+.anillo.ok .barra{stroke:var(--verde)}
+.centro{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 30px}
+.centro b{font-size:54px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.centro b.texto{font-size:30px;line-height:1.15}
+.centro small{color:var(--suave);font-size:14px;margin-top:8px}
+.anillo.ok .centro b{color:var(--verde)}
+.pasos{display:flex;justify-content:space-between;gap:6px;margin:0 0 18px;padding:14px 10px;border-radius:16px;background:var(--tarjeta);border:1px solid var(--borde)}
+.paso{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;color:var(--suave)}
+.paso i{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#222226;font-style:normal;font-size:16px}
+.paso.on{color:var(--texto);font-weight:700}.paso.on i{background:var(--rojo)}
+.paso.ok i{background:#1E7A45}
+.nota{color:var(--suave);font-size:14px;line-height:1.5;margin:0}
+.btn{display:inline-block;margin-top:16px;padding:13px 20px;border-radius:14px;background:#1E7A45;color:#fff;text-decoration:none;font-weight:700}
+.pie{color:#6E6862;font-size:12px;margin-top:22px}
+.vivo{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--suave);margin-top:10px}
+.vivo i{width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 4px rgba(47,212,122,.18)}
+</style>
+</head>
+<body>
+<main class="caja" id="app">
+  <img class="logo" src="fotos/logo.png" alt="Jireh Sushi">
+  <p class="frase">Buscando tu pedido…</p>
+</main>
+
+<script type="module">
+import { escucharSeguimiento } from "./fb.js";
+
+/* @@TEXTOS */
+const NEGOCIO = { nombre: "Jireh Sushi", whatsapp: "19785664534" };   // PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
+const TEXTOS = {
+  nuevo: "Tu pedido llegó. Estamos por confirmarlo 🙌",
+  preparando: "Estamos preparando tu pedido 👨‍🍳",
+  listoLlevar: "¡Tu pedido está listo! Puedes pasar a buscarlo 🙌",
+  listoDelivery: "¡Tu pedido está listo! Sale en un momento 🛵",
+  en_camino: "¡Tu pedido va en camino! 🛵",
+  entregado: "¡Pedido entregado! Buen provecho 🍣",
+  rechazado: "Lo sentimos, no pudimos preparar tu pedido.",
+  noExiste: "No encontramos este pedido. Revisa el enlace o escríbenos por WhatsApp."
+};
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const ms = t => t && t.toMillis ? t.toMillis() : (t || 0);
+const R = 106, C = 2 * Math.PI * R;
+const app = document.getElementById("app");
+const id = new URLSearchParams(location.search).get("id") || "";
+let actual = null;
+
+function pintar(s){
+  actual = s;
+  if (!s) {
+    app.innerHTML = `<img class="logo" src="fotos/logo.png" alt="Jireh Sushi"><h1>Tu pedido</h1><p class="frase">${TEXTOS.noExiste}</p>
+      <a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>`;
+    return;
+  }
+  const delivery = s.modo === "delivery";
+  const orden = delivery ? ["nuevo", "preparando", "listo", "en_camino", "entregado"] : ["nuevo", "preparando", "listo", "entregado"];
+  const pasos = delivery
+    ? [["nuevo","✓","Recibido"],["preparando","👨‍🍳","Preparando"],["en_camino","🛵","En camino"],["entregado","🎉","Entregado"]]
+    : [["nuevo","✓","Recibido"],["preparando","👨‍🍳","Preparando"],["listo","🙌","Listo"],["entregado","🎉","Entregado"]];
+  const pos = orden.indexOf(s.estado === "listo" && delivery ? "preparando" : s.estado);
+  const frase = s.estado === "listo" ? (delivery ? TEXTOS.listoDelivery : TEXTOS.listoLlevar) : (TEXTOS[s.estado] || "");
+  const rechazado = s.estado === "rechazado";
+  app.innerHTML = `
+    <img class="logo" src="fotos/logo.png" alt="Jireh Sushi">
+    <h1>${s.nombre ? esc(s.nombre) + ", t" : "T"}u pedido #${esc(s.codigo)}</h1>
+    <p class="frase">${esc(frase)}${rechazado && s.motivo ? "<br>" + esc(s.motivo) : ""}</p>
+    ${rechazado ? `<a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>` : `
+    <div class="anillo" id="anillo">
+      <svg viewBox="0 0 240 240" aria-hidden="true"><circle class="base" cx="120" cy="120" r="${R}"/><circle class="barra" id="barra" cx="120" cy="120" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>
+      <div class="centro"><b id="tiempo" class="texto">…</b><small id="debajo"></small></div>
+    </div>
+    <div class="pasos">${pasos.map(([k, ic, t]) => {
+      const i = orden.indexOf(k);
+      const cls = i < pos || (k === "entregado" && s.estado === "entregado") ? "ok" : (i === pos || (k === "en_camino" && s.estado === "en_camino") ? "on" : "");
+      return `<div class="paso ${cls}"><i>${cls === "ok" ? "✓" : ic}</i>${t}</div>`;
+    }).join("")}</div>
+    <p class="nota">Esta pantalla se actualiza sola. El tiempo es aproximado.</p>`}
+    <div class="vivo"><i></i>En vivo</div>
+    <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
+  tick();
+}
+
+function tick(){
+  const s = actual; if (!s || s.estado === "rechazado") return;
+  const t = document.getElementById("tiempo"), d = document.getElementById("debajo"), barra = document.getElementById("barra"), anillo = document.getElementById("anillo");
+  if (!t) return;
+  if (s.estado === "nuevo") { t.className = "texto"; t.textContent = "Recibido"; d.textContent = "Esperando confirmación"; barra.style.strokeDashoffset = C * .92; return; }
+  if (s.estado === "preparando" && s.listoEn) {
+    const total = (s.minutos || 30) * 60000, falta = ms(s.listoEn) - Date.now();
+    if (falta > 0) {
+      const seg = Math.ceil(falta / 1000);
+      t.className = ""; t.textContent = String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0");
+      d.textContent = "minutos aprox."; barra.style.strokeDashoffset = C * Math.max(0, Math.min(1, falta / total));
+    } else { t.className = "texto"; t.textContent = "Casi listo"; d.textContent = "Unos minutos más"; barra.style.strokeDashoffset = C * .04; }
+    return;
+  }
+  anillo.classList.add("ok"); barra.style.strokeDashoffset = 0; t.className = "texto"; d.textContent = "";
+  t.textContent = { listo: "¡Listo!", en_camino: "En camino", entregado: "¡Entregado!" }[s.estado] || "";
+}
+setInterval(tick, 1000);
+
+if (!id) pintar(null);
+else escucharSeguimiento(id, pintar, () => pintar(null));
+</script>
+</body>
+</html>

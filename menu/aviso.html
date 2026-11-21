@@ -159,7 +159,7 @@ function mensajeDelivery(){
   let m = `🛵 *PEDIDO #${P.id}* — ${NEGOCIO.nombre}\n\n`;
   m += `Cliente: ${P.nombre}\nTeléfono: ${P.tel}\n`;
   m += `Dirección: ${P.dir}${P.ref ? `\nReferencia: ${P.ref}` : ""}\n`;
-  if (P.ubic) m += `Ubicación: https://maps.google.com/?q=${P.ubic}\n`;
+  if (enlaceMapa()) m += `${P.ubic ? "Ubicación" : "Mapa (por dirección)"}: ${enlaceMapa()}\n`;
   if (P.km) m += `Distancia aprox.: ${P.km} km\n`;
   m += `\n${listaItems()}\n\n`;
   if (P.pago === "Efectivo") m += `💵 *COBRAR: ${P.total}* en efectivo${P.cambio ? ` (paga con ${P.cambio})` : ""}`;
@@ -172,11 +172,17 @@ function mensajeDelivery(){
 function listaItems(){
   return P.items.split(";").filter(Boolean).map(x => { const [nom, det] = x.trim().split(" → "); return "• " + nom + (det ? det.split(" · ").map(d => "\n   " + d).join("") : ""); }).join("\n");
 }
+/* @@MAPA: punto exacto si el cliente compartió su ubicación; si no, busca la dirección escrita */
+function enlaceMapa(){
+  if (P.ubic) return "https://maps.google.com/?q=" + P.ubic;
+  if (P.dir) return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(P.dir + ", Santo Domingo Este");
+  return "";
+}
 /* Texto completo del pedido, para el botón "Copiar datos" */
 function textoPedido(){
   let m = `Pedido #${P.id} · ${P.modo === "delivery" ? "Delivery" : "Para llevar"}\n`;
   m += `Cliente: ${P.nombre} · ${P.tel}\n`;
-  if (P.modo === "delivery") { m += `Dirección: ${P.dir}${P.ref ? ` (${P.ref})` : ""}\n`; if (P.ubic) m += `Mapa: https://maps.google.com/?q=${P.ubic}\n`; }
+  if (P.modo === "delivery") { m += `Dirección: ${P.dir}${P.ref ? ` (${P.ref})` : ""}\n`; if (enlaceMapa()) m += `Mapa${P.ubic ? "" : " (por dirección, confirmar)"}: ${enlaceMapa()}\n`; }
   m += listaItems() + "\n";
   if (P.modo === "delivery") m += `Subtotal: ${P.sub} · Delivery: ${P.del || "por confirmar"}\n`;
   m += `Total: ${P.total} · Pago: ${P.pago}${P.banco ? " (" + P.banco + ")" : ""}${P.cambio ? " · paga con " + P.cambio : ""}`;
@@ -288,7 +294,7 @@ function pintarPedido(){
       <div class="fila"><span>Teléfono</span><span>${esc(P.tel)}</span></div>
       ${P.modo === "delivery" ? `<div class="fila"><span>Dirección</span><span>${esc(P.dir)}</span></div>
       ${P.ref ? `<div class="fila"><span>Referencia</span><span>${esc(P.ref)}</span></div>` : ""}
-      ${P.ubic ? `<div class="fila"><span>Ubicación</span><span><a class="enlace" href="https://maps.google.com/?q=${esc(P.ubic)}" target="_blank" rel="noopener">Ver en el mapa</a></span></div>` : ""}` : ""}
+      ${enlaceMapa() ? `<div class="fila"><span>Ubicación</span><span><a class="enlace" href="${esc(enlaceMapa())}" target="_blank" rel="noopener">${P.ubic ? "Ver en el mapa" : "Buscar la dirección en el mapa"}</a>${P.ubic ? "" : `<br><small style="color:#FFD27A">El cliente no compartió su ubicación: confirmar</small>`}</span></div>` : ""}` : ""}
       <div class="fila"><span>Pago</span><span>${esc(P.pago)}${P.banco ? " · " + esc(P.banco) : ""}${P.cambio ? " · paga con " + esc(P.cambio) : ""}</span></div>
       ${P.notas ? `<div class="fila"><span>Notas</span><span>${esc(P.notas)}</span></div>` : ""}
       <ul class="items">${P.items.split(";").filter(Boolean).map(x => {
