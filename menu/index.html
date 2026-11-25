@@ -41,7 +41,7 @@
   @@LOBBY          Bienvenida: Para llevar / Delivery / Comer aquí
   @@TEXTOS-MODO    Texto de la barra según la opción elegida
   @@INFO           Tarjetas de horario, dirección y teléfono
-  @@PASOS          "Cómo pedir" (1, 2, 3)
+  @@PASOS          (quitados) Los 3 cuadros "Cómo pedir"
   @@PIE            Pie de página y firma
   @@FORMULARIO     Campos que llena el cliente al pedir
   @@MENSAJE        Mensaje que llega por WhatsApp
@@ -202,6 +202,8 @@ img{display:block;max-width:100%}
 .campo{display:flex;flex-direction:column;gap:6px}
 /* @@SUGERENCIAS-DIRECCION */
 .campo-dir{position:relative}
+.ayuda-dir{display:block;min-height:0;margin-top:6px;color:#FFC24B;font-size:13px;font-weight:600}
+.ayuda-dir:empty{display:none}
 .sugerencias{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:30;background:#1B1B1F;border:1px solid #34343A;border-radius:14px;box-shadow:0 14px 30px rgba(0,0,0,.55);overflow:hidden;max-height:300px;overflow-y:auto}
 .sugerencias button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #2A2A2F;color:inherit;padding:11px 14px;font:inherit;cursor:pointer}
 .sugerencias button:last-child{border-bottom:0}
@@ -331,8 +333,17 @@ img{display:block;max-width:100%}
 .pie .redes{display:flex;gap:10px}
 .pie .redes a{width:44px;height:44px;border-radius:50%;background:var(--tarjeta);border:1px solid var(--borde);color:var(--texto);display:flex;align-items:center;justify-content:center}
 .pie .redes a:hover{border-color:var(--acento);color:var(--acento-texto)}
-.pie .datos{color:#A8A29A;font-size:13px;line-height:1.6}
-.pie .firma{color:#6E6A63;font-size:12px}
+.pie .datos{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;width:100%;max-width:1100px;text-align:left;box-sizing:border-box;padding:0 4px}
+@media (max-width:900px){.pie .datos{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.pie .datos{grid-template-columns:1fr;padding:0 16px}}
+.pie-dato{display:flex;gap:12px;align-items:flex-start;padding:16px;border-radius:16px;background:var(--tarjeta);border:1px solid var(--borde);color:var(--texto);text-decoration:none}
+a.pie-dato:hover{border-color:var(--acento)}
+.pie-ico{font-size:22px;line-height:1;width:40px;height:40px;border-radius:12px;background:#2A1214;display:flex;align-items:center;justify-content:center;flex:none}
+.pie-dato small{display:block;color:#A8A29A;font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.pie-dato b{display:block;font-size:16.5px;line-height:1.35;font-weight:700}
+.pie-dato em{display:block;font-style:normal;color:var(--acento-texto);font-size:14px;font-weight:700;margin-top:4px}
+.p-tag.oferta,.etiqueta.oferta{background:#E1262D;color:#fff;border-color:#E1262D}
+.pie .firma{color:#6E6A63;font-size:12.5px;margin-top:6px}
 
 /* @@FOTO-RESPALDO — Logo transparente cuando no hay foto o mientras carga.
    En la plantilla está apagado: mientras no haya logo se ven los dibujos.
@@ -472,12 +483,7 @@ img{display:block;max-width:100%}
       </div>
     </div>
     <button class="hero" id="hero" aria-label="Ver el producto destacado"></button>
-    <!-- ================= @@PASOS — CÓMO PEDIR ================= -->
-    <div class="pasos" aria-label="Cómo pedir">
-      <div class="paso"><b>1</b><span>Elige tus favoritos</span></div>
-      <div class="paso"><b>2</b><span>Agrégalos al carrito</span></div>
-      <div class="paso"><b>3</b><span id="paso3">Envía tu pedido por WhatsApp</span></div>
-    </div>
+    <!-- @@PASOS: los 3 cuadros "Cómo pedir" se quitaron a pedido del dueño (24 nov) -->
   </div>
 
   <nav class="pestanas" aria-label="Categorías"><div class="pestanas-in" id="pestanas"></div></nav>
@@ -552,12 +558,18 @@ const NEGOCIO = {
   deliveryMaxKm: 20        // más lejos de esto: el delivery se coordina con el cliente por WhatsApp
 };
 
-const DESTACADO = "eby-banana";     // @@DESTACADO  Producto que sale grande arriba (escribe su id)
+/* @@DESTACADO — El producto grande de arriba. Para rotarlo (cada semana o cada mes): pon el id del producto
+   que más gustó esa semana y, si quieres, cambia la etiqueta. Ej.: "combo-golden", "32-vip", "sutil-roll". */
+const DESTACADO = "antojo-24";
+const DESTACADO_ETIQUETA = "EL FAVORITO DE LA SEMANA";   // ej.: "EL FAVORITO DEL MES", "LA ESTRELLA DE LA CASA"
 
-/* @@REBAJAS — dos formas, en cualquier producto:
-   1) Por porcentaje:   precio:545, rebaja:15        → la página calcula RD$ 463 y tacha RD$ 545
-   2) Precio exacto:    precioAntes:830, precio:750  → tacha RD$ 830 y cobra RD$ 750
-   Para quitar la rebaja, borra "rebaja" o "precioAntes". La etiqueta "-15%" sale sola. */
+/* @@REBAJAS — dos formas, en cualquier producto (combos incluidos):
+   1) Por porcentaje:   precio:1050, rebaja:15             → la página calcula RD$ 893 y tacha RD$ 1,050
+   2) Precio exacto:    precioAntes:1050, precio:950       → tacha RD$ 1,050 y cobra RD$ 950
+   + Etiqueta opcional: oferta:"Solo hoy"                   → sale un letrero rojo "🔥 Solo hoy" en el producto
+   Ejemplo completo:
+     { id:"antojo-24", nombre:"Antojo 24", precioAntes:1050, precio:950, oferta:"Solo hoy", desc:"...", img:"fotos/antojo-24.jpg" },
+   Para quitar la rebaja: borra "rebaja:…", "precioAntes:…" y "oferta:…". La etiqueta "-10%" de la foto sale sola. */
 /* Para poner una foto: guarda la imagen en la carpeta "fotos" y escribe img: "fotos/nombre.jpg"
    Mientras no haya foto, se muestra una ilustración de la categoría (arte: burger, parrilla, pollo, papas, bebida, postre) */
 /* ================= @@CAMBIO-PROTEINA =================
@@ -629,11 +641,11 @@ const MENU = [
       { id:"combo-royal", nombre:"Combo Royal", tag:"PARA EL GRUPO", precio:2650, desc:"53 piezas: 16 empanizados (pollo, queso crema y puerro · salmón y camarón con queso crema) · 8 Avocado Roll (salmón, puerro y queso crema, envuelto en aguacate) · 8 Chicken Cheese (pollo empanizado, aguacate y ají morrón, envuelto en queso crema) · 8 Chicken Sake (pollo empanizado, queso crema y puerro, envuelto en salmón) · 8 Kanimaki (kanikama y aguacate) · 5 gyozas de pollo.", img:"fotos/combo-royal.jpg" }
     ]}
   ]},
-  /* ---------- @@ROLLS-CASA ---------- */
-  { id:"rolls-casa", nombre:"Rolls de la casa", tab:"De la casa", arte:"burger", sub:"Nuestras creaciones, con Frescura Sagrada.", grupos:[{ items:[
+  /* ---------- @@ROLLS-CASA (se muestra como "Aplatanao") ---------- */
+  { id:"rolls-casa", nombre:"Aplatanao", tab:"Aplatanao", arte:"burger", sub:"Rolls con plátano maduro, creación de la casa.", grupos:[{ items:[
     { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:710, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
     { id:"cheddar-roll", nombre:"Cheddar Roll", precio:720, desc:"Empanizado, relleno de pollo empanizado, queso crema y plátano maduro, bañado en queso cheddar y tocino. 8 unidades.", img:"fotos/cheddar-roll.jpg" },
-    { id:"chicken-aplatanao", nombre:"Chicken Banana Roll", tag:"NUEVO", precio:610, desc:"Pollo empanizado, queso crema y puerro, envuelto en plátano maduro. 8 unidades.", img:"fotos/chicken-aplatanao.jpg" }
+    { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:610, desc:"Pollo empanizado, queso crema y puerro, envuelto en plátano maduro. 8 unidades.", img:"fotos/chicken-aplatanao.jpg" }
   ]}]},
   /* ---------- @@CALIFORNIA ---------- */
   { id:"california", nombre:"California", tab:"California", arte:"burger", sub:"Rolls envueltos en ajonjolí o en puerro.", grupos:[{ items:[
@@ -829,7 +841,7 @@ function pintarMenu(filtro = ""){
 function tarjeta(p, chico){
   const precio = p.precio == null ? `<span class="pendiente">[Precio pendiente]</span>` : precioHTML(p);
   const desc = p.desc ? `<p class="p-desc">${textoPendiente(p.desc)}</p>` : "";
-  const tag = p.tag ? `<span class="p-tag">${esc(p.tag)}</span>` : "";
+  const tag = p.oferta ? `<span class="p-tag oferta">🔥 ${esc(p.oferta)}</span>` : p.tag ? `<span class="p-tag">${esc(p.tag)}</span>` : "";
   const ag = estaAgotado(PRODUCTOS[p.id]);
   return `<button class="producto${chico ? " chico" : ""}${ag ? " agotado" : ""}" data-id="${p.id}" aria-label="Ver ${esc(p.nombre)}">
     <div class="foto">${fotoHTML(PRODUCTOS[p.id])}${seloRebaja(p)}</div>
@@ -849,7 +861,7 @@ function pintarHero(){
   const p = PRODUCTOS[DESTACADO];
   $("#hero").innerHTML = `<div class="foto">${p.img ? `<div class="hero-fondo" style="background-image:url('${p.img}')"></div>` : ""}${fotoHTML(p, "Foto grande · " + p.nombre)}${seloRebaja(p)}</div>
     <div class="hero-txt">
-      <span class="etiqueta">LA ESTRELLA DE LA CASA</span>
+      <span style="display:flex;flex-wrap:wrap;gap:8px"><span class="etiqueta">${esc(DESTACADO_ETIQUETA)}</span>${p.oferta ? `<span class="etiqueta oferta">🔥 ${esc(p.oferta)}</span>` : ""}</span>
       <h1 class="display">${esc(p.nombre)}</h1>
       <p>${esc(p.desc)}</p>
       <div class="hero-pie">${precioHTML(p, 22)}${estaAgotado(p) ? `<span class="agotado-tag">Agotado por hoy</span>` : `<span class="btn-acento">${ICONO_MAS} Agregar</span>`}</div>
@@ -970,6 +982,20 @@ const SECTORES = ["Hainamosa","Ana Teresa Balaguer","Los Solares del Perla","El 
   "Urbanización Mi Hogar","Residencial Don Oscar","Residencial Doña Hilaria","Villa Panamericana","Issfapol","San Luis","Los Molinos","Jardines del Este"];
 const sinTildes = t => String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 let sugTimer = null, sugPedido = 0, sugLista = [];
+/* La dirección debe tener algo más que el sector (la calle). true = solo escribió el sector. */
+const ZONAS = SECTORES.concat(["Santo Domingo Este", "Santo Domingo", "SDE", "República Dominicana", "Distrito Nacional"]).map(sinTildes).sort((a, b) => b.length - a.length);
+function soloSector(dir){
+  let t = sinTildes(dir);
+  ZONAS.forEach(z => { t = t.split(z).join(" "); });
+  return t.replace(/[,.#\-]/g, " ").replace(/\s+/g, " ").trim().length < 4;
+}
+/* Ayuda debajo del campo: le recuerda al cliente lo que falta */
+function ayudaDireccion(input){
+  const a = input.parentElement.querySelector(".ayuda-dir"); if (!a) return;
+  const v = input.value.trim();
+  a.textContent = !v ? "" : soloSector(v) ? "✍️ Escribe también la calle y el número de casa"
+    : !/\d/.test(v) ? "💡 ¿Y el número de casa? Agrégalo o pon una referencia abajo" : "";
+}
 function sugerenciasLocales(texto){
   const pal = texto.trim().split(/\s+/);
   for (let n = Math.min(4, pal.length); n >= 1; n--) {          // prueba con las últimas 4, 3, 2 o 1 palabras
@@ -982,7 +1008,7 @@ function sugerenciasLocales(texto){
 }
 function pintarSugerencias(caja){
   if (!sugLista.length) { caja.hidden = true; caja.innerHTML = ""; return; }
-  caja.innerHTML = sugLista.map((x, i) => `<button type="button" data-sug="${i}" role="option"><span class="ico">${x.tipo === "sector" ? "🏘️" : "📍"}</span><span><b>${esc(x.titulo)}</b><small>${esc(x.sub)}</small></span></button>`).join("");
+  caja.innerHTML = sugLista.map((x, i) => `<button type="button" data-sug="${i}" role="option"><span class="ico">${x.tipo === "mapa" ? "📍" : "🏘️"}</span><span><b>${esc(x.titulo)}</b><small>${esc(x.sub)}</small></span></button>`).join("");
   caja.hidden = false;
 }
 function buscarDireccion(input){
@@ -1001,7 +1027,8 @@ function buscarDireccion(input){
         const pr = f.properties;
         const titulo = [pr.name || pr.street, pr.name ? "" : pr.housenumber].filter(Boolean).join(" ");
         const sub = [pr.name && pr.street ? pr.street : "", pr.district || pr.locality, pr.city].filter(Boolean).join(", ");
-        return { tipo: "mapa", titulo, sub: sub || "República Dominicana", lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+        const esCalle = ["street", "house"].includes(pr.type) || !!pr.housenumber;     // calle o casa: punto preciso
+        return { tipo: esCalle ? "mapa" : "zona", titulo, sub: sub || "República Dominicana", lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
       }).filter(x => x.titulo && !vistos.has(sinTildes(x.titulo)) && (vistos.add(sinTildes(x.titulo)) || true));
       sugLista = locales.concat(mapa).slice(0, 8);
       if (document.activeElement === input) pintarSugerencias(caja);
@@ -1009,7 +1036,12 @@ function buscarDireccion(input){
   }, 350);
 }
 function elegirSugerencia(input, x){
-  if (x.tipo === "sector") {
+  if (x.tipo === "zona") {   // barrio o sector del mapa: se agrega al final, sin borrar la calle que escribió
+    const yaEsta = sinTildes(input.value).includes(sinTildes(x.titulo));
+    const pal = input.value.trim().split(/\s+/), ult = sinTildes(pal[pal.length - 1] || "");
+    const base = (ult.length >= 3 && sinTildes(x.titulo).includes(ult) ? pal.slice(0, -1).join(" ") : input.value).replace(/[\s,]+$/, "");
+    if (!yaEsta) input.value = (base ? base + ", " : "") + x.titulo;
+  } else if (x.tipo === "sector") {
     const base = input.value.slice(0, input.value.length - x.cola.length).replace(/[\s,]+$/, "");
     input.value = (base ? base + ", " : "") + x.titulo;
   } else {
@@ -1026,12 +1058,12 @@ function elegirSugerencia(input, x){
   const raiz = input.closest("#carrito-lateral,#carrito-movil");
   leerDatos(raiz); sugLista = [];
   const caja = input.parentElement.querySelector(".sugerencias"); caja.hidden = true;
-  if (x.tipo === "mapa") { actualizarCarrito(); const nuevo = raiz.querySelector("#f-dir"); if (nuevo) nuevo.blur(); }
-  else input.focus();
+  if (x.tipo === "mapa") { actualizarCarrito(); const nuevo = raiz.querySelector("#f-dir"); if (nuevo) { nuevo.blur(); ayudaDireccion(nuevo); } }
+  else { input.focus(); ayudaDireccion(input); }
 }
 ["#carrito-lateral","#carrito-movil"].forEach(sel => {
   const raiz = $(sel);
-  raiz.addEventListener("input", e => { if (e.target.id === "f-dir") buscarDireccion(e.target); });
+  raiz.addEventListener("input", e => { if (e.target.id === "f-dir") { buscarDireccion(e.target); ayudaDireccion(e.target); } });
   raiz.addEventListener("focusout", e => { if (e.target.id === "f-dir") setTimeout(() => { const c = e.target.parentElement && e.target.parentElement.querySelector(".sugerencias"); if (c && !c.contains(document.activeElement)) c.hidden = true; }, 180); });
   raiz.addEventListener("mousedown", e => { if (e.target.closest(".sugerencias")) e.preventDefault(); });   // que no se cierre antes de tocar
   raiz.addEventListener("click", e => {
@@ -1121,7 +1153,7 @@ function htmlDatos(){
           <button class="copiar" data-acc="copiar" data-v="${esc(b.numero)}">Copiar</button>
         </div>`).join("")}
       </div>` : ""}
-      ${modo === "delivery" ? `<div class="campo campo-dir"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Calle, número, sector" value="${esc(d.dir)}" autocomplete="off" aria-autocomplete="list"><div class="sugerencias" role="listbox" hidden></div></div>
+      ${modo === "delivery" ? `<div class="campo campo-dir"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Ej.: Calle Central #18, Hainamosa" value="${esc(d.dir)}" autocomplete="off" aria-autocomplete="list"><div class="sugerencias" role="listbox" hidden></div><small class="ayuda-dir" aria-live="polite"></small></div>
       <div class="campo"><label for="f-ref">Referencia (opcional)</label><input id="f-ref" type="text" placeholder="Ej.: casa blanca, al lado del colmado" value="${esc(d.ref)}"></div>
       <div class="campo"><span class="lbl">Ubicación para el delivery</span>
         <button class="btn-borde ubic-btn" data-acc="ubicacion">📍 ${ubic ? "Actualizar mi ubicación" : "Usar mi ubicación"}</button>
@@ -1181,6 +1213,7 @@ function validar(raiz, paraCocina){
   const d = datosGuardados, err = raiz.querySelector("#f-error");
   if (d.nombre.trim().length < 2) { err.textContent = "Escribe tu nombre para el pedido."; raiz.querySelector("#f-nombre").focus(); return null; }
   if (modo === "delivery" && d.dir.trim().length < 5) { err.textContent = "Escribe la dirección de entrega."; raiz.querySelector("#f-dir").focus(); return null; }
+  if (modo === "delivery" && soloSector(d.dir)) { err.textContent = "Escribe la calle y el número de casa, no solo el sector (ej.: Calle Central #18, Hainamosa)."; raiz.querySelector("#f-dir").focus(); return null; }
   if (modo === "local" && !d.mesa.trim()) { err.textContent = "Escribe el número de tu mesa."; raiz.querySelector("#f-mesa").focus(); return null; }
   if (!paraCocina && d.tel.replace(/\D/g, "").length < 10) { err.textContent = "Escribe un teléfono válido (10 dígitos)."; raiz.querySelector("#f-tel").focus(); return null; }
   err.textContent = "";
@@ -1537,13 +1570,19 @@ function pintarInfo(){
   const redes = Object.entries(NEGOCIO.redes || {}).filter(([, url]) => url).map(([red, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener" aria-label="${red}">${ICONOS_REDES[red] || ""}</a>`);
   redes.push(`<a href="https://api.whatsapp.com/send?phone=${num}" target="_blank" rel="noopener" aria-label="WhatsApp">${ICONOS_REDES.whatsapp}</a>`);
   $("#redes").innerHTML = redes.join("");
-  $("#pie-datos").innerHTML = `${esc(NEGOCIO.direccion)}<br>${esc(NEGOCIO.telefono)} · ${esc(NEGOCIO.horario.texto)}${NEGOCIO.delivery ? " · Delivery" : ""}`;
+  /* @@PIE-DATOS: dirección, teléfono, horario y delivery en bloques grandes */
+  const wa = "https://api.whatsapp.com/send?phone=" + String(NEGOCIO.whatsapp).replace(/\D/g, "");
+  $("#pie-datos").innerHTML = `
+    <a class="pie-dato" href="${esc(NEGOCIO.mapa)}" target="_blank" rel="noopener"><span class="pie-ico">📍</span><span><small>Dirección</small><b>${esc(NEGOCIO.direccion)}</b><em>Cómo llegar ›</em></span></a>
+    <a class="pie-dato" href="${wa}" target="_blank" rel="noopener"><span class="pie-ico">💬</span><span><small>WhatsApp y llamadas</small><b>${esc(NEGOCIO.telefono)}</b><em>Escríbenos ›</em></span></a>
+    <div class="pie-dato"><span class="pie-ico">🕐</span><span><small>Horario</small><b>${esc(NEGOCIO.horario.texto)}</b></span></div>
+    ${NEGOCIO.delivery ? `<div class="pie-dato"><span class="pie-ico">🛵</span><span><small>Delivery</small><b>Desde ${dinero(NEGOCIO.deliveryMinimo)} · según la distancia</b></span></div>` : ""}`;
   pintarEstado();
   setInterval(pintarEstado, 60000);
 }
 function actualizarPaso3(){
   const ico = document.querySelector(`.modo[data-modo="${modo}"] .modo-icono svg`);
-  if (ico) { const c = ico.cloneNode(true); c.setAttribute("width", "20"); c.setAttribute("height", "20"); c.style.color = "#FF4D55"; $("#modo-icono").replaceChildren(c); } $("#paso3").textContent = modo === "local" && NEGOCIO.panelDemo ? "Envía tu pedido a la cocina" : "Envía tu pedido por WhatsApp"; }
+  if (ico) { const c = ico.cloneNode(true); c.setAttribute("width", "20"); c.setAttribute("height", "20"); c.style.color = "#FF4D55"; $("#modo-icono").replaceChildren(c); } if ($("#paso3")) $("#paso3").textContent = modo === "local" && NEGOCIO.panelDemo ? "Envía tu pedido a la cocina" : "Envía tu pedido por WhatsApp"; }
 
 /* ---------- Arranque ---------- */
 pintarInfo();
@@ -1556,22 +1595,28 @@ mostrarSplash(1300, () => { if (!modo) mostrarLobby(); });
 </script>
 <!-- @@FIREBASE: conecta el menú con Firebase (archivo fb.js). Si no carga, el menú sigue funcionando solo con WhatsApp. -->
 <script type="module">
-import { crearPedido, escucharDisponibilidad } from "./fb.js";
+import { crearPedido, escucharDisponibilidad, escucharSeguimiento } from "./fb.js";
 window.JirehFB = { crearPedido };
 escucharDisponibilidad(lista => window.aplicarAgotados(lista));   // @@AGOTADOS en vivo
-</script>
-<script>
-/* @@MI-PEDIDO: si el cliente hizo un pedido en las últimas 8 horas, le mostramos un botón para verlo */
+
+/* @@MI-PEDIDO: botón flotante "Ver mi pedido" si el cliente tiene un pedido en curso (últimas 8 horas).
+   Muestra el estado en vivo y DESAPARECE solo cuando el pedido se entrega o se rechaza. */
 (function(){
-  try {
-    const p = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null");
-    if (!p || Date.now() - p.t > 8 * 3600000) return;
-    const a = document.createElement("a");
-    a.href = "pedido.html?id=" + encodeURIComponent(p.id);
-    a.textContent = "🍣 Ver mi pedido #" + p.codigo;
-    a.style.cssText = "position:fixed;left:14px;bottom:86px;z-index:40;background:#E1262D;color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:999px;text-decoration:none;box-shadow:0 10px 24px rgba(0,0,0,.45)";
-    document.body.appendChild(a);
-  } catch(e) {}
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); } catch(e) {}
+  const olvidar = () => { try { localStorage.removeItem("jireh-mi-pedido"); } catch(e) {} };
+  if (!p || !p.id) return;
+  if (Date.now() - p.t > 8 * 3600000) return olvidar();
+  const a = document.createElement("a");
+  a.href = "pedido.html?id=" + encodeURIComponent(p.id);
+  a.style.cssText = "position:fixed;left:14px;bottom:86px;z-index:40;background:#E1262D;color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:999px;text-decoration:none;box-shadow:0 10px 24px rgba(0,0,0,.45);display:none";
+  document.body.appendChild(a);
+  const ESTADO = { nuevo: "Recibido", preparando: "Preparando", listo: "¡Listo!", en_camino: "En camino 🛵" };
+  const parar = escucharSeguimiento(p.id, s => {
+    if (!s || s.estado === "entregado" || s.estado === "rechazado") { a.remove(); olvidar(); if (parar) parar(); return; }
+    a.textContent = `🍣 Mi pedido #${s.codigo || p.codigo} · ${ESTADO[s.estado] || "Ver"}`;
+    a.style.display = "";
+  }, () => { a.textContent = "🍣 Ver mi pedido #" + p.codigo; a.style.display = ""; });
 })();
 </script>
 </body>

@@ -57,6 +57,7 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3A
 @keyframes latido{70%{box-shadow:0 0 0 10px rgba(227,18,27,0)}100%{box-shadow:0 0 0 0 rgba(227,18,27,0)}}
 .nota{color:var(--suave);font-size:13px;line-height:1.5;margin:0}
 .btn{display:inline-block;margin-top:14px;padding:13px 20px;border-radius:14px;background:#1E7A45;color:#fff;text-decoration:none;font-weight:700}
+.contacto{display:inline-block;margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--borde);color:var(--texto);text-decoration:none;font-size:14px;font-weight:600}   /* @@CONTACTO: botón discreto para escribir al negocio */
 .pie{color:#6E6862;font-size:12px;margin-top:18px}
 .vivo{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--suave);margin-top:10px}
 .vivo i{width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 4px rgba(47,212,122,.18)}
@@ -205,6 +206,8 @@ const ESC = {
 /* ---------- Pantalla ---------- */
 function pintar(s){
   actual = s; escenaDe = "";
+  // pedido terminado: se borra el aviso "Ver mi pedido" del menú (@@MI-PEDIDO)
+  if (!demo && (!s || s.estado === "entregado" || s.estado === "rechazado")) { try { const m = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); if (m && m.id === id) localStorage.removeItem("jireh-mi-pedido"); } catch(e) {} }
   if (!s) {
     app.innerHTML = `<div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>Tu pedido</h1></div></div>
       <p class="sub">${TEXTOS.noExiste}</p><a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>`;
@@ -229,7 +232,8 @@ function pintar(s){
       const cls = i < pos || (k === "entregado" && s.estado === "entregado") ? "ok" : (i === pos || (k === "en_camino" && s.estado === "en_camino") ? "on" : "");
       return `<div class="paso ${cls}"><i>${cls === "ok" ? "✓" : ic}</i>${t}</div>`;
     }).join("")}</div>
-    <p class="nota">Esta pantalla se actualiza sola. Los tiempos son aproximados.</p>`}
+    <p class="nota">Esta pantalla se actualiza sola. Los tiempos son aproximados.</p>
+    ${s.estado !== "entregado" ? `<a class="contacto" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}&text=${encodeURIComponent("Hola, les escribo sobre mi pedido #" + s.codigo + ": ")}" target="_blank" rel="noopener">💬 ¿Se retrasa o tienes una pregunta? Escríbenos</a>` : ""}`}
     <div class="vivo"><i></i>En vivo</div>
     <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
   tick();
