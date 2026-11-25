@@ -22,7 +22,7 @@
   @@DESTACADO      Producto grande de arriba
   @@REBAJAS        Cómo poner rebaja a un producto
   @@MENU           Inicio de la lista de productos
-  @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@AVOCADO  @@QUESO-CREMA  @@EMPANIZADOS
+  @@CAJAS  @@ROLLS-CASA  @@CALIFORNIA  @@AVOCADO  @@QUESO-CREMA  @@SALMON  @@EMPANIZADOS
   @@HAND-ROLLS  @@SUSHI-BURGER  @@SIN-ARROZ  @@PARA-PICAR  @@BEBIDAS
   @@CAMBIO-PROTEINA  Cambios de proteína y su precio (salmón, camarón…)
   @@SALSAS-EXTRA     Salsas extra y su precio
@@ -733,7 +733,7 @@ const MENU = [
   /* ---------- @@BEBIDAS ---------- */
   { id:"bebidas", nombre:"Bebidas y extras", tab:"Bebidas", arte:"bebida", chico:true, grupos:[{ items:[
     { id:"coca-cola", nombre:"Coca-Cola 591 ml", precio:100, desc:"Refresco Coca-Cola original.", img:"fotos/coca-cola.jpg" },
-    { id:"7up", nombre:"Refresco 7 Up", precio:60, desc:"Refresco de lima-limón." },
+    { id:"7up", nombre:"7 Up 400 ml", precio:60, desc:"Refresco de lima-limón.", img:"fotos/7up.jpg" },
     { id:"agua", nombre:"Agua Planeta Azul", precio:30, desc:"Agua purificada.", img:"fotos/agua.jpg" }
   ]},
   { titulo:"Salsas y extras", items: SALSAS_EXTRA.opciones.map(o => ({ id: "extra-" + o.nombre.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""), nombre: o.nombre, precio: o.precio, desc: o.desc, img: o.img, salsa: o.nombre })) }
