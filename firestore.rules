@@ -34,7 +34,7 @@ service cloud.firestore {
              'codigo', 'dia', 'estado', 'creado', 'modo', 'nombre', 'tel', 'dir', 'ref',
              'ubic', 'items', 'subtotal', 'delivery', 'km', 'total', 'totalTexto',
              'pago', 'banco', 'cambio', 'notas', 'comprobante'])
-        && request.resource.data.codigo is string && request.resource.data.codigo.size() <= 8
+        && request.resource.data.codigo is string && request.resource.data.codigo.size() <= 12
         && request.resource.data.nombre is string && request.resource.data.nombre.size() >= 2
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0 && request.resource.data.items.size() <= 60
@@ -43,6 +43,21 @@ service cloud.firestore {
         && textoCorto('ref', 200) && textoCorto('notas', 500) && textoCorto('pago', 30)
         && textoCorto('banco', 60) && textoCorto('cambio', 30) && textoCorto('totalTexto', 60)
         && textoCorto('modo', 20) && textoCorto('dia', 10);
+    }
+
+    // ---------- Contador de pedidos del día (SAGRADO-1, SAGRADO-2…) ----------
+    // Solo puede subir de 1 en 1, y solo se usa al crear un pedido.
+    match /contadores/{dia} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['n']) && request.resource.data.n == 1;
+      allow update: if request.resource.data.keys().hasOnly(['n']) && request.resource.data.n == resource.data.n + 1;
+      allow list, delete: if esEquipo();
+    }
+
+    // ---------- Productos agotados (los marca el equipo desde el panel) ----------
+    match /config/{nombre} {
+      allow get: if true;
+      allow list, write: if esEquipo();
     }
 
     // ---------- Seguimiento (lo que ve el cliente) ----------

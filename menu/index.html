@@ -26,6 +26,8 @@
   @@HAND-ROLLS  @@SUSHI-BURGER  @@SIN-ARROZ  @@PARA-PICAR  @@BEBIDAS
   @@CAMBIO-PROTEINA  Cambios de proteína y su precio (salmón, camarón…)
   @@SALSAS-EXTRA     Salsas extra y su precio
+  @@AGOTADOS        Lo agotado se marca desde el panel (botón "Agotados")
+  @@CODIGO-PEDIDO    Nombre de los pedidos (SAGRADO-1, SAGRADO-2…)
 
   APARIENCIA
   @@COLORES        Colores de la página
@@ -157,6 +159,10 @@ img{display:block;max-width:100%}
 .p-tag{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--acento-texto);border:1px solid #5E1A1E;background:var(--acento-oscuro);padding:3px 7px;border-radius:999px}
 .p-desc{margin:0;color:var(--texto-suave);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .p-pie{margin-top:auto;display:flex;align-items:center;justify-content:space-between}
+.producto.agotado .foto{filter:grayscale(1);opacity:.45}
+.producto.agotado .p-nombre,.producto.agotado .p-desc,.producto.agotado .precios{opacity:.5}
+.agotado-tag{flex:0 0 auto;padding:7px 12px;border-radius:999px;background:#3A1416;border:1px solid #7A2328;color:#FF8A8F;font-size:12.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase}   /* @@AGOTADO-ESTILO */
+.opcion:disabled{opacity:.38;text-decoration:line-through;cursor:not-allowed}
 .mas{width:40px;height:40px;border-radius:50%;background:var(--acento);color:var(--sobre-acento);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .pendiente{color:#8C867E;font-style:italic;font-weight:500}
 
@@ -523,6 +529,7 @@ const NEGOCIO = {
   rebajaTodo: 0,                      // @@REBAJA-TODO
   llamadas: false,                    // @@LLAMADAS
   panelDemo: false,
+  prefijoPedido: "SAGRADO",           // @@CODIGO-PEDIDO  Los pedidos salen como SAGRADO-1, SAGRADO-2… (vuelve a 1 cada día)
   firebase: true,                    // @@FIREBASE  true = cada pedido se guarda en Firebase y entra solo al panel (menu/panel.html)
   panelAvisos: false,                 // @@PANEL-AVISOS  false = el cliente NO ve enlace; el negocio pega el mensaje en el panel (botón "Pegar pedido"). true = vuelve a poner el enlace al final
   comprobante: false,                 // @@COMPROBANTE  true = mostrar "Necesito comprobante fiscal"
@@ -557,7 +564,7 @@ const DESTACADO = "eby-banana";     // @@DESTACADO  Producto que sale grande arr
    El cliente puede cambiar la proteína del roll. Se suma el precio del cambio.
    "secciones": en qué categorías sale la opción (los id de las secciones de abajo). */
 const CAMBIO_PROTEINA = {
-  secciones: ["rolls-casa", "california", "avocado", "queso-crema", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz"],
+  secciones: ["rolls-casa", "california", "avocado", "queso-crema", "salmon", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz"],
   opciones: [
     { nombre: "Salmón",   precio: 250 },
     { nombre: "Camarón",  precio: 250 },
@@ -569,7 +576,7 @@ const CAMBIO_PROTEINA = {
    Salsas y extras (wasabi, jengibre). Salen para elegir dentro de cada producto
    y también solas en "Bebidas y extras", con su foto y descripción. */
 const SALSAS_EXTRA = {
-  secciones: ["cajas", "rolls-casa", "california", "avocado", "queso-crema", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz", "para-picar"],
+  secciones: ["cajas", "rolls-casa", "california", "avocado", "queso-crema", "salmon", "empanizados", "hand-rolls", "sushi-burger", "sin-arroz", "para-picar"],
   opciones: [
     { nombre: "Soya (3 und)",     precio: 50, img: "fotos/salsa-soya.jpg",       desc: "3 unidades de soya premium." },
     { nombre: "Salsa teriyaki",   precio: 40, img: "fotos/salsa-teriyaki.jpg",   desc: "Salsa dulce para rolls empanizados y langostinos." },
@@ -673,6 +680,15 @@ const MENU = [
     { id:"cheese-camaron", nombre:"Cheese Camarón", precio:699, desc:"Camarón empanizado, aguacate y puerro, envuelto en queso crema Philadelphia. 8 unidades.", img:"fotos/cheese-camaron.jpg" },
     { id:"cheese-salmon", nombre:"Cheese Salmón", precio:730, desc:"Salmón, aguacate y puerro, envuelto en queso crema Philadelphia. 8 unidades.", img:"fotos/cheese-salmon.jpg" }
   ]}]},
+  /* ---------- @@SALMON (Envueltos en Salmón, 23 nov) ---------- */
+  { id:"salmon", nombre:"Envueltos en Salmón", tab:"Salmón", arte:"burger", sub:"Rolls envueltos en salmón fresco.", grupos:[{ items:[
+    { id:"sutil-roll", nombre:"Sutil Roll", precio:720, desc:"Camarón empanizado y queso crema, envuelto en salmón, con limón y bañado en salsa teriyaki. 8 unidades.", img:"fotos/sutil-roll.jpg" },
+    { id:"salmon-roll", nombre:"Salmón Roll", precio:720, desc:"Salmón, queso crema y puerro, envuelto en salmón. 8 unidades.", img:"fotos/salmon-roll.jpg" },
+    { id:"sake-pollo-roll", nombre:"Sake Pollo Roll", precio:699, desc:"Pollo empanizado, puerro y queso crema, envuelto en salmón. 8 unidades.", img:"fotos/sake-pollo-roll.jpg" },
+    { id:"sakeby-roll", nombre:"Sakeby Roll", precio:730, desc:"Camarón empanizado, queso crema, puerro y aguacate, envuelto en salmón. 8 unidades.", img:"fotos/sakeby-roll.jpg" },
+    { id:"ebytori-roll", nombre:"Ebytori Roll", precio:710, desc:"Camarón empanizado, pollo empanizado y queso crema, envuelto en salmón. 8 unidades.", img:"fotos/ebytori-roll.jpg" },
+    { id:"nigiri-salmon", nombre:"Nigiri", precio:510, desc:"Bolitas de arroz cubiertas con salmón fresco. 4 unidades.", img:"fotos/nigiri-salmon.jpg", sinCambio:true }
+  ]}]},
   /* ---------- @@EMPANIZADOS (19 rolls reales del catálogo, por precio) ---------- */
   { id:"empanizados", nombre:"Colección HOT", tab:"Colección HOT", arte:"burger", sub:"Rolls crujientes, empanizados al momento. 8 piezas cada uno.", grupos:[{ items:[
     { id:"fernando-rolls", nombre:"Fernando Rolls", precio:475, desc:"Pollo y queso crema, envuelto en panko, con salsa teriyaki dulce. 8 unidades.", img:"fotos/fernando-rolls.jpg" },
@@ -720,7 +736,7 @@ const MENU = [
     { id:"7up", nombre:"Refresco 7 Up", precio:60, desc:"Refresco de lima-limón." },
     { id:"agua", nombre:"Agua Planeta Azul", precio:30, desc:"Agua purificada.", img:"fotos/agua.jpg" }
   ]},
-  { titulo:"Salsas y extras", items: SALSAS_EXTRA.opciones.map(o => ({ id: "extra-" + o.nombre.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""), nombre: o.nombre, precio: o.precio, desc: o.desc, img: o.img })) }
+  { titulo:"Salsas y extras", items: SALSAS_EXTRA.opciones.map(o => ({ id: "extra-" + o.nombre.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""), nombre: o.nombre, precio: o.precio, desc: o.desc, img: o.img, salsa: o.nombre })) }
   ]}
 ];
 
@@ -761,10 +777,22 @@ for (let i = MENU.length - 1; i >= 0; i--) if (!MENU[i].grupos.length) MENU.spli
 const PRODUCTOS = {};
 // Qué productos tienen cambio de proteína y salsas extra (según la sección)
 MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => {
-  p.cambioProteina = CAMBIO_PROTEINA.secciones.includes(sec.id);
+  p.cambioProteina = CAMBIO_PROTEINA.secciones.includes(sec.id) && !p.sinCambio;   // sinCambio:true = ese producto no lleva cambio de proteína
   p.salsasExtra = SALSAS_EXTRA.secciones.includes(sec.id);
 })));
 MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => { PRODUCTOS[p.id] = { ...p, chico: !!sec.chico, arte: sec.arte }; })));
+
+/* @@AGOTADOS — Lo agotado se marca desde el PANEL (botón "Agotados"), no aquí.
+   La lista llega sola desde Firebase y el menú se actualiza en vivo para todos los clientes. */
+let AGOTADOS = new Set();
+const estaAgotado = p => !!p && (AGOTADOS.has(p.id) || (!!p.salsa && AGOTADOS.has("salsa:" + p.salsa)));
+const protAgotada = n => AGOTADOS.has("prot:" + n);
+const salsaAgotada = n => AGOTADOS.has("salsa:" + n);
+const lineaAgotada = l => estaAgotado(PRODUCTOS[l.id]) || (!!l.prot && protAgotada(l.prot)) || (l.salsas || []).some(salsaAgotada);
+window.aplicarAgotados = lista => {
+  AGOTADOS = new Set(lista || []);
+  pintarHero(); pintarMenu($("#buscar") ? $("#buscar").value : ""); actualizarCarrito();
+};
 
 const ICONO_MAS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 const ICONO_X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -802,12 +830,13 @@ function tarjeta(p, chico){
   const precio = p.precio == null ? `<span class="pendiente">[Precio pendiente]</span>` : precioHTML(p);
   const desc = p.desc ? `<p class="p-desc">${textoPendiente(p.desc)}</p>` : "";
   const tag = p.tag ? `<span class="p-tag">${esc(p.tag)}</span>` : "";
-  return `<button class="producto${chico ? " chico" : ""}" data-id="${p.id}" aria-label="Ver ${esc(p.nombre)}">
+  const ag = estaAgotado(PRODUCTOS[p.id]);
+  return `<button class="producto${chico ? " chico" : ""}${ag ? " agotado" : ""}" data-id="${p.id}" aria-label="Ver ${esc(p.nombre)}">
     <div class="foto">${fotoHTML(PRODUCTOS[p.id])}${seloRebaja(p)}</div>
     <div class="p-info">
       <div class="p-nombre">${textoPendiente(p.nombre)}${tag}</div>
       ${desc}
-      <div class="p-pie">${precio}<span class="mas">${ICONO_MAS}</span></div>
+      <div class="p-pie">${precio}${ag ? `<span class="agotado-tag">Agotado</span>` : `<span class="mas">${ICONO_MAS}</span>`}</div>
     </div>
   </button>`;
 }
@@ -823,7 +852,7 @@ function pintarHero(){
       <span class="etiqueta">LA ESTRELLA DE LA CASA</span>
       <h1 class="display">${esc(p.nombre)}</h1>
       <p>${esc(p.desc)}</p>
-      <div class="hero-pie">${precioHTML(p, 22)}<span class="btn-acento">${ICONO_MAS} Agregar</span></div>
+      <div class="hero-pie">${precioHTML(p, 22)}${estaAgotado(p) ? `<span class="agotado-tag">Agotado por hoy</span>` : `<span class="btn-acento">${ICONO_MAS} Agregar</span>`}</div>
     </div>`;
   $("#hero").dataset.id = p.id;
 }
@@ -1047,6 +1076,7 @@ function htmlCarrito(){
       <div class="info">
         <div class="arriba"><span>${esc(nombreLinea(l))}</span><span class="precio">${dinero(precioUnidad(l) * l.cant)}</span></div>
         ${detallesLinea(l).map(x => `<div class="nota">${esc(x)}</div>`).join("")}
+        ${lineaAgotada(l) ? `<div class="nota" style="color:#FF8A8F;font-weight:800">Agotado por hoy: quítalo para continuar</div>` : ""}
         <div class="abajo">
           <div class="cantidad"><button data-acc="menos" data-i="${i}" aria-label="Quitar uno">−</button><span>${l.cant}</span><button data-acc="mas" data-i="${i}" aria-label="Agregar uno">+</button></div>
           <button class="quitar" data-acc="quitar" data-i="${i}">Eliminar</button>
@@ -1161,6 +1191,7 @@ function validar(raiz, paraCocina){
    En la versión real, aquí se envía a una base de datos en internet (Firebase, Supabase…). */
 let ultimoEnvio = { mesa:"", resumen:"" };
 function enviarACocina(raiz){
+  if (carrito.some(lineaAgotada)) { avisar("Hay algo agotado en tu pedido. Quítalo para continuar."); vistaCarrito = "lista"; actualizarCarrito(); return; }
   const d = validar(raiz, true); if (!d) return;
   const pedido = {
     id: Date.now().toString(36), mesa: d.mesa.trim(), nombre: d.nombre.trim(), pago, notas: d.notas.trim(),
@@ -1179,6 +1210,7 @@ function enviarACocina(raiz){
 let enviando = false, miPedido = { id: "", codigo: "" };
 async function enviarPedido(raiz){
   if (enviando) return;                      // evita pedidos repetidos por tocar dos veces
+  if (carrito.some(lineaAgotada)) { avisar("Hay algo agotado en tu pedido. Quítalo para continuar."); vistaCarrito = "lista"; actualizarCarrito(); return; }
   const d = validar(raiz, false); if (!d) return;
   const lineas = carrito.map(l => {
     const p = PRODUCTOS[l.id];
@@ -1209,8 +1241,8 @@ async function enviarPedido(raiz){
 
   /* @@PANEL-PEDIDO — enlace al panel de avisos (aviso.html) para el negocio.
      Los datos del pedido viajan dentro del enlace, por eso no hace falta base de datos. */
-  const idPedido = Date.now().toString(36).slice(-4).toUpperCase();
-  msg = msg.replace("Quiero hacer este pedido", `Quiero hacer este pedido (#${idPedido})`);
+  /* @@CODIGO-PEDIDO: con Firebase sale SAGRADO-1, SAGRADO-2… (lo da Firebase). Si Firebase falla, un código corto de respaldo. */
+  let idPedido = (NEGOCIO.prefijoPedido || "PEDIDO") + "-" + Date.now().toString(36).slice(-3).toUpperCase();
   if (NEGOCIO.panelAvisos) {
     const b = NEGOCIO.bancos[bancoSel];
     const datos = new URLSearchParams({
@@ -1239,7 +1271,7 @@ async function enviarPedido(raiz){
     const b = NEGOCIO.bancos[bancoSel];
     const entrega = modo === "delivery";
     const pedido = {
-      codigo: idPedido, modo: entrega ? "delivery" : (modo === "local" ? "local" : "llevar"),
+      modo: entrega ? "delivery" : (modo === "local" ? "local" : "llevar"),
       nombre: d.nombre.trim(), tel: d.tel.trim(),
       dir: entrega ? d.dir.trim() : "", ref: entrega ? d.ref.trim() : "",
       ubic: entrega && ubic ? { lat: +ubic.lat.toFixed(6), lng: +ubic.lng.toFixed(6), aprox: !!ubic.aprox } : null,
@@ -1255,7 +1287,8 @@ async function enviarPedido(raiz){
     const primer = pedido.nombre.split(/\s+/)[0];
     try {
       const espera = new Promise((_, no) => setTimeout(() => no(new Error("sin respuesta")), 8000));
-      const id = await Promise.race([window.JirehFB.crearPedido(pedido, { codigo: idPedido, nombre: primer, modo: pedido.modo }), espera]);
+      const r = await Promise.race([window.JirehFB.crearPedido(pedido, { nombre: primer, modo: pedido.modo }, NEGOCIO.prefijoPedido), espera]);
+      const id = r.id; idPedido = r.codigo;
       miPedido = { id, codigo: idPedido };
       try { localStorage.setItem("jireh-mi-pedido", JSON.stringify({ id, codigo: idPedido, t: Date.now() })); } catch(e) {}
       carrito = []; guardar(); vistaCarrito = "registrado"; actualizarCarrito();
@@ -1266,6 +1299,7 @@ async function enviarPedido(raiz){
     if (boton && boton.isConnected) { boton.disabled = false; boton.innerHTML = boton.dataset.texto; }
   }
 
+  msg = msg.replace("Quiero hacer este pedido", `Quiero hacer este pedido (#${idPedido})`);
   const numero = String(NEGOCIO.whatsapp).replace(/\D/g, "");          // deja solo los números
   const texto = encodeURIComponent(msg);
   const esCelular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -1310,7 +1344,7 @@ function precioDetalle(p){ return p.precio + precioCambio(detalleProt) + detalle
 function abrirDetalle(id){
   const p = PRODUCTOS[id]; detalleCant = 1; ultimoFoco = document.activeElement;
   detalleOp = p.opciones ? p.opciones[0] : ""; detalleProt = ""; detalleSalsas = [];
-  const sinPrecio = p.precio == null;
+  const sinPrecio = p.precio == null, ag = estaAgotado(p);
   $("#detalle").innerHTML = `
     <div class="agarre"><span></span></div>
     <div class="detalle-foto">
@@ -1328,17 +1362,17 @@ function abrirDetalle(id){
       ${p.cambioProteina && !sinPrecio ? `<div class="campo" style="margin-top:8px"><span class="lbl">¿Quieres cambiar la proteína?</span>
         <div class="opciones extras" role="radiogroup" aria-label="Cambio de proteína">
           <button class="opcion activa" role="radio" aria-checked="true" data-acc="prot" data-v="">Normal<small>Sin cambio</small></button>
-          ${CAMBIO_PROTEINA.opciones.map(o => `<button class="opcion" role="radio" aria-checked="false" data-acc="prot" data-v="${esc(o.nombre)}">${esc(o.nombre)}<small>+${dinero(o.precio)}</small></button>`).join("")}
+          ${CAMBIO_PROTEINA.opciones.map(o => protAgotada(o.nombre) ? `<button class="opcion" disabled>${esc(o.nombre)}<small>Agotado</small></button>` : `<button class="opcion" role="radio" aria-checked="false" data-acc="prot" data-v="${esc(o.nombre)}">${esc(o.nombre)}<small>+${dinero(o.precio)}</small></button>`).join("")}
         </div></div>` : ""}
       ${p.salsasExtra && !sinPrecio ? `<div class="campo" style="margin-top:8px"><span class="lbl">Salsas y extras (opcional)</span>
         <div class="opciones extras">
-          ${SALSAS_EXTRA.opciones.map(o => `<button class="opcion" aria-pressed="false" data-acc="salsa" data-v="${esc(o.nombre)}">${esc(o.nombre)}<small>+${dinero(o.precio)}</small></button>`).join("")}
+          ${SALSAS_EXTRA.opciones.map(o => salsaAgotada(o.nombre) ? `<button class="opcion" disabled>${esc(o.nombre)}<small>Agotado</small></button>` : `<button class="opcion" aria-pressed="false" data-acc="salsa" data-v="${esc(o.nombre)}">${esc(o.nombre)}<small>+${dinero(o.precio)}</small></button>`).join("")}
         </div></div>` : ""}
       <div class="campo" style="margin-top:8px"><label for="det-nota">Notas para la cocina (opcional)</label><textarea id="det-nota" rows="2" placeholder="Ej.: sin cebolla, término medio…"></textarea></div>
     </div>
     <div class="detalle-pie">
       <div class="cantidad"><button data-acc="menos" aria-label="Quitar uno">−</button><span id="det-cant">1</span><button data-acc="mas" aria-label="Agregar uno">+</button></div>
-      <button class="btn-acento" data-acc="agregar" id="det-agregar" ${sinPrecio ? "disabled" : ""}>${sinPrecio ? "Precio pendiente" : "Agregar · " + dinero(p.precio)}</button>
+      <button class="btn-acento" data-acc="agregar" id="det-agregar" ${sinPrecio || ag ? "disabled" : ""}>${ag ? "Agotado por hoy" : sinPrecio ? "Precio pendiente" : "Agregar · " + dinero(p.precio)}</button>
     </div>`;
   $("#detalle").dataset.id = id;
   abrir($("#detalle"));
@@ -1365,6 +1399,7 @@ $("#detalle").addEventListener("click", e => {
     detalleSalsas = SALSAS_EXTRA.opciones.map(o => o.nombre).filter(n => detalleSalsas.includes(n));   // siempre en el mismo orden
     b.classList.toggle("activa", i < 0); b.setAttribute("aria-pressed", i < 0);
   }
+  if (b.dataset.acc === "agregar" && lineaAgotada({ id: p.id, prot: detalleProt, salsas: detalleSalsas })) { avisar("Eso se agotó por hoy 😔"); return; }
   if (b.dataset.acc === "agregar") { agregar(p.id, detalleCant, $("#det-nota").value.trim(), detalleOp, detalleProt, detalleSalsas.slice()); return cerrarTodo(); }
   $("#det-cant").textContent = detalleCant;
   if (p.precio != null) $("#det-agregar").textContent = "Agregar · " + dinero(precioDetalle(p) * detalleCant);
@@ -1521,8 +1556,9 @@ mostrarSplash(1300, () => { if (!modo) mostrarLobby(); });
 </script>
 <!-- @@FIREBASE: conecta el menú con Firebase (archivo fb.js). Si no carga, el menú sigue funcionando solo con WhatsApp. -->
 <script type="module">
-import { crearPedido } from "./fb.js";
+import { crearPedido, escucharDisponibilidad } from "./fb.js";
 window.JirehFB = { crearPedido };
+escucharDisponibilidad(lista => window.aplicarAgotados(lista));   // @@AGOTADOS en vivo
 </script>
 <script>
 /* @@MI-PEDIDO: si el cliente hizo un pedido en las últimas 8 horas, le mostramos un botón para verlo */

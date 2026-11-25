@@ -9,6 +9,8 @@
    Colecciones en Firestore:
      pedidos/{id}      Pedido completo (solo lo ve el equipo con contraseña)
      seguimiento/{id}  Estado público del pedido (lo ve el cliente con su enlace)
+     contadores/{dia}  Número del último pedido del día (para SAGRADO-1, SAGRADO-2…)
+     config/menu       Lista de productos agotados (se marca desde el panel)
    El {id} es el mismo en las dos y es largo y aleatorio: nadie lo puede adivinar.
 
    Para cambiar algo, busca con Ctrl+F:
@@ -20,7 +22,7 @@
 const V = "10.12.2";
 const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
 const {
-  getFirestore, collection, doc, writeBatch, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp
+  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, runTransaction, onSnapshot, query, where, serverTimestamp, Timestamp
 } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
 const {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -45,15 +47,33 @@ const auth = getAuth(app);
 export const diaDeHoy = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Santo_Domingo" });
 
 /* ---------- CLIENTE: guardar un pedido nuevo ----------
-   Guarda el pedido completo y su seguimiento público a la vez (si falla uno, no se guarda ninguno). */
-export async function crearPedido(pedido, publico){
+   Saca el siguiente número del día (SAGRADO-1, SAGRADO-2… vuelve a 1 cada día) y guarda
+   el pedido completo y su seguimiento público a la vez (si algo falla, no se guarda nada). */
+export async function crearPedido(pedido, publico, prefijo = "SAGRADO"){
   const ref = doc(collection(db, "pedidos"));
-  const lote = writeBatch(db);
-  lote.set(ref, { ...pedido, dia: diaDeHoy(), estado: "nuevo", creado: serverTimestamp() });
-  lote.set(doc(db, "seguimiento", ref.id), { ...publico, estado: "nuevo", creado: serverTimestamp() });
-  await lote.commit();
-  return ref.id;
+  const dia = diaDeHoy();
+  const contador = doc(db, "contadores", dia);
+  const codigo = await runTransaction(db, async tx => {
+    const c = await tx.get(contador);
+    const n = (c.exists() ? c.data().n || 0 : 0) + 1;
+    const codigo = `${prefijo}-${n}`;
+    tx.set(contador, { n });
+    tx.set(ref, { ...pedido, codigo, dia, estado: "nuevo", creado: serverTimestamp() });
+    tx.set(doc(db, "seguimiento", ref.id), { ...publico, codigo, estado: "nuevo", creado: serverTimestamp() });
+    return codigo;
+  });
+  return { id: ref.id, codigo };
 }
+
+/* ---------- TODOS: productos agotados (en vivo) ----------
+   Claves: id del producto ("eby-banana"), "prot:Salmón" (cambio de proteína) o "salsa:Salsa anguila". */
+export function escucharDisponibilidad(alCambiar){
+  return onSnapshot(doc(db, "config", "menu"),
+    s => alCambiar(s.exists() ? (s.data().agotados || []) : []),
+    () => alCambiar([]));
+}
+/* ---------- EQUIPO: guardar la lista de agotados ---------- */
+export const guardarAgotados = lista => setDoc(doc(db, "config", "menu"), { agotados: lista, actualizado: serverTimestamp() });
 
 /* ---------- CLIENTE: escuchar el estado de su pedido (en vivo) ---------- */
 export function escucharSeguimiento(id, alCambiar, alFallar){

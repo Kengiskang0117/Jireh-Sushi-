@@ -18,6 +18,8 @@
   - Si algún día falla internet, el panel viejo de "pegar pedido" sigue en menu/aviso.html.
 
   Para cambiar algo, busca con Ctrl+F:
+  @@DELIVERYS     Correos de los delivery: entran a una pantalla solo de entregas
+  @@AGOTADOS      Botón "Agotados": marcar lo que no hay hoy (los productos salen solos del menú)
   @@MINUTOS       Opciones del tiempo de preparación (máximo 50)
   @@MENSAJES      Mensajes que se le mandan al cliente por WhatsApp
   @@DELIVERY-MSG  Mensaje para el grupo de delivery
@@ -94,6 +96,17 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#1E7A45;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;transition:transform .25s;z-index:20;max-width:90vw;text-align:center}
 .aviso.ver{transform:translateX(-50%) translateY(0)}
 .sonido{background:#3A2A0A;border:1px solid #6A4E14;color:var(--amarillo);border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:700;width:100%}
+/* @@AGOTADOS-ESTILO */
+.lista-p{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;overflow:hidden;margin-bottom:8px}
+.fila-p{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 14px;border-bottom:1px solid var(--borde)}
+.fila-p:last-child{border-bottom:0}
+.fila-p span{font-size:16px}
+.fila-p.off span{color:var(--suave);text-decoration:line-through}
+.sw{flex:none;min-width:118px;height:42px;border-radius:999px;border:1px solid #2C5A3C;background:#132219;color:var(--verde-claro);font-weight:800;font-size:14px}
+.sw.off{background:var(--rojo);border-color:var(--rojo);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.chips button{border:0;border-radius:999px;background:var(--rojo);color:#fff;font-weight:700;font-size:14px;padding:8px 12px}
+.ayuda{color:var(--suave);font-size:14px;line-height:1.5;margin:0 0 12px}
 textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:12px}
 </style>
 </head>
@@ -102,9 +115,13 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--bo
 <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos } from "./fb.js";
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados } from "./fb.js";
 
 const NEGOCIO = { nombre: "Jireh Sushi" };
+/* @@DELIVERYS — correos de los repartidores (en minúscula). Al entrar con uno de estos,
+   el panel muestra SOLO las entregas: pedidos de delivery listos para salir, en camino y entregados.
+   Para agregar otro delivery: créalo en Firebase → Authentication y pon su correo aquí, separado por coma. */
+const DELIVERYS = ["delivery@jirehsushi.com"];
 /* @@MINUTOS */
 const MINUTOS = [10, 15, 20, 25, 30, 35, 40, 50];
 /* @@MENSAJES — {nombre}, {id}, {min} y {enlace} se rellenan solos */
@@ -137,6 +154,8 @@ const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").s
   .replace(/\{min\}/g, extra.min ?? p.minutos ?? "").replace(/\{enlace\}/g, enlaceSeguimiento(p.id)).replace(/\{motivo\}/g, extra.motivo || "");
 
 /* ---------- Estado de la pantalla ---------- */
+let rol = "cocina", usuarioActual = "";
+let vista = "pedidos", agotados = new Set(), catalogo = null, buscarAg = "", seguroTodo = false;
 let pedidos = [], filtro = "activos", abierto = null, minutosSel = 20, conectado = false, vistos = new Set(), primeraCarga = true;
 
 /* ---------- @@SONIDO: campanita con el navegador (sin archivos) ---------- */
@@ -154,7 +173,9 @@ function campana(){
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 // Mientras haya pedidos nuevos sin aceptar, la campana suena cada 20 segundos
-setInterval(() => { if (pedidos.some(p => p.estado === "nuevo")) campana(); }, 20000);
+setInterval(() => {
+  if (rol === "delivery" ? pedidos.some(p => p.modo === "delivery" && p.estado === "listo") : pedidos.some(p => p.estado === "nuevo")) campana();
+}, rol === "delivery" ? 30000 : 20000);
 
 /* ---------- Pantalla siempre encendida ---------- */
 let wake = null;
@@ -183,12 +204,21 @@ let dejarDeEscuchar = null;
 alCambiarSesion(usuario => {
   if (dejarDeEscuchar) { dejarDeEscuchar(); dejarDeEscuchar = null; }
   if (!usuario) { pedidos = []; pintarLogin(); return; }
+  usuarioActual = (usuario.email || "").toLowerCase();
+  rol = DELIVERYS.map(x => x.trim().toLowerCase()).includes(usuarioActual) ? "delivery" : "cocina";
+  vista = "pedidos"; abierto = null;
+  let listosAntes = null;
   pantallaEncendida();
   primeraCarga = true;
+  escucharDisponibilidad(lista => { agotados = new Set(lista); if (vista === "agotados") pintar(); });
   dejarDeEscuchar = escucharPedidosDeHoy((lista, nuevos) => {
     conectado = true;
     pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
-    if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); }
+    if (rol === "delivery") {   // al delivery le suena cuando un pedido queda listo para salir
+      const listos = new Set(pedidos.filter(p => p.modo === "delivery" && p.estado === "listo").map(p => p.id));
+      if (listosAntes && [...listos].some(id => !listosAntes.has(id))) { campana(); avisar("🛵 ¡Pedido listo para salir!"); }
+      listosAntes = listos;
+    } else if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); }
     primeraCarga = false;
     pintar();
   }, err => { conectado = false; console.error(err); avisar("Sin conexión con los pedidos. Revisa el internet."); pintar(); });
@@ -203,6 +233,8 @@ const GRUPOS = {
   entregado: p => ["entregado", "rechazado"].includes(p.estado)
 };
 function pintar(){
+  if (rol === "delivery") return pintarDelivery();
+  if (vista === "agotados") return pintarAgotados();
   if (abierto) { const p = pedidos.find(x => x.id === abierto); if (p) return pintarPedido(p); abierto = null; }
   const entregados = pedidos.filter(p => p.estado === "entregado");
   const vendido = entregados.reduce((a, p) => a + (p.total || 0), 0);
@@ -211,7 +243,8 @@ function pintar(){
   $("#app").innerHTML = `
     <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Pedidos de hoy</h1>
       <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"}</small></div>
-      <button class="chico" data-acc="salir">Salir</button></div>
+      <button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>
+      <button class="chico" data-acc="salir" style="margin-left:0">Salir</button></div>
     ${sonidoListo ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido de pedidos nuevos</button>`}
     <div class="resumen">
       <div><b>${pedidos.filter(p => p.estado !== "rechazado").length}</b><small>Pedidos</small></div>
@@ -280,6 +313,7 @@ function pintarPedido(p){
       ${entrega ? `<div class="fila"><span>Subtotal</span><span>${dinero(p.subtotal)}</span></div>
         <div class="fila"><span>Delivery</span><span>${p.delivery != null ? dinero(p.delivery) + " (" + p.km + " km)" : "Por confirmar"}</span></div>` : ""}
       <div class="fila"><span>Total</span><span class="total">${esc(p.totalTexto || dinero(p.total))}</span></div>
+      ${p.repartidor ? `<div class="fila"><span>Delivery</span><span>🛵 ${esc(p.repartidor)}</span></div>` : ""}
       <div class="fila"><span>Pago</span><span>${esc(p.pago)}${p.banco ? " · " + esc(p.banco) : ""}${p.cambio ? " (paga con " + esc(p.cambio) + ")" : ""}${p.pagado ? " ✅ recibido" : ""}</span></div>
     </div>
     ${p.estado === "preparando" && p.listoEn ? `<div class="reloj" data-reloj="${ms(p.listoEn)}"><span style="font-size:30px">⏱️</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Tiempo de preparación (${p.minutos} min)</small></div></div>` : ""}
@@ -297,6 +331,121 @@ function relojes(){
   document.querySelectorAll("[data-reloj]").forEach(el => el.classList.toggle("tarde", +el.dataset.reloj < Date.now()));
 }
 setInterval(relojes, 1000);
+
+/* ---------- @@VISTA-DELIVERY: pantalla de los repartidores ---------- */
+const nombreUsuario = () => usuarioActual.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+const cobrar = p => p.pago === "Transferencia"
+  ? (p.pagado ? "💳 Transferencia ✅ pagado" : "💳 Transferencia · verificar")
+  : (p.pagado ? "💵 Cobrado ✅" : `💵 Cobrar ${p.totalTexto || dinero(p.total)}${p.cambio ? " · paga con " + p.cambio : ""}`);
+function tarjetaEntrega(p, apagado){
+  return `<button class="pedido ${p.estado === "listo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}" ${apagado ? 'style="opacity:.6"' : ""}>
+    <span class="info"><small style="color:var(--rojo-claro);font-weight:800">#${esc(p.codigo)}</small><b>${esc(p.nombre)}</b><small>📍 ${esc(p.dir || "Sin dirección")}</small>
+      <span class="tiempo" style="color:${p.pagado || p.pago === "Transferencia" ? "var(--suave)" : "var(--amarillo)"}">${esc(cobrar(p))}</span>
+      ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ Sale en <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}
+      ${p.estado === "en_camino" && p.repartidor ? `<span class="tiempo" style="color:#8FD3FF">🛵 ${esc(p.repartidor)}</span>` : ""}</span>
+    <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
+  </button>`;
+}
+function pintarDelivery(){
+  const mios = pedidos.filter(p => p.modo === "delivery");
+  if (abierto) { const p = mios.find(x => x.id === abierto); if (p) return pintarEntrega(p); abierto = null; }
+  const listos = mios.filter(p => p.estado === "listo"), camino = mios.filter(p => p.estado === "en_camino");
+  const cocina = mios.filter(p => p.estado === "preparando"), hechos = mios.filter(p => p.estado === "entregado");
+  const efectivo = hechos.filter(p => p.pago !== "Transferencia").reduce((a, p) => a + (p.total || 0), 0);
+  $("#app").innerHTML = `
+    <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Entregas de hoy</h1>
+      <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"} · ${esc(nombreUsuario())}</small></div>
+      <button class="chico" data-acc="salir">Salir</button></div>
+    ${sonidoListo ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido cuando un pedido esté listo</button>`}
+    <div class="resumen">
+      <div><b>${listos.length}</b><small>Para salir</small></div>
+      <div><b>${camino.length}</b><small>En camino</small></div>
+      <div><b>${hechos.length}</b><small>Entregados</small></div>
+    </div>
+    <h2>🛵 Listos para salir</h2>
+    ${listos.length ? listos.map(p => tarjetaEntrega(p)).join("") : `<div class="vacio" style="padding:18px">Nada listo por ahora. Te suena cuando la cocina termine uno 🔔</div>`}
+    ${camino.length ? `<h2>En camino</h2>${camino.map(p => tarjetaEntrega(p)).join("")}` : ""}
+    ${cocina.length ? `<h2>En cocina (próximos)</h2>${cocina.map(p => tarjetaEntrega(p, true)).join("")}` : ""}
+    ${hechos.length ? `<h2>Entregados hoy · efectivo ${dinero(efectivo)}</h2>${hechos.map(p => tarjetaEntrega(p, true)).join("")}` : ""}`;
+  relojes();
+}
+function pintarEntrega(p){
+  let acciones = "";
+  if (p.estado === "preparando") acciones = `<div class="reloj"><span style="font-size:30px">👨‍🍳</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Todavía en cocina. Te suena cuando esté listo.</small></div></div>`;
+  if (p.estado === "listo") acciones = `<div class="botones"><button class="btn rojo" data-acc="d-camino">🛵 Lo tomo · salgo ahora</button></div>`;
+  if (p.estado === "en_camino") acciones = `<div class="botones"><button class="btn verde" data-acc="d-entregado">📦 Entregado</button>
+    ${p.pago !== "Transferencia" ? `<button class="btn" data-acc="d-cobrado">${p.pagado ? "✅ Cobrado" : "💵 Marcar cobrado"}</button>` : ""}</div>`;
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="volver">← Entregas de hoy</button>
+    <div class="tarjeta">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1 style="margin:0;font-size:26px">#${esc(p.codigo)}</h1><span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
+      <div class="fila"><span>Cliente</span><span>${esc(p.nombre)}</span></div>
+      <div class="fila"><span>Teléfono</span><span>${esc(p.tel)}</span></div>
+      <div class="fila"><span>Dirección</span><span>${esc(p.dir)}</span></div>
+      ${p.ref ? `<div class="fila"><span>Referencia</span><span>${esc(p.ref)}</span></div>` : ""}
+      ${p.notas ? `<div class="fila"><span>Notas</span><span>${esc(p.notas)}</span></div>` : ""}
+      <ul class="items">${itemsHTML(p)}</ul>
+      <div class="fila"><span>Total</span><span class="total">${esc(p.totalTexto || dinero(p.total))}</span></div>
+      <div class="fila"><span>Pago</span><span style="color:${p.pagado || p.pago === "Transferencia" ? "inherit" : "var(--amarillo)"}">${esc(cobrar(p))}</span></div>
+      ${p.repartidor ? `<div class="fila"><span>Delivery</span><span>🛵 ${esc(p.repartidor)}</span></div>` : ""}
+    </div>
+    ${mapa(p) ? `<a class="btn" href="${esc(mapa(p))}" target="_blank" rel="noopener" style="margin-bottom:10px">📍 Abrir en el mapa${p.ubic && !p.ubic.aprox ? "" : " (aprox.)"}</a>` : ""}
+    ${acciones}
+    <h2>Cliente</h2>
+    <div class="dos"><a class="btn" href="tel:${esc(String(p.tel).replace(/\D/g, ""))}">📞 Llamar</a><button class="btn" data-acc="wa">💬 WhatsApp</button></div>`;
+  relojes();
+}
+
+/* ---------- @@AGOTADOS: marcar lo que no hay hoy ----------
+   La lista de productos se lee del mismo menú (index.html), así cualquier producto nuevo sale aquí solo. */
+async function cargarCatalogo(){
+  const txt = await (await fetch("index.html", { cache: "no-store" })).text();
+  const a = txt.indexOf("const CAMBIO_PROTEINA"), b = txt.indexOf("/* Ilustraciones");
+  const { CAMBIO_PROTEINA, SALSAS_EXTRA, MENU } = new Function(txt.slice(a, b) + "\nreturn { CAMBIO_PROTEINA, SALSAS_EXTRA, MENU };")();
+  const secciones = MENU.map(sec => ({ nombre: sec.nombre, items: sec.grupos.flatMap(g => g.items).filter(p => !p.oculto && !p.salsa).map(p => ({ k: p.id, n: p.nombre })) }))
+    .filter(s => s.items.length);
+  secciones.push({ nombre: "Salsas y extras", items: SALSAS_EXTRA.opciones.map(o => ({ k: "salsa:" + o.nombre, n: o.nombre })) });
+  secciones.push({ nombre: "Cambio de proteína", items: CAMBIO_PROTEINA.opciones.map(o => ({ k: "prot:" + o.nombre, n: "Cambio a " + o.nombre.toLowerCase() })) });
+  return secciones;
+}
+const nombreDe = k => { for (const s of catalogo || []) for (const it of s.items) if (it.k === k) return it.n; return k; };
+function pintarAgotados(){
+  if (!catalogo) {
+    $("#app").innerHTML = `<p class="vacio">Cargando productos…</p>`;
+    cargarCatalogo().then(c => { catalogo = c; pintar(); }).catch(() => { $("#app").innerHTML = `<button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button><p class="vacio">No se pudo cargar el menú. Revisa el internet.</p>`; });
+    return;
+  }
+  const lista = [...agotados];
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button>
+    <div class="cab"><div><h1>Agotados de hoy</h1><small>Toca un producto para marcarlo. El menú cambia al instante.</small></div></div>
+    <div class="tarjeta">
+      <h2 style="margin-top:0">Agotado ahora (${lista.length})</h2>
+      ${lista.length ? `<div class="chips">${lista.map(k => `<button data-k="${esc(k)}">✕ ${esc(nombreDe(k))}</button>`).join("")}</div>
+        <button class="btn borde" data-acc="todo-disponible" style="margin-top:10px;min-height:48px">${seguroTodo ? "¿Seguro? Toca otra vez" : "Poner todo disponible"}</button>`
+        : `<p class="ayuda" style="margin:0">Todo está disponible ✅</p>`}
+    </div>
+    <input id="buscar-ag" type="search" placeholder="Buscar producto…" value="${esc(buscarAg)}" style="margin-bottom:6px">
+    ${catalogo.map(sec => `<div class="sec-ag"><h2>${esc(sec.nombre)}</h2><div class="lista-p">
+      ${sec.items.map(it => { const off = agotados.has(it.k); return `<div class="fila-p${off ? " off" : ""}" data-n="${esc(it.n.toLowerCase())}"><span>${esc(it.n)}</span>
+        <button class="sw${off ? " off" : ""}" data-k="${esc(it.k)}">${off ? "Agotado" : "Disponible"}</button></div>`; }).join("")}
+    </div></div>`).join("")}`;
+  filtrarAg();
+  $("#buscar-ag").addEventListener("input", e => { buscarAg = e.target.value; filtrarAg(); });
+}
+function filtrarAg(){
+  const q = buscarAg.trim().toLowerCase();
+  document.querySelectorAll(".fila-p").forEach(f => f.style.display = !q || f.dataset.n.includes(q) ? "" : "none");
+  document.querySelectorAll(".sec-ag").forEach(s => s.style.display = [...s.querySelectorAll(".fila-p")].some(f => f.style.display !== "none") ? "" : "none");
+}
+async function cambiarAgotado(k){
+  const nuevo = new Set(agotados); nuevo.has(k) ? nuevo.delete(k) : nuevo.add(k);
+  const quedo = nuevo.has(k);
+  agotados = nuevo; pintar();
+  try { await guardarAgotados([...nuevo]); avisar(quedo ? `🚫 ${nombreDe(k)}: agotado` : `✅ ${nombreDe(k)}: disponible`); }
+  catch (e) { console.error(e); avisar("No se pudo guardar. Revisa el internet."); }
+}
 
 /* ---------- Acciones ---------- */
 async function cambiar(p, cambios, cambiosCli, texto){
@@ -316,6 +465,15 @@ function mensajeDelivery(p){
 document.addEventListener("click", e => {
   const b = e.target.closest("button, [data-abrir]"); if (!b) return;
   activarSonido();
+  if (b.dataset.k) return cambiarAgotado(b.dataset.k);
+  if (b.dataset.acc === "ver-agotados") { vista = "agotados"; abierto = null; seguroTodo = false; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.acc === "ver-pedidos") { vista = "pedidos"; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.acc === "todo-disponible") {
+    if (!seguroTodo) { seguroTodo = true; return pintar(); }
+    seguroTodo = false; agotados = new Set(); pintar();
+    guardarAgotados([]).then(() => avisar("✅ Todo disponible")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
   if (b.dataset.filtro) { filtro = b.dataset.filtro; return pintar(); }
   if (b.dataset.abrir) { abierto = b.dataset.abrir; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.min) { minutosSel = +b.dataset.min; return pintar(); }
@@ -341,7 +499,11 @@ document.addEventListener("click", e => {
       if (p.modo !== "delivery") abrirWA(telWA(p.tel), llenar(MSG.listoLlevar, p));
       break;
     case "camino":
-      cambiar(p, { estado: "en_camino" }, { estado: "en_camino" }, "Va en camino");
+    { // @@VIAJE: minutos estimados del viaje (3 min por km + 5, entre 10 y 40) para mover el motorcito del cliente
+      const viaje = Math.min(40, Math.max(10, Math.round((Number(p.km) || 3) * 3 + 5)));
+      const salio = enMinutos(0);
+      cambiar(p, { estado: "en_camino", salio, viaje }, { estado: "en_camino", salio, viaje }, "Va en camino");
+    }
       abrirWA(telWA(p.tel), llenar(MSG.enCamino, p));
       break;
     case "entregado": cambiar(p, { estado: "entregado" }, { estado: "entregado" }, "Pedido entregado"); break;
@@ -349,6 +511,14 @@ document.addEventListener("click", e => {
     case "grupo": abrirWA("", mensajeDelivery(p)); break;
     case "wa": abrirWA(telWA(p.tel), `Hola ${(p.nombre || "").split(/\s+/)[0]}, te escribimos de Jireh Sushi sobre tu pedido #${p.codigo}. `); break;
     case "seguimiento": abrirWA(telWA(p.tel), `Sigue tu pedido #${p.codigo} en vivo aquí: ${enlaceSeguimiento(p.id)}`); break;
+    case "d-camino": {   // el delivery toma el pedido: queda a su nombre y el cliente ve el motorcito
+      const viaje = Math.min(40, Math.max(10, Math.round((Number(p.km) || 3) * 3 + 5)));
+      const salio = enMinutos(0);
+      cambiar(p, { estado: "en_camino", salio, viaje, repartidor: nombreUsuario() }, { estado: "en_camino", salio, viaje }, "¡Buen viaje! 🛵");
+      break;
+    }
+    case "d-entregado": cambiar(p, { estado: "entregado", entregado: new Date() }, { estado: "entregado" }, "Pedido entregado ✅"); abierto = null; break;
+    case "d-cobrado": cambiar(p, { pagado: !p.pagado }, null, p.pagado ? "Cobro desmarcado" : "Cobrado ✅"); break;
     case "pago":
       if (!p.pagado) { cambiar(p, { pagado: true }, null, "Pago marcado"); abrirWA(telWA(p.tel), llenar(MSG.pago, p)); }
       else cambiar(p, { pagado: false }, null, "Pago desmarcado");
