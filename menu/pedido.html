@@ -342,6 +342,7 @@ function montarChat(){
       <div class="chat-cab"><img src="fotos/logo.png" alt=""><div><b>Chat con Jireh Sushi</b><small>Te respondemos aquí mismo</small></div><button data-chat-cerrar aria-label="Cerrar">×</button></div>
       <div class="chat-msjs" id="chat-msjs"></div>
       <div class="chat-rapido">
+        <button data-rapido="ubicacion">📍 Mi ubicación</button>
         <button data-rapido="foto">📎 Enviar comprobante</button>
         <button data-rapido="¿Cuánto le falta a mi pedido?">¿Cuánto falta?</button>
         <button data-rapido="Quisiera agregar algo a mi pedido: ">Agregar algo</button>
@@ -370,7 +371,7 @@ function pintarBadge(){
 function pintarChat(){
   const c = document.getElementById("chat-msjs"); if (!c) return;
   const abajo = c.scrollHeight - c.scrollTop - c.clientHeight < 80;
-  c.innerHTML = chatMsjs.length ? chatMsjs.map(m => `<div class="msj ${m.de === "negocio" ? "negocio" : "cliente"}">${m.foto ? `<img src="${esc(m.foto)}" alt="Foto enviada">` : ""}${esc(m.texto)}<small>${m.de === "negocio" ? "Jireh Sushi · " : ""}${horaMsj(m)}</small></div>`).join("")
+  c.innerHTML = chatMsjs.length ? chatMsjs.map(m => `<div class="msj ${m.de === "negocio" ? "negocio" : "cliente"}">${m.foto ? `<img src="${esc(m.foto)}" alt="Foto enviada">` : ""}${esc(m.texto).replace(/(https:\/\/www\.google\.com\/maps\/\?q=[-\d.,]+)/, '<a href="$1" target="_blank" rel="noopener" style="color:inherit">ver mapa</a>')}<small>${m.de === "negocio" ? "Jireh Sushi · " : ""}${horaMsj(m)}</small></div>`).join("")
     : `<div class="chat-vacio">Escríbenos si tienes alguna pregunta o quieres agregar algo.<br>${actual && actual.pago === "Transferencia" ? "<b>Envía aquí la foto del comprobante de tu transferencia.</b>" : ""}</div>`;
   if (abajo || document.body.classList.contains("chat-abierto")) c.scrollTop = c.scrollHeight;
   if (document.body.classList.contains("chat-abierto")) marcarVisto(); else pintarBadge();
@@ -397,11 +398,26 @@ async function mandarFoto(f){
   try { const d = await reducirFoto(f); await chatEnviar(actual && actual.pago === "Transferencia" ? "Comprobante de transferencia" : "Foto", d); }
   catch(e) { alert("No se pudo enviar la foto. Prueba otra vez."); }
 }
+/* 📍 Mi ubicación: manda un enlace de Google Maps con el punto exacto; el panel calcula el delivery con él */
+function mandarUbicacion(btn){
+  if (!navigator.geolocation) return alert("Tu teléfono no permite compartir la ubicación desde aquí.");
+  const t = btn.textContent; btn.textContent = "Buscando…";
+  navigator.geolocation.getCurrentPosition(async pos => {
+    btn.textContent = t;
+    const q = pos.coords.latitude.toFixed(6) + "," + pos.coords.longitude.toFixed(6);
+    try { await chatEnviar("📍 Mi ubicación: https://www.google.com/maps/?q=" + q, null); } catch(e) { alert("No se pudo enviar. Revisa tu internet."); }
+  }, err => {
+    btn.textContent = t;
+    alert(err && err.code === 1 ? "Activa la ubicación y permite el acceso para esta página, luego toca otra vez." : "No pudimos obtener tu ubicación. Enciende el GPS y prueba otra vez.");
+  }, { enableHighAccuracy: true, timeout: 15000 });
+}
 document.addEventListener("click", e => {
   if (e.target.closest("[data-chat]")) return abrirChat();
   if (e.target.closest("[data-chat-cerrar]")) return cerrarChat();
   const r = e.target.closest("[data-rapido]");
-  if (r) { if (r.dataset.rapido === "foto") return document.getElementById("chat-foto").click(); const i = document.getElementById("chat-txt"); i.value = r.dataset.rapido; i.focus(); }
+  if (r) {
+    if (r.dataset.rapido === "foto") return document.getElementById("chat-foto").click();
+    if (r.dataset.rapido === "ubicacion") return mandarUbicacion(r); const i = document.getElementById("chat-txt"); i.value = r.dataset.rapido; i.focus(); }
 });
 
 /* ---------- Demo o Firebase ---------- */

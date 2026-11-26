@@ -335,9 +335,13 @@ const rangoDe = d => `${bonita(NEGOCIO.horario.abre)} – ${bonita(cierreDe(d))}
 const rango = rangoDe(2);
 const cerrados = NEGOCIO.diasCerrado.map(d => DIAS[d]).join(", ");
 /* @@HOY — tabla del horario con el día de hoy resaltado */
+/* @@CERRAR-HOY: si en el panel tocaron "Cerrar por hoy", la portada también dice cerrado (lo lee de Firebase al final de la página) */
+let CIERRE_HASTA = 0;
+const cerradoHoy = () => CIERRE_HASTA > Date.now();
+window.aplicarCierre = hasta => { CIERRE_HASTA = hasta || 0; pintarHoras(); estado(); };
 function pintarHoras(){
   const ahora = new Date(), hoy = ahora.getDay(), t = ahora.getHours() * 60 + ahora.getMinutes();
-  const abiertoAhora = !NEGOCIO.diasCerrado.includes(hoy) && t >= min(NEGOCIO.horario.abre) && t < min(cierreDe(hoy));
+  const abiertoAhora = !cerradoHoy() && !NEGOCIO.diasCerrado.includes(hoy) && t >= min(NEGOCIO.horario.abre) && t < min(cierreDe(hoy));
   $("#horas").innerHTML = [1,2,3,4,5,6,0].map(d => {
     const c = NEGOCIO.diasCerrado.includes(d), esHoy = d === hoy;
     const est = esHoy ? `<span class="estado-hoy" style="color:${abiertoAhora ? "#3DDC84" : "#8A8580"}">${abiertoAhora ? "● Abierto ahora" : "● Cerrado ahora"}</span>` : "";
@@ -349,11 +353,11 @@ function pintarHoras(){
 pintarHoras(); setInterval(pintarHoras, 60000);
 function estado(){
   const ahora = new Date(), t = ahora.getHours() * 60 + ahora.getMinutes(), a = min(NEGOCIO.horario.abre), c = min(cierreDe(ahora.getDay()));
-  const abierto = !NEGOCIO.diasCerrado.includes(ahora.getDay()) && t >= a && t < c;
+  const abierto = !cerradoHoy() && !NEGOCIO.diasCerrado.includes(ahora.getDay()) && t >= a && t < c;
   let prox = "hoy";
-  for (let k = 0; k < 8; k++) { const d = (ahora.getDay() + k) % 7; if (NEGOCIO.diasCerrado.includes(d) || (k === 0 && t >= a)) continue; prox = k === 0 ? "hoy" : k === 1 ? "mañana" : "el " + DIAS[d].toLowerCase(); break; }
+  for (let k = 0; k < 8; k++) { const d = (ahora.getDay() + k) % 7; if (NEGOCIO.diasCerrado.includes(d) || (k === 0 && (t >= a || cerradoHoy()))) continue; prox = k === 0 ? "hoy" : k === 1 ? "mañana" : "el " + DIAS[d].toLowerCase(); break; }
   const h = bonita(NEGOCIO.horario.abre), alas = (h.startsWith("1:") ? "a la " : "a las ") + h;
-  $("#estado span").textContent = abierto ? "Abierto ahora · Ordena en línea" : `Cerrado · Abrimos ${prox === "hoy" ? "" : prox + " "}${alas}`;
+  $("#estado span").textContent = abierto ? "Abierto ahora · Ordena en línea" : `Cerrado${cerradoHoy() ? " por hoy" : ""} · Abrimos ${prox === "hoy" ? "" : prox + " "}${alas}`;
   $("#estado i").style.background = abierto ? "#3DDC84" : "#8A8580";
 }
 estado(); setInterval(estado, 60000);
@@ -430,6 +434,11 @@ document.querySelectorAll("img").forEach(i => { const f = () => i.classList.add(
 /* @@DESCUENTO-BARRA: barra de arriba mientras dure el descuento */
 if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) document.getElementById("barra-descuento").outerHTML =
   `<div class="barra-descuento"><b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span><a href="menu/index.html${/descuento=ver/.test(location.search) ? "?descuento=ver" : ""}">Pedir ahora</a></div>`;
+</script>
+<!-- @@CERRAR-HOY: lee de Firebase si el negocio cerró temprano hoy. Si no carga, la portada sigue normal. -->
+<script type="module">
+import { escucharDisponibilidad } from "./menu/fb.js";
+escucharDisponibilidad((lista, config) => window.aplicarCierre(config && config.cerradoHoy ? config.cerradoHoy.hasta : 0));
 </script>
 </body>
 </html>

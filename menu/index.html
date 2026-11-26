@@ -252,6 +252,10 @@ img{display:block;max-width:100%}
 /* @@ESTILO-PAGOS — bancos y ubicación */
 .bancos{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--tarjeta);border:1px solid var(--borde)}
 .bancos-tit{margin:0;font-size:13px;color:#C9C3B8}
+.paso-pago{margin:0;font-size:14px;line-height:1.45;color:#E9E4DA}.paso-pago b{color:#fff}
+.subir-comp{display:flex;align-items:center;justify-content:center;height:54px;width:100%;cursor:pointer;font-weight:800;text-align:center}
+.comp-listo{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;background:#0F2A1A;border:1px solid #1F6B3E;color:#7BE3A4;font-size:13.5px;font-weight:700}
+.comp-listo img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none}
 .banco{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--borde);background:transparent;color:inherit;text-align:left;cursor:pointer}
 .banco.activa{border-color:var(--acento);background:rgba(255,255,255,.04)}
 .banco .datos{flex:1;display:flex;flex-direction:column;gap:2px;font-size:13px;color:#C9C3B8}
@@ -545,6 +549,8 @@ const NEGOCIO = {
   rebajaTodo: 0,                      // @@REBAJA-TODO
   llamadas: false,                    // @@LLAMADAS
   panelDemo: false,
+  soloUbicacion: true,                // @@SOLO-UBICACION  true = para delivery se pide solo "Usar mi ubicación" (GPS), sin escribir dirección.
+                                       //   false = vuelve el campo de dirección escrita con sugerencias.
   pedidoPorWhatsApp: false,           // @@SALA-DE-ESPERA  false = el cliente NO sale a WhatsApp: va directo a "Mi pedido" (seguimiento + chat).
                                        //   WhatsApp solo se usa si Firebase falla. true = también abre WhatsApp como antes.
   prefijoPedido: "SAGRADO",           // @@CODIGO-PEDIDO  Los pedidos salen como SAGRADO-1, SAGRADO-2… (vuelve a 1 cada día)
@@ -847,19 +853,27 @@ const salsaAgotada = n => AGOTADOS.has("salsa:" + n);
 const lineaAgotada = l => estaAgotado(PRODUCTOS[l.id]) || (!!l.prot && protAgotada(l.prot)) || (l.salsas || []).some(salsaAgotada);
 /* @@BREAK: si el negocio está en break, sale un aviso arriba y en el carrito. Igual se puede pedir. */
 let PAUSA = null;
+/* @@CERRAR-HOY: si el equipo tocó "Cerrar por hoy" en el panel, el menú se ve pero NO deja enviar pedidos hasta mañana. */
+let CIERRE = null;
+const cerradoHoy = () => !!(CIERRE && CIERRE.hasta > Date.now());
+const textoCierre = () => { const d = proximoDia(); return `Hoy cerramos temprano 🙏 Volvemos ${d === "hoy" ? "hoy" : d} ${aLas(horaBonita(NEGOCIO.horario.abre))}. ¡Gracias por tu comprensión!`; };
 const horaCorta = ms => new Date(ms).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" });
 const enBreak = () => !!(PAUSA && PAUSA.hasta > Date.now());
 const textoBreak = () => `Estamos en break 🍽️ Volvemos a las ${horaCorta(PAUSA.hasta)} · Puedes hacer tu pedido y lo preparamos al volver.`;
 function pintarBreak(){
   let b = document.getElementById("aviso-break");
-  if (!enBreak()) { if (b) b.remove(); return; }
+  if (!enBreak() && !cerradoHoy()) { if (b) b.remove(); return; }
   if (!b) { b = document.createElement("div"); b.id = "aviso-break"; b.className = "aviso-break"; const h = document.querySelector("header"); h ? h.after(b) : document.body.prepend(b); }
-  b.textContent = textoBreak();
+  b.textContent = cerradoHoy() ? textoCierre() : textoBreak();
 }
-setInterval(() => { if (PAUSA && !enBreak()) { PAUSA = null; pintarBreak(); actualizarCarrito(); } }, 30000);
+setInterval(() => {
+  if (PAUSA && !enBreak()) { PAUSA = null; pintarBreak(); actualizarCarrito(); }
+  if (CIERRE && !cerradoHoy()) { CIERRE = null; pintarBreak(); pintarEstado(); actualizarCarrito(); }
+}, 30000);
 window.aplicarAgotados = (lista, config) => {
   PAUSA = config && config.pausa && config.pausa.hasta ? config.pausa : null;
-  pintarBreak();
+  CIERRE = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null;
+  pintarBreak(); if ($("#estado span")) pintarEstado();
   AGOTADOS = new Set(lista || []);
   pintarHero(); pintarMenu($("#buscar") ? $("#buscar").value : ""); actualizarCarrito();
 };
@@ -996,6 +1010,31 @@ function cambiarCantidad(i, d){
 let vistaCarrito = "lista";   // "lista" o "datos"
 let pago = NEGOCIO.pagos[0];
 let bancoSel = 0;              // banco que eligió el cliente para transferir
+/* @@PAGO-OBLIGATORIO: con Transferencia, el cliente tiene que subir la foto del comprobante ANTES de enviar el pedido.
+   La foto se manda sola al chat del pedido (el equipo la ve en el panel). Efectivo no pide nada. */
+let comprobanteFoto = null, comprobanteEstado = "";
+function reducirFoto(f){
+  return new Promise((ok, no) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      let w = img.width, h = img.height; const k = Math.min(1, 1100 / Math.max(w, h)); w = Math.round(w * k); h = Math.round(h * k);
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      let q = .72, d = cv.toDataURL("image/jpeg", q);
+      while (d.length > 850000 && q > .3) { q -= .12; d = cv.toDataURL("image/jpeg", q); }
+      URL.revokeObjectURL(url); ok(d);
+    };
+    img.onerror = no; img.src = url;
+  });
+}
+document.addEventListener("change", async e => {
+  if (!e.target.matches || !e.target.matches(".f-comp-foto")) return;
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const raiz = e.target.closest(".carrito-cuerpo"); if (raiz) leerDatos(raiz);
+  comprobanteEstado = "Cargando la foto…"; actualizarCarrito();
+  try { comprobanteFoto = await reducirFoto(f); comprobanteEstado = ""; }
+  catch(err) { comprobanteFoto = null; comprobanteEstado = "No se pudo leer esa foto. Prueba con otra (captura de pantalla o foto)."; }
+  actualizarCarrito();
+});
 
 /* ---------- @@CALCULO-DELIVERY — distancia y costo ---------- */
 let ubic = null;               // { lat, lng, km, costo, lejos }
@@ -1008,18 +1047,33 @@ function distanciaKm(a, b){    // distancia en línea recta entre dos puntos del
 }
 function costoDelivery(){ return modo === "delivery" && ubic && !ubic.lejos ? ubic.costo : 0; }
 function totalConDelivery(){ return totalDinero() + costoDelivery(); }
+let ubicFallo = false, ubicTexto = "";
+/* Nombre de la calle/sector del punto GPS (para que el panel lo muestre). Gratis, sin clave. Si falla, no pasa nada. */
+async function nombreDelPunto(p){
+  try {
+    const r = await fetch(`https://photon.komoot.io/reverse?lat=${p.lat}&lon=${p.lng}&lang=es`);
+    const f = (await r.json()).features[0]; if (!f) return "";
+    const pr = f.properties;
+    return [pr.street ? pr.street + (pr.housenumber ? " #" + pr.housenumber : "") : pr.name, pr.district || pr.locality, pr.city].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(", ");
+  } catch(e) { return ""; }
+}
 function pedirUbicacion(){
-  if (!navigator.geolocation) { ubicEstado = "Tu teléfono no permite compartir la ubicación. Escribe bien tu dirección y te confirmamos el delivery."; actualizarCarrito(); return; }
+  ubicFallo = false;
+  if (!navigator.geolocation) { ubicFallo = true; ubicEstado = "Tu teléfono no permite compartir la ubicación desde aquí."; actualizarCarrito(); return; }
   ubicEstado = "Buscando tu ubicación…"; actualizarCarrito();
   navigator.geolocation.getCurrentPosition(pos => {
     const punto = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     const km = Math.max(1, Math.ceil(distanciaKm(NEGOCIO.local, punto) * NEGOCIO.factorCalles));
     const lejos = km > NEGOCIO.deliveryMaxKm;
     ubic = { ...punto, km, lejos, costo: Math.max(NEGOCIO.deliveryMinimo, km * NEGOCIO.deliveryPorKm) };
-    ubicEstado = "";
+    ubicEstado = ""; ubicTexto = "";
     actualizarCarrito();
-  }, () => {
-    ubicEstado = "No pudimos obtener tu ubicación. Revisa que esté activada, o escribe bien tu dirección y te confirmamos el delivery.";
+    nombreDelPunto(punto).then(t => { ubicTexto = t; actualizarCarrito(); });
+  }, err => {
+    ubicFallo = true;
+    ubicEstado = err && err.code === 1
+      ? "No diste permiso. Activa la ubicación del teléfono y, en el navegador, permite la ubicación para esta página. Luego toca el botón otra vez."
+      : "No pudimos obtener tu ubicación. Revisa que la ubicación (GPS) del teléfono esté encendida y vuelve a tocar el botón.";
     actualizarCarrito();
   }, { enableHighAccuracy: true, timeout: 15000 });
 }
@@ -1194,8 +1248,9 @@ function htmlDatos(){
   return `<div class="carrito-cab"><h2 class="display">Tus datos</h2>${cerrarBtn()}</div>
     <div class="carrito-cuerpo">
       <button class="volver" data-acc="volver">← Volver al pedido</button>
-      ${estaAbierto() && enBreak() ? `<div class="aviso-cerrado">${esc(textoBreak())}</div>` : ""}
-      ${!estaAbierto() ? `<div class="aviso-cerrado">Ahora estamos cerrados. Puedes enviar tu pedido y lo atendemos al abrir (${esc(NEGOCIO.horario.texto)}).</div>` : ""}
+      ${cerradoHoy() ? `<div class="aviso-cerrado">${esc(textoCierre())} Por hoy no estamos recibiendo pedidos.</div>` : ""}
+      ${!cerradoHoy() && estaAbierto() && enBreak() ? `<div class="aviso-cerrado">${esc(textoBreak())}</div>` : ""}
+      ${!cerradoHoy() && !estaAbierto() ? `<div class="aviso-cerrado">Ahora estamos cerrados. Puedes enviar tu pedido y lo atendemos al abrir (${esc(NEGOCIO.horario.texto)}).</div>` : ""}
       <div class="campo"><label for="f-nombre">Nombre y apellido</label><input id="f-nombre" type="text" placeholder="Tu nombre completo" value="${esc(d.nombre)}" autocomplete="name"></div>
       <div class="campo"><label for="f-tel">Teléfono / WhatsApp</label><input id="f-tel" type="tel" placeholder="809-000-0000" value="${esc(d.tel)}" autocomplete="tel"></div>
       <div class="campo"><span class="lbl">Método de pago</span>
@@ -1205,14 +1260,26 @@ function htmlDatos(){
       </div>
       ${pago === "Efectivo" ? `<div class="campo"><label for="f-cambio">¿Con cuánto vas a pagar? (para tu cambio)</label><input id="f-cambio" type="text" inputmode="numeric" placeholder="${NEGOCIO.moneda} 2,000" value="${esc(d.cambio)}"></div>` : ""}
       ${pago === "Transferencia" ? `<div class="bancos">
-        <p class="bancos-tit">Elige a qué cuenta vas a transferir. Después envía el comprobante desde el chat de tu pedido.</p>
+        <p class="paso-pago"><b>Paso 1 ·</b> Transfiere <b>${dinero(totalConDelivery())}</b> a una de estas cuentas (toca <b>Copiar</b> para copiar el número):</p>
         ${NEGOCIO.bancos.map((b, i) => `<div class="banco${bancoSel === i ? " activa" : ""}" data-acc="banco" data-i="${i}" role="radio" aria-checked="${bancoSel === i}" tabindex="0">
           <span class="marca-sel"></span>
           <span class="datos"><b>${esc(b.banco)}</b><span>${esc(b.tipo)} · ${esc(b.numero)}</span><span>${esc(b.titular)}</span></span>
           <button class="copiar" data-acc="copiar" data-v="${esc(b.numero)}">Copiar</button>
         </div>`).join("")}
+        <p class="paso-pago" style="margin-top:6px"><b>Paso 2 ·</b> Sube la foto o captura del comprobante. <b>Sin el comprobante no se puede enviar el pedido.</b></p>
+        <label class="${comprobanteFoto ? "btn-borde" : "btn-acento"} subir-comp">📎 ${comprobanteFoto ? "Cambiar la foto del comprobante" : "Subir comprobante de la transferencia"}<input class="f-comp-foto" type="file" accept="image/*" hidden></label>
+        ${comprobanteEstado ? `<small class="ubic-estado aviso">${esc(comprobanteEstado)}</small>`
+          : comprobanteFoto ? `<div class="comp-listo"><img src="${comprobanteFoto}" alt="Comprobante"><span>✓ Comprobante listo. Se enviará con tu pedido.</span></div>` : ""}
       </div>` : ""}
-      ${modo === "delivery" ? `<div class="campo campo-dir"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Ej.: Calle Central #18, Hainamosa" value="${esc(d.dir)}" autocomplete="off" aria-autocomplete="list"><div class="sugerencias" role="listbox" hidden></div><small class="ayuda-dir" aria-live="polite"></small></div>
+      ${modo === "delivery" && NEGOCIO.soloUbicacion ? `<div class="campo"><span class="lbl">Tu ubicación para el delivery</span>
+        <button class="${ubic && !ubic.aprox ? "btn-borde" : "btn-acento"} ubic-btn" data-acc="ubicacion" style="height:54px;width:100%">📍 ${ubic && !ubic.aprox ? "Actualizar mi ubicación" : "Usar mi ubicación actual"}</button>
+        ${ubicEstado ? `<small class="ubic-estado ${ubicFallo ? "aviso" : ""}">${esc(ubicEstado)}</small>${ubicFallo ? `<small class="ubic-estado">¿No te funciona? <a href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Escríbenos por WhatsApp</a> y te ayudamos.</small>` : ""}`
+          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${ubic.km} km. Por la distancia, coordinamos el delivery contigo.</small>`
+          : ubic && !ubic.aprox ? `<small class="ubic-estado ok">✓ Ubicación lista${ubicTexto ? " · " + esc(ubicTexto) : ""} · aprox. ${ubic.km} km · Delivery ${dinero(ubic.costo)}</small>`
+          : `<small class="ubic-estado">Es necesaria para que el delivery llegue exacto a tu puerta. Cuando el teléfono pregunte, toca <b>Permitir</b>.</small>`}
+      </div>
+      <div class="campo"><label for="f-ref">Indicaciones para el delivery (recomendado)</label><input id="f-ref" type="text" placeholder="Ej.: casa verde de 2 niveles, apto. 3B, al lado del colmado" value="${esc(d.ref)}"></div>` : ""}
+      ${modo === "delivery" && !NEGOCIO.soloUbicacion ? `<div class="campo campo-dir"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Ej.: Calle Central #18, Hainamosa" value="${esc(d.dir)}" autocomplete="off" aria-autocomplete="list"><div class="sugerencias" role="listbox" hidden></div><small class="ayuda-dir" aria-live="polite"></small></div>
       <div class="campo"><label for="f-ref">Referencia (opcional)</label><input id="f-ref" type="text" placeholder="Ej.: casa blanca, al lado del colmado" value="${esc(d.ref)}"></div>
       <div class="campo"><span class="lbl">Ubicación para el delivery</span>
         <button class="btn-borde ubic-btn" data-acc="ubicacion">📍 ${ubic ? "Actualizar mi ubicación" : "Usar mi ubicación"}</button>
@@ -1268,11 +1335,20 @@ function actualizarCarrito(){
 }
 
 function validar(raiz, paraCocina){
+  if (cerradoHoy()) { const e = raiz.querySelector("#f-error"); if (e) e.textContent = "Por hoy ya cerramos y no estamos recibiendo pedidos. " + textoCierre(); return null; }   // @@CERRAR-HOY
   leerDatos(raiz);
   const d = datosGuardados, err = raiz.querySelector("#f-error");
   if (d.nombre.trim().length < 2) { err.textContent = "Escribe tu nombre para el pedido."; raiz.querySelector("#f-nombre").focus(); return null; }
-  if (modo === "delivery" && d.dir.trim().length < 5) { err.textContent = "Escribe la dirección de entrega."; raiz.querySelector("#f-dir").focus(); return null; }
-  if (modo === "delivery" && soloSector(d.dir)) { err.textContent = "Escribe la calle y el número de casa, no solo el sector (ej.: Calle Central #18, Hainamosa)."; raiz.querySelector("#f-dir").focus(); return null; }
+  if (pago === "Transferencia" && !comprobanteFoto && !paraCocina) {   // @@PAGO-OBLIGATORIO
+    err.textContent = "📎 Falta subir el comprobante de la transferencia. Sin el comprobante no podemos recibir tu pedido.";
+    const c = raiz.querySelector(".subir-comp"); if (c) c.scrollIntoView({ block: "center", behavior: "smooth" }); return null;
+  }
+  if (modo === "delivery" && NEGOCIO.soloUbicacion) {
+    if (!ubic || ubic.aprox) { err.textContent = "📍 Falta poner tu ubicación. Toca \"Usar mi ubicación actual\" para seguir."; const u = raiz.querySelector('[data-acc="ubicacion"]'); if (u) u.focus(); return null; }
+    d.dir = ubicTexto || "Ubicación compartida por GPS (ver mapa)";
+  }
+  else if (modo === "delivery" && d.dir.trim().length < 5) { err.textContent = "Escribe la dirección de entrega."; raiz.querySelector("#f-dir").focus(); return null; }
+  if (modo === "delivery" && !NEGOCIO.soloUbicacion && soloSector(d.dir)) { err.textContent = "Escribe la calle y el número de casa, no solo el sector (ej.: Calle Central #18, Hainamosa)."; raiz.querySelector("#f-dir").focus(); return null; }
   if (modo === "local" && !d.mesa.trim()) { err.textContent = "Escribe el número de tu mesa."; raiz.querySelector("#f-mesa").focus(); return null; }
   if (!paraCocina && d.tel.replace(/\D/g, "").length < 10) { err.textContent = "Escribe un teléfono válido (10 dígitos)."; raiz.querySelector("#f-tel").focus(); return null; }
   err.textContent = "";
@@ -1383,6 +1459,12 @@ async function enviarPedido(raiz){
       const id = r.id; idPedido = r.codigo;
       miPedido = { id, codigo: idPedido };
       try { localStorage.setItem("jireh-mi-pedido", JSON.stringify({ id, codigo: idPedido, t: Date.now() })); } catch(e) {}
+      if (pago === "Transferencia" && comprobanteFoto && window.JirehFB.enviarMensaje) {   // @@PAGO-OBLIGATORIO: el comprobante va al chat
+        if (boton) boton.textContent = "Enviando comprobante…";
+        try { await Promise.race([window.JirehFB.enviarMensaje(id, "cliente", "🧾 Comprobante de transferencia (" + pedido.totalTexto + (pedido.banco ? " · " + pedido.banco : "") + ")", comprobanteFoto), new Promise(ok => setTimeout(ok, 12000))]); }
+        catch(e) { console.warn("No se pudo mandar el comprobante; el cliente lo puede subir en el chat.", e); }
+        comprobanteFoto = null;
+      }
       carrito = []; guardar(); vistaCarrito = "registrado"; actualizarCarrito();
       if (!NEGOCIO.pedidoPorWhatsApp) {   // @@SALA-DE-ESPERA: directo a la pantalla del pedido (como Uber)
         enviando = false;
@@ -1576,6 +1658,7 @@ if (mesaQR) $("#cambiar-modo").hidden = true;   // si viene del QR de la mesa, n
 function minutosDe(hhmm){ const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); }
 function cierreDe(dia){ return (NEGOCIO.horario.cierraDia || {})[dia] || NEGOCIO.horario.cierra; }   // hora de cerrar de ese día
 function estaAbierto(){
+  if (typeof cerradoHoy === "function" && cerradoHoy()) return false;   // @@CERRAR-HOY
   const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes();
   const a = minutosDe(NEGOCIO.horario.abre), c = minutosDe(cierreDe(ahora.getDay()));
   const dia = (a < c || m >= a) ? ahora.getDay() : (ahora.getDay() + 6) % 7;   // después de medianoche cuenta el día anterior
@@ -1588,7 +1671,7 @@ function proximoDia(){   // "hoy", "mañana" o "el martes": cuándo vuelve a abr
   const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes(), a = minutosDe(NEGOCIO.horario.abre);
   for (let k = 0; k < 8; k++) {
     const d = (ahora.getDay() + k) % 7;
-    if ((NEGOCIO.diasCerrado || []).includes(d) || (k === 0 && m >= a)) continue;
+    if ((NEGOCIO.diasCerrado || []).includes(d) || (k === 0 && (m >= a || cerradoHoy()))) continue;
     return k === 0 ? "hoy" : k === 1 ? "mañana" : "el " + DIAS_SEMANA[d];
   }
   return "hoy";
@@ -1605,6 +1688,7 @@ function pintarEstado(){
   let texto, color;
   if (abierto && faltaCerrar <= AVISO_CIERRE) { texto = `Cerramos pronto · ${aLas(horaBonita(cierreDe(ahora.getDay())))}`; color = "#F2994A"; }
   else if (abierto) { texto = "Abierto ahora"; color = "#3DDC84"; }
+  else if (cerradoHoy()) { const d = proximoDia(); texto = `Cerrado por hoy · Abrimos ${d} ${aLas(horaBonita(NEGOCIO.horario.abre))}`; color = "#8C867E"; }
   else if (faltaAbrir <= AVISO_ANTES && proximoDia() === "hoy") { texto = `¡Casi abrimos! · en ${faltaAbrir} min`; color = "#F2C230"; }
   else { const d = proximoDia(); texto = `Cerrado · Abrimos ${d === "hoy" ? "" : d + " "}${aLas(horaBonita(NEGOCIO.horario.abre))}`; color = "#8C867E"; }
   const punto = $("#estado i");
@@ -1659,8 +1743,8 @@ mostrarSplash(1300, () => { if (!modo) mostrarLobby(); });
 </script>
 <!-- @@FIREBASE: conecta el menú con Firebase (archivo fb.js). Si no carga, el menú sigue funcionando solo con WhatsApp. -->
 <script type="module">
-import { crearPedido, escucharDisponibilidad, escucharSeguimiento } from "./fb.js";
-window.JirehFB = { crearPedido };
+import { crearPedido, escucharDisponibilidad, escucharSeguimiento, enviarMensaje } from "./fb.js";
+window.JirehFB = { crearPedido, enviarMensaje };
 escucharDisponibilidad((lista, config) => window.aplicarAgotados(lista, config));   // @@AGOTADOS en vivo
 
 /* @@MI-PEDIDO: botón flotante "Ver mi pedido" si el cliente tiene un pedido en curso (últimas 8 horas).

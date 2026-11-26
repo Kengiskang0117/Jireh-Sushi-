@@ -75,6 +75,10 @@ export function escucharDisponibilidad(alCambiar){
 }
 /* ---------- EQUIPO: guardar la lista de agotados (merge: no borra el break) ---------- */
 export const guardarAgotados = lista => setDoc(doc(db, "config", "menu"), { agotados: lista, actualizado: serverTimestamp() }, { merge: true });
+/* ---------- EQUIPO: @@CERRAR-HOY — cerrar el negocio antes de tiempo. hasta = fecha en ms (fin del día), o null para volver a abrir ---------- */
+export const guardarCierre = (hasta) => setDoc(doc(db, "config", "menu"),
+  { cerradoHoy: hasta ? { hasta } : null, actualizado: serverTimestamp() }, { merge: true });
+
 /* ---------- EQUIPO: break (pausa) — hasta = fecha en ms, o null para terminarlo ---------- */
 export const guardarBreak = (hasta, mensaje) => setDoc(doc(db, "config", "menu"),
   { pausa: hasta ? { hasta, mensaje: mensaje || "" } : null, actualizado: serverTimestamp() }, { merge: true });
