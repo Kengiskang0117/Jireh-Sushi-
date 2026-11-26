@@ -124,6 +124,8 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .nmsj{display:inline-block;align-self:flex-start;background:var(--rojo);color:#fff;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800;margin:3px 0}
 .nprueba{display:inline-block;background:#333;color:#bbb;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px}
 /* @@LOGIN-ESTILO */
+.check-recordar{display:flex;align-items:center;gap:10px;margin:12px 0 4px;color:var(--suave);font-size:14.5px}
+.check-recordar input{width:20px;height:20px;margin:0;accent-color:var(--rojo)}
 .cuentas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
 .cuenta{border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:999px;padding:10px 14px;font-size:15px;font-weight:700}
 .cuenta.sel{border-color:var(--rojo);background:#2A1214}
@@ -252,6 +254,15 @@ function recordarCuenta(correo){
   const l = [correo, ...cuentasGuardadas().filter(c => c !== correo)].slice(0, 4);
   try { localStorage.setItem("panel-cuentas", JSON.stringify(l)); } catch(e) {}
 }
+/* @@RECORDAR-CLAVE: guarda la contraseña SOLO en este celular (si la casilla está marcada) para no escribirla otra vez.
+   No viaja a ningún lado. Si se pierde o se presta el celular, se cambia la contraseña en Firebase. */
+const claves = () => { try { return JSON.parse(localStorage.getItem("panel-claves") || "{}"); } catch(e) { return {}; } };
+const claveDe = c => { const v = claves()[c]; try { return v ? decodeURIComponent(escape(atob(v))) : ""; } catch(e) { return ""; } };
+function guardarClave(correo, clave, si){
+  const k = claves(); if (si) k[correo] = btoa(unescape(encodeURIComponent(clave))); else delete k[correo];
+  try { localStorage.setItem("panel-claves", JSON.stringify(k)); } catch(e) {}
+  if (si && window.PasswordCredential) try { navigator.credentials.store(new PasswordCredential({ id: correo, password: clave })).catch(() => {}); } catch(e) {}
+}
 function pintarLogin(error = "", correoPrevio = ""){
   const cuentas = cuentasGuardadas();
   const correo = correoPrevio || cuentas[0] || "";
@@ -259,17 +270,18 @@ function pintarLogin(error = "", correoPrevio = ""){
     <img src="fotos/logo.png" alt="Jireh Sushi">
     <h1>Panel de pedidos</h1><p>Entra con el usuario del negocio</p>
     ${cuentas.length ? `<label>Cuentas en este celular</label><div class="cuentas">${cuentas.map(c => `<button type="button" class="cuenta${c === correo ? " sel" : ""}" data-cuenta="${esc(c)}">${esc(c.split("@")[0])}</button>`).join("")}</div>` : ""}
-    <label for="correo">Correo</label><input id="correo" type="email" autocomplete="username" required value="${esc(correo)}">
+    <label for="correo">Correo</label><input id="correo" name="username" type="email" autocomplete="username" required value="${esc(correo)}">
     <label for="clave">Contraseña</label>
-    <div class="clave-caja"><input id="clave" type="password" autocomplete="current-password" required>
+    <div class="clave-caja"><input id="clave" name="password" type="password" autocomplete="current-password" required value="${esc(claveDe(correo))}">
       <button type="button" class="ojito" id="ojito" aria-label="Mostrar contraseña">${ICONO_OJO}</button></div>
+    <label class="check-recordar"><input type="checkbox" id="recordar" checked> Recordar correo y contraseña en este celular</label>
     <div class="error">${esc(error)}</div>
     <button class="btn rojo" type="submit">Entrar</button>
   </form>`;
   if (correo) $("#clave").focus(); else $("#correo").focus();
   $("#form-login").addEventListener("click", e => {
     const c = e.target.closest("[data-cuenta]");
-    if (c) { $("#correo").value = c.dataset.cuenta; document.querySelectorAll(".cuenta").forEach(x => x.classList.toggle("sel", x === c)); $("#clave").value = ""; $("#clave").focus(); }
+    if (c) { $("#correo").value = c.dataset.cuenta; document.querySelectorAll(".cuenta").forEach(x => x.classList.toggle("sel", x === c)); $("#clave").value = claveDe(c.dataset.cuenta); $("#clave").focus(); }
     if (e.target.closest("#ojito")) {
       const k = $("#clave"), ver = k.type === "password";
       k.type = ver ? "text" : "password"; $("#ojito").innerHTML = ver ? ICONO_OJO_CERRADO : ICONO_OJO;
@@ -280,8 +292,9 @@ function pintarLogin(error = "", correoPrevio = ""){
     e.preventDefault(); activarSonido();
     const b = e.target.querySelector("button[type=submit]"); b.disabled = true; b.textContent = "Entrando…";
     const correo = $("#correo").value.trim().toLowerCase();
-    try { await entrar(correo, $("#clave").value); recordarCuenta(correo); }
-    catch (err) { pintarLogin("Correo o contraseña incorrectos.", correo); }
+    const clave = $("#clave").value, si = $("#recordar").checked;
+    try { await entrar(correo, clave); recordarCuenta(correo); guardarClave(correo, clave, si); }
+    catch (err) { guardarClave(correo, "", false); pintarLogin("Correo o contraseña incorrectos.", correo); }
   });
 }
 
