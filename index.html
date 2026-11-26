@@ -102,7 +102,7 @@ section{padding:70px 0}
 
 /* @@MENU */
 .categorias{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
-.categorias .cat{flex:0 0 calc((100% - 5*12px)/6)}   /* 6 por fila; la última fila queda centrada */
+.categorias .cat{flex:0 0 calc((100% - 5*12px)/6)}   /* 6 por fila; 11 categorías = 6 + 5 centradas */
 .cat{position:relative;border:1.5px solid rgba(227,18,27,.75);border-radius:16px;overflow:hidden;text-decoration:none;background:#151517;aspect-ratio:1/1;transition:transform .15s,border-color .15s}
 .cat:hover{transform:translateY(-3px);border-color:var(--rojo-claro)}
 .cat img{width:100%;height:100%;object-fit:cover}
@@ -160,6 +160,11 @@ footer{border-top:1px solid #1E1E21;padding:28px 0 92px;color:#8A8580;font-size:
 footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 .flotante{position:fixed;right:18px;bottom:18px;z-index:40;height:56px;padding:0 20px;border-radius:999px;background:linear-gradient(180deg,#F02029,#C30D15);color:#fff;display:flex;align-items:center;gap:10px;font-weight:800;text-decoration:none;box-shadow:0 12px 30px rgba(0,0,0,.5)}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.cat{transition:none}}
+/* @@DESCUENTO-BARRA */
+.barra-descuento{display:flex;align-items:center;justify-content:center;gap:8px 14px;flex-wrap:wrap;padding:10px 16px;background:linear-gradient(90deg,#0B0B0C,#3A0A0D 25%,#B30E15 50%,#3A0A0D 75%,#0B0B0C);border-bottom:1px solid #5A1418;color:#fff;text-align:center;font-weight:700;font-size:14.5px;line-height:1.3}
+.barra-descuento b{font-size:17px;font-weight:900;letter-spacing:.04em}
+.barra-descuento .pct{background:#fff;color:#E3121B;border-radius:999px;padding:3px 10px;font-weight:900}
+.barra-descuento a{color:#fff;background:#0B0B0C;border:1px solid #fff;border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:800;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -171,7 +176,7 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
     <nav class="enlaces" id="enlaces" aria-label="Secciones">
       <a href="#inicio" class="activo">Inicio</a>
       <a href="#menu">Menú</a>
-      <a href="#promociones">Promociones</a>
+      <a href="#promociones" id="nav-promos" hidden>Promociones</a>
       <a href="#nosotros">Nosotros</a>
       <a href="#contacto">Contacto</a>
     </nav>
@@ -179,6 +184,7 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
     <button class="abrir-menu" id="abrir-menu" aria-label="Abrir secciones" aria-expanded="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </div>
 </header>
+<div id="barra-descuento"></div>
 
 <main id="inicio">
   <!-- @@PORTADA -->
@@ -219,33 +225,19 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/eby-banana.jpg" alt="" loading="lazy"><b>Aplatanao</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/cali-pollo.jpg" alt="" loading="lazy"><b>California</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/avocado-salmon.jpg" alt="" loading="lazy"><b>Avocado Rolls</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/cheese-salmon.jpg" alt="" loading="lazy"><b>Queso Crema</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/sutil-roll.jpg" alt="" loading="lazy"><b>Envueltos en Salmón</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/acevichado-roll.jpg" alt="" loading="lazy"><b>Acevichado</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-salmon-acevichado.jpg" alt="" loading="lazy"><b>Sin Arroz</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Colección HOT</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hand-roll-salmon.jpg" alt="" loading="lazy"><b>Hand Rolls</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/burger-pollo.jpg" alt="" loading="lazy"><b>Sushi Burger</b></a>
+        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/bowl-mixto.jpg" alt="" loading="lazy"><b>Signature Bowls</b></a>
         <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/coca-cola.jpg" alt="" loading="lazy"><b>Bebidas y salsas</b></a>
       </div>
       <div class="centro"><a class="btn rojo js-menu" href="menu/index.html">Ver el menú completo y ordenar</a></div>
     </div>
   </section>
 
-  <!-- @@PROMOCIONES -->
-  <section class="promos" id="promociones">
-    <div class="contenedor">
-      <div class="titulo-seccion"><h2>Promo<em>ciones</em></h2><div class="raya"></div></div>
-      <div class="promo">
-        <img src="menu/fotos/eby-banana.jpg" alt="Eby Banana Rolls" loading="lazy">
-        <div class="texto">
-          <span class="chip">NUEVO</span>
-          <h3>Eby Banana Rolls</h3>
-          <p style="margin:0;color:#D6D1CB">Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado. El sabor dominicano en un roll.</p>
-          <div class="precio"><b>RD$ 710</b></div>
-          <div><a class="btn rojo js-menu" href="menu/index.html">Pedirlo ahora</a></div>
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- @@PROMOCIONES — se prende y se apaga abajo en el código, en PROMO (activa: true / false) -->
+  <section class="promos" id="promociones" hidden></section>
 
   <section>
     <div class="contenedor">
@@ -298,7 +290,21 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
 
 <a class="flotante js-menu" href="menu/index.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h15l-1.5 9h-12z"/><path d="M6 7 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>Ordenar</a>
 
+<script src="menu/descuento.js"></script>
 <script>
+/* @@PROMOCIONES — la sección "Promociones" de la portada.
+   activa: false = no se ve (ni la sección ni el enlace de arriba). Para una promo nueva: llena los datos y pon true. */
+const PROMO = {
+  activa: false,
+  etiqueta: "PROMO",                          // letrero rojo: "NUEVO", "SOLO HOY", "2x1"…
+  titulo: "Antojo 24",
+  texto: "8 Avocado Pollo · 8 California Cheese Cangrejo · 8 Hot Pollo.",
+  precio: "RD$ 950",                          // precio de la promo, como se quiere ver
+  precioAntes: "RD$ 1,050",                   // opcional: precio tachado ("" = sin tachar)
+  foto: "menu/fotos/antojo-24.jpg",
+  boton: "Pedirlo ahora"
+};
+
 /* @@NEGOCIO */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
@@ -356,14 +362,15 @@ estado(); setInterval(estado, 60000);
    Para cambiar las fotos: agrega o quita líneas. "precio" es opcional.
    llenar: true = la foto cubre todo el cuadro (para fotos anchas sin texto).
    nombre: "" = no se muestra la etiqueta (para fotos que ya traen su texto). */
-const PASARELA = [
-  { img: "menu/fotos/pasarela/pausa-perfecta.jpg",     nombre: "" },   // sin etiqueta: la foto ya trae su texto (24 nov)
-  { img: "menu/fotos/pasarela/mixta-16.jpg",           nombre: "" },
-  { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "" },
-  { img: "menu/fotos/pasarela/eby-banana.jpg",         nombre: "" },
+const PASARELA = [   // orden del 25 nov. La de Black Friday se pone sola de primera el viernes (menu/descuento.js)
+  { img: "menu/fotos/pasarela/pausa-perfecta.jpg",     nombre: "" },
+  { img: "menu/fotos/antojo-24.jpg",                   nombre: "" },
+  { img: "menu/fotos/pasarela/california-green.jpg",   nombre: "" },
   { img: "menu/fotos/pasarela/sushi-burger-pollo.jpg", nombre: "" },
-  { img: "menu/fotos/pasarela/california-green.jpg",   nombre: "" }
+  { img: "menu/fotos/pasarela/eby-banana.jpg",         nombre: "" },
+  { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "" }
 ];
+if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY && DESCUENTO.imagen) PASARELA.unshift({ img: DESCUENTO.imagen, nombre: "" });   // @@DESCUENTO: su foto sale primero
 const SEGUNDOS = 4;   // cada cuántos segundos cambia la foto
 (function(){
   let actual = 0, temporizador;
@@ -389,6 +396,39 @@ const SEGUNDOS = 4;   // cada cuántos segundos cambia la foto
 $("#abrir-menu").addEventListener("click", () => { const ab = $("#enlaces").classList.toggle("abierto"); $("#abrir-menu").setAttribute("aria-expanded", ab); });
 document.querySelectorAll("#enlaces a").forEach(a => a.addEventListener("click", () => { $("#enlaces").classList.remove("abierto"); document.querySelectorAll("#enlaces a").forEach(x => x.classList.toggle("activo", x === a)); }));
 document.querySelectorAll("img").forEach(i => { const f = () => i.classList.add("roto"); if (i.complete && !i.naturalWidth) f(); else i.addEventListener("error", f); });
+
+/* Pinta la sección de promociones solo si PROMO.activa es true */
+(function(){
+  /* @@DESCUENTO: mientras dure el descuento (Black Friday), la sección Promociones lo muestra sola */
+  if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) Object.assign(PROMO, {
+    activa: true, etiqueta: "-" + DESCUENTO.porcentaje + "%", titulo: DESCUENTO.titulo,
+    texto: DESCUENTO.texto + (DESCUENTO.excluir.includes("bebidas") ? " (no aplica a bebidas)." : "."),
+    precio: DESCUENTO.porcentaje + "% de descuento", precioAntes: "", foto: DESCUENTO.imagen, boton: "Ver el menú con descuento"
+  });
+  if (!PROMO.activa) return;
+  const e = t => String(t || "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+  const sec = document.getElementById("promociones");
+  sec.innerHTML = `<div class="contenedor">
+      <div class="titulo-seccion"><h2>Promo<em>ciones</em></h2><div class="raya"></div></div>
+      <div class="promo">
+        <img src="${e(PROMO.foto)}" alt="${e(PROMO.titulo)}" loading="lazy">
+        <div class="texto">
+          ${PROMO.etiqueta ? `<span class="chip">${e(PROMO.etiqueta)}</span>` : ""}
+          <h3>${e(PROMO.titulo)}</h3>
+          <p style="margin:0;color:#D6D1CB">${e(PROMO.texto)}</p>
+          <div class="precio">${PROMO.precioAntes ? `<s style="color:#8A857F;font-size:20px;margin-right:10px">${e(PROMO.precioAntes)}</s>` : ""}<b>${e(PROMO.precio)}</b></div>
+          <div><a class="btn rojo js-menu" href="${e(NEGOCIO.menu)}">${e(PROMO.boton || "Pedirlo ahora")}</a></div>
+        </div>
+      </div>
+    </div>`;
+  sec.hidden = false;
+  const nav = document.getElementById("nav-promos"); if (nav) nav.hidden = false;
+})();
+</script>
+<script>
+/* @@DESCUENTO-BARRA: barra de arriba mientras dure el descuento */
+if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) document.getElementById("barra-descuento").outerHTML =
+  `<div class="barra-descuento"><b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span><a href="menu/index.html${/descuento=ver/.test(location.search) ? "?descuento=ver" : ""}">Pedir ahora</a></div>`;
 </script>
 </body>
 </html>
