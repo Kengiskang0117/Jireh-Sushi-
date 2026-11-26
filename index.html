@@ -371,6 +371,7 @@ const PASARELA = [   // orden del 25 nov. La de Black Friday se pone sola de pri
   { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "" }
 ];
 if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY && DESCUENTO.imagen) PASARELA.unshift({ img: DESCUENTO.imagen, nombre: "" });   // @@DESCUENTO: su foto sale primero
+if (typeof AVISO_HOY !== "undefined" && AVISO_HOY) PASARELA.unshift({ img: AVISO_ANTES.imagen, nombre: "" });   // @@AVISO-ANTES: "Falta 1 día", solo ese día
 const SEGUNDOS = 4;   // cada cuántos segundos cambia la foto
 (function(){
   let actual = 0, temporizador;

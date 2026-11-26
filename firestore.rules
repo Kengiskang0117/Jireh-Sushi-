@@ -61,6 +61,20 @@ service cloud.firestore {
     }
 
     // ---------- Seguimiento (lo que ve el cliente) ----------
+    // ---------- Chat del pedido (cliente <-> negocio) ----------
+    // Solo lo puede leer quien tiene el enlace largo del pedido. El cliente escribe como "cliente";
+    // solo el equipo puede escribir como "negocio". Foto (comprobante) reducida, máx. ~900 KB.
+    match /seguimiento/{id}/mensajes/{m} {
+      allow read: if true;
+      allow create: if exists(/databases/$(database)/documents/seguimiento/$(id))
+        && request.resource.data.keys().hasOnly(['de', 'texto', 'foto', 'creado'])
+        && request.resource.data.creado == request.time
+        && request.resource.data.texto is string && request.resource.data.texto.size() <= 1000
+        && (!('foto' in request.resource.data) || (request.resource.data.foto is string && request.resource.data.foto.size() < 900000))
+        && (request.resource.data.de == 'cliente' || (request.resource.data.de == 'negocio' && esEquipo()));
+      allow update, delete: if esEquipo();
+    }
+
     match /seguimiento/{id} {
       allow get: if true;                 // con el enlace exacto
       allow list: if esEquipo();          // nadie de afuera puede listar todos
@@ -69,7 +83,7 @@ service cloud.firestore {
       // Solo se crea junto con su pedido (en el mismo envío)
       allow create: if request.resource.data.estado == 'nuevo'
         && request.resource.data.creado == request.time
-        && request.resource.data.keys().hasOnly(['codigo', 'nombre', 'modo', 'estado', 'creado'])
+        && request.resource.data.keys().hasOnly(['codigo', 'nombre', 'modo', 'pago', 'estado', 'creado'])
         && existsAfter(/databases/$(database)/documents/pedidos/$(id));
     }
   }

@@ -10,7 +10,8 @@
      pedidos/{id}      Pedido completo (solo lo ve el equipo con contraseña)
      seguimiento/{id}  Estado público del pedido (lo ve el cliente con su enlace)
      contadores/{dia}  Número del último pedido del día (para SAGRADO-1, SAGRADO-2…)
-     config/menu       Lista de productos agotados (se marca desde el panel)
+     config/menu       Lista de productos agotados y break (se marca desde el panel)
+     seguimiento/{id}/mensajes  Chat del pedido entre el cliente y el negocio (texto y foto del comprobante)
    El {id} es el mismo en las dos y es largo y aleatorio: nadie lo puede adivinar.
 
    Para cambiar algo, busca con Ctrl+F:
@@ -22,7 +23,7 @@
 const V = "10.12.2";
 const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
 const {
-  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, runTransaction, onSnapshot, query, where, serverTimestamp, Timestamp
+  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp
 } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
 const {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -69,11 +70,14 @@ export async function crearPedido(pedido, publico, prefijo = "SAGRADO"){
    Claves: id del producto ("eby-banana"), "prot:Salmón" (cambio de proteína) o "salsa:Salsa anguila". */
 export function escucharDisponibilidad(alCambiar){
   return onSnapshot(doc(db, "config", "menu"),
-    s => alCambiar(s.exists() ? (s.data().agotados || []) : []),
-    () => alCambiar([]));
+    s => alCambiar(s.exists() ? (s.data().agotados || []) : [], s.exists() ? s.data() : {}),   // 2do dato: todo config/menu (break)
+    () => alCambiar([], {}));
 }
-/* ---------- EQUIPO: guardar la lista de agotados ---------- */
-export const guardarAgotados = lista => setDoc(doc(db, "config", "menu"), { agotados: lista, actualizado: serverTimestamp() });
+/* ---------- EQUIPO: guardar la lista de agotados (merge: no borra el break) ---------- */
+export const guardarAgotados = lista => setDoc(doc(db, "config", "menu"), { agotados: lista, actualizado: serverTimestamp() }, { merge: true });
+/* ---------- EQUIPO: break (pausa) — hasta = fecha en ms, o null para terminarlo ---------- */
+export const guardarBreak = (hasta, mensaje) => setDoc(doc(db, "config", "menu"),
+  { pausa: hasta ? { hasta, mensaje: mensaje || "" } : null, actualizado: serverTimestamp() }, { merge: true });
 
 /* ---------- CLIENTE: escuchar el estado de su pedido (en vivo) ---------- */
 export function escucharSeguimiento(id, alCambiar, alFallar){
@@ -109,3 +113,16 @@ export async function actualizarPedido(id, cambios, cambiosCli){
 
 /* Hora (como Timestamp de Firebase) dentro de X minutos */
 export const enMinutos = m => Timestamp.fromMillis(Date.now() + m * 60000);
+
+/* ---------- CHAT DEL PEDIDO (cliente ↔ negocio) ----------
+   de: "cliente" o "negocio". foto: imagen ya reducida (data:image/jpeg;base64…), opcional. */
+export function escucharChat(id, alCambiar){
+  return onSnapshot(query(collection(db, "seguimiento", id, "mensajes"), orderBy("creado")),
+    s => alCambiar(s.docs.map(d => ({ id: d.id, ...d.data() }))),
+    e => { console.warn("chat", e); alCambiar(null); });
+}
+export function enviarMensaje(id, de, texto, foto){
+  const m = { de, texto: texto || "", creado: serverTimestamp() };
+  if (foto) m.foto = foto;
+  return addDoc(collection(db, "seguimiento", id, "mensajes"), m);
+}

@@ -57,7 +57,33 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3A
 @keyframes latido{70%{box-shadow:0 0 0 10px rgba(227,18,27,0)}100%{box-shadow:0 0 0 0 rgba(227,18,27,0)}}
 .nota{color:var(--suave);font-size:13px;line-height:1.5;margin:0}
 .btn{display:inline-block;margin-top:14px;padding:13px 20px;border-radius:14px;background:#1E7A45;color:#fff;text-decoration:none;font-weight:700}
-.contacto{display:inline-block;margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--borde);color:var(--texto);text-decoration:none;font-size:14px;font-weight:600}   /* @@CONTACTO: botón discreto para escribir al negocio */
+.contacto{display:inline-block;background:transparent;font:inherit;cursor:pointer;line-height:1.4;margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--borde);color:var(--texto);text-decoration:none;font-size:14px;font-weight:600}   /* @@CONTACTO: botón discreto para escribir al negocio */
+/* @@CHAT — sala de espera: chat del pedido con el negocio */
+.chat-boton{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;display:flex;align-items:center;gap:10px;padding:14px 22px;border-radius:999px;border:0;background:var(--rojo);color:#fff;font-weight:800;font-size:16px;box-shadow:0 12px 30px rgba(0,0,0,.5);cursor:pointer;white-space:nowrap}
+.chat-boton .n{min-width:22px;height:22px;border-radius:99px;background:#fff;color:var(--rojo);font-size:13px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.chat-boton .n:empty{display:none}
+.chat-fondo{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:none}
+.chat-hoja{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;height:min(78vh,640px);background:#141416;border:1px solid var(--borde);border-radius:22px 22px 0 0;display:none;flex-direction:column;text-align:left}
+.chat-abierto .chat-fondo{display:block}.chat-abierto .chat-hoja{display:flex}.chat-abierto .chat-boton{display:none}
+.chat-cab{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--borde)}
+.chat-cab img{width:40px;height:40px;border-radius:50%;border:2px solid var(--rojo);background:#0B0B0B}
+.chat-cab b{display:block;font-size:16px}.chat-cab small{color:var(--suave);font-size:12.5px}
+.chat-cab button{margin-left:auto;width:40px;height:40px;border-radius:50%;border:1px solid var(--borde);background:transparent;color:var(--texto);font-size:20px;cursor:pointer}
+.chat-msjs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.msj{max-width:80%;padding:10px 13px;border-radius:16px;font-size:15px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.msj.cliente{align-self:flex-end;background:var(--rojo);color:#fff;border-bottom-right-radius:4px}
+.msj.negocio{align-self:flex-start;background:#26262A;border-bottom-left-radius:4px}
+.msj img{display:block;max-width:220px;border-radius:10px;margin-bottom:4px}
+.msj small{display:block;font-size:11px;opacity:.7;margin-top:3px}
+.chat-vacio{color:var(--suave);font-size:14px;text-align:center;margin:auto;padding:20px;line-height:1.5}
+.chat-rapido{display:flex;gap:8px;overflow-x:auto;padding:8px 14px 0}
+.chat-rapido button{flex:none;border:1px solid var(--borde);background:#1C1C20;color:var(--texto);border-radius:999px;padding:8px 12px;font-size:13.5px;cursor:pointer}
+.chat-escribir{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom))}
+.chat-escribir input[type=text]{flex:1;min-width:0;height:46px;border-radius:999px;border:1px solid var(--borde);background:#0F0F11;color:var(--texto);padding:0 16px;font-size:16px}
+.chat-escribir .redondo{width:46px;height:46px;flex:none;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.chat-escribir .adjuntar{background:#26262A;color:var(--texto)}.chat-escribir .enviar{background:var(--rojo);color:#fff}
+.chat-wa{display:block;text-align:center;color:var(--suave);font-size:12.5px;padding:0 0 10px;text-decoration:underline}
+body{padding-bottom:90px}
 .pie{color:#6E6862;font-size:12px;margin-top:18px}
 .vivo{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--suave);margin-top:10px}
 .vivo i{width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 4px rgba(47,212,122,.18)}
@@ -122,7 +148,7 @@ const mmss = m => { const s = Math.max(0, Math.ceil(m / 1000)); return String(Ma
 const app = document.getElementById("app");
 const q = new URLSearchParams(location.search);
 const id = q.get("id") || "";
-let actual = null, escenaDe = "", vuelta = 0;
+let actual = null, escenaDe = "", vuelta = 0, PAUSA = null;
 
 /* ---------- Dibujos (SVG, 360 x 250) ---------- */
 const LOGO = `<clipPath id="cl"><circle cx="180" cy="112" r="52"/></clipPath>`;
@@ -233,7 +259,7 @@ function pintar(s){
       return `<div class="paso ${cls}"><i>${cls === "ok" ? "✓" : ic}</i>${t}</div>`;
     }).join("")}</div>
     <p class="nota">Esta pantalla se actualiza sola. Los tiempos son aproximados.</p>
-    ${s.estado !== "entregado" ? `<a class="contacto" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}&text=${encodeURIComponent("Hola, les escribo sobre mi pedido #" + s.codigo + ": ")}" target="_blank" rel="noopener">💬 ¿Se retrasa o tienes una pregunta? Escríbenos</a>` : ""}`}
+    ${s.estado !== "entregado" && s.estado !== "rechazado" ? `<button class="contacto" data-chat>💬 ¿Una pregunta, algo extra o el comprobante? Escríbenos aquí</button>` : ""}`}
     <div class="vivo"><i></i>En vivo</div>
     <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
   tick();
@@ -259,7 +285,10 @@ function tick(){
   if (escenaDe !== estado) { caja.innerHTML = ESC[estado] ? ESC[estado]() : ""; escenaDe = estado; }
   vuelta++;
 
-  if (estado === "nuevo") { textos(TEXTOS.nuevo); medidor(null); return; }
+  if (estado === "nuevo") {   // @@BREAK: si el negocio está en break, se le avisa al cliente
+    textos(PAUSA && PAUSA.hasta > Date.now() ? [TEXTOS.nuevo[0], "Estamos en break 🍽️ Lo confirmamos al volver, a las " + new Date(PAUSA.hasta).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" })] : TEXTOS.nuevo);
+    medidor(null); return;
+  }
 
   if (estado === "preparando") {
     const r = TEXTOS.preparando[Math.floor(vuelta / 5) % 3];
@@ -294,10 +323,93 @@ function tick(){
 }
 setInterval(tick, 1000);
 
+
+/* =========================================================
+   @@CHAT — sala de espera: el cliente escribe al negocio sin salir de la página
+   (preguntas, algo extra, foto del comprobante de transferencia). El negocio contesta desde el panel.
+   ========================================================= */
+const ICO_CLIP = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>';
+const ICO_ENVIAR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1.1L4 11l9 1-9 1-2 6.3a1 1 0 0 0 1.4 1.1z"/></svg>';
+let chatMsjs = [], chatEnviar = null, chatListo = false;
+const vistoKey = "chat-visto-" + (id || "demo");
+const horaMsj = m => { const t = ms(m.creado) || Date.now(); return new Date(t).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" }); };
+function montarChat(){
+  if (chatListo || (!id && !demo)) return; chatListo = true;
+  document.body.insertAdjacentHTML("beforeend", `
+    <button class="chat-boton" data-chat>💬 Chat con Jireh <span class="n" id="chat-n"></span></button>
+    <div class="chat-fondo" data-chat-cerrar></div>
+    <section class="chat-hoja" aria-label="Chat con Jireh Sushi">
+      <div class="chat-cab"><img src="fotos/logo.png" alt=""><div><b>Chat con Jireh Sushi</b><small>Te respondemos aquí mismo</small></div><button data-chat-cerrar aria-label="Cerrar">×</button></div>
+      <div class="chat-msjs" id="chat-msjs"></div>
+      <div class="chat-rapido">
+        <button data-rapido="foto">📎 Enviar comprobante</button>
+        <button data-rapido="¿Cuánto le falta a mi pedido?">¿Cuánto falta?</button>
+        <button data-rapido="Quisiera agregar algo a mi pedido: ">Agregar algo</button>
+      </div>
+      <form class="chat-escribir" id="chat-form" onsubmit="return false">
+        <button type="button" class="redondo adjuntar" data-rapido="foto" aria-label="Adjuntar foto">${ICO_CLIP}</button>
+        <input type="text" id="chat-txt" placeholder="Escribe tu mensaje…" maxlength="1000" autocomplete="off">
+        <button type="submit" class="redondo enviar" aria-label="Enviar">${ICO_ENVIAR}</button>
+      </form>
+      <input type="file" id="chat-foto" accept="image/*" hidden>
+      <a class="chat-wa" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}" target="_blank" rel="noopener">¿Prefieres WhatsApp? Escríbenos allá</a>
+    </section>`);
+  document.getElementById("chat-form").addEventListener("submit", e => { e.preventDefault(); mandarTexto(); });
+  document.getElementById("chat-foto").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) mandarFoto(f); });
+  pintarChat();
+}
+function abrirChat(){ document.body.classList.add("chat-abierto"); marcarVisto(); setTimeout(() => { const c = document.getElementById("chat-msjs"); c.scrollTop = c.scrollHeight; }, 50); }
+function cerrarChat(){ document.body.classList.remove("chat-abierto"); }
+function marcarVisto(){ try { localStorage.setItem(vistoKey, String(chatMsjs.filter(m => m.de === "negocio").length)); } catch(e) {} pintarBadge(); }
+function pintarBadge(){
+  const n = document.getElementById("chat-n"); if (!n) return;
+  let visto = 0; try { visto = +localStorage.getItem(vistoKey) || 0; } catch(e) {}
+  const nuevos = chatMsjs.filter(m => m.de === "negocio").length - visto;
+  n.textContent = nuevos > 0 && !document.body.classList.contains("chat-abierto") ? nuevos : "";
+}
+function pintarChat(){
+  const c = document.getElementById("chat-msjs"); if (!c) return;
+  const abajo = c.scrollHeight - c.scrollTop - c.clientHeight < 80;
+  c.innerHTML = chatMsjs.length ? chatMsjs.map(m => `<div class="msj ${m.de === "negocio" ? "negocio" : "cliente"}">${m.foto ? `<img src="${esc(m.foto)}" alt="Foto enviada">` : ""}${esc(m.texto)}<small>${m.de === "negocio" ? "Jireh Sushi · " : ""}${horaMsj(m)}</small></div>`).join("")
+    : `<div class="chat-vacio">Escríbenos si tienes alguna pregunta o quieres agregar algo.<br>${actual && actual.pago === "Transferencia" ? "<b>Envía aquí la foto del comprobante de tu transferencia.</b>" : ""}</div>`;
+  if (abajo || document.body.classList.contains("chat-abierto")) c.scrollTop = c.scrollHeight;
+  if (document.body.classList.contains("chat-abierto")) marcarVisto(); else pintarBadge();
+}
+async function mandarTexto(){
+  const i = document.getElementById("chat-txt"), t = i.value.trim(); if (!t) return;
+  i.value = "";
+  try { await chatEnviar(t, null); } catch(e) { i.value = t; alert("No se pudo enviar. Revisa tu internet."); }
+}
+function reducirFoto(f){
+  return new Promise((ok, no) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      let w = img.width, h = img.height, max = 1100; const k = Math.min(1, max / Math.max(w, h)); w = Math.round(w * k); h = Math.round(h * k);
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      let q = .72, d = cv.toDataURL("image/jpeg", q);
+      while (d.length > 850000 && q > .3) { q -= .12; d = cv.toDataURL("image/jpeg", q); }
+      URL.revokeObjectURL(url); ok(d);
+    };
+    img.onerror = no; img.src = url;
+  });
+}
+async function mandarFoto(f){
+  try { const d = await reducirFoto(f); await chatEnviar(actual && actual.pago === "Transferencia" ? "Comprobante de transferencia" : "Foto", d); }
+  catch(e) { alert("No se pudo enviar la foto. Prueba otra vez."); }
+}
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-chat]")) return abrirChat();
+  if (e.target.closest("[data-chat-cerrar]")) return cerrarChat();
+  const r = e.target.closest("[data-rapido]");
+  if (r) { if (r.dataset.rapido === "foto") return document.getElementById("chat-foto").click(); const i = document.getElementById("chat-txt"); i.value = r.dataset.rapido; i.focus(); }
+});
+
 /* ---------- Demo o Firebase ---------- */
 const demo = q.get("demo");
 if (demo) {
-  const base = { codigo: "SAGRADO-7", nombre: "María", modo: "delivery" };
+  chatEnviar = async (t, f) => { chatMsjs.push({ de: "cliente", texto: t, foto: f, creado: Date.now() }); pintarChat(); };
+  setTimeout(() => { chatMsjs.push({ de: "negocio", texto: "¡Hola María! Ya estamos preparando tu pedido 🍣", creado: Date.now() }); montarChat(); pintarChat(); }, 300);
+  const base = { codigo: "SAGRADO-7", nombre: "María", modo: "delivery", pago: "Transferencia" };
   const de = e => ({ ...base, estado: e, minutos: 25, listoEn: Date.now() + (e === "preparando" ? 14 * 60000 : 0), salio: Date.now() - 7 * 60000, viaje: 18 });
   if (demo === "todo") {
     const lista = ["nuevo", "preparando", "listo", "en_camino", "entregado"]; let i = 0;
@@ -305,7 +417,12 @@ if (demo) {
     sig(); setInterval(sig, 6000);
   } else pintar(de(demo));
 } else if (!id) pintar(null);
-else import("./fb.js").then(({ escucharSeguimiento }) => escucharSeguimiento(id, pintar, () => pintar(null))).catch(() => pintar(null));
+else import("./fb.js").then(({ escucharSeguimiento, escucharDisponibilidad, escucharChat, enviarMensaje }) => {
+  escucharSeguimiento(id, s => { pintar(s); if (s) montarChat(); }, () => pintar(null));
+  chatEnviar = (t, f) => enviarMensaje(id, "cliente", t, f);
+  escucharChat(id, l => { if (l) { chatMsjs = l; pintarChat(); } });
+  escucharDisponibilidad((l, c) => { PAUSA = c && c.pausa ? c.pausa : null; });
+}).catch(() => pintar(null));
 </script>
 </body>
 </html>

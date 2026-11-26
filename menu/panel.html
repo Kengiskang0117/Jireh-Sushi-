@@ -8,6 +8,7 @@
 <link rel="icon" type="image/png" sizes="64x64" href="fotos/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="fotos/icono-180.png">
 <meta name="theme-color" content="#0B0B0C">
+<link rel="manifest" href="panel.webmanifest">
 <!--
   =========================================================
   PANEL EN VIVO (para el negocio) · Kenmake Soluciones
@@ -97,6 +98,31 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#1E7A45;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;transition:transform .25s;z-index:20;max-width:90vw;text-align:center}
 .aviso.ver{transform:translateX(-50%) translateY(0)}
 .sonido{background:#3A2A0A;border:1px solid #6A4E14;color:var(--amarillo);border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:700;width:100%}
+/* @@BREAK-ESTILO y @@MINUTOS-EXTRA */
+.herramientas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:-4px 0 14px}
+.herramientas .chico{padding:11px 12px;font-size:15px;font-weight:700;color:var(--texto)}
+.chico.on{background:#3A2A08;border-color:#8A6A1A;color:#FFD27A}
+.banda-break{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:16px;background:#3A2A08;border:1px solid #8A6A1A;color:#FFD27A;margin-bottom:14px}
+.banda-break b{display:block;font-size:17px}.banda-break small{color:#E9C98A;font-size:13.5px}
+.banda-break button{border:1px solid #8A6A1A;background:#1A1405;color:#FFD27A;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px}
+.extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.extra span{color:var(--suave);font-size:14px;margin-right:4px}
+.extra button{border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:12px;padding:10px 14px;font-weight:800;font-size:15px}
+/* @@CHAT-ESTILO y @@ARCHIVAR */
+.pchat{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}
+.pm{max-width:82%;padding:9px 12px;border-radius:14px;font-size:15px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.pm.cliente{align-self:flex-start;background:#26262A;border-bottom-left-radius:4px}
+.pm.negocio{align-self:flex-end;background:var(--rojo);color:#fff;border-bottom-right-radius:4px}
+.pm img{display:block;max-width:220px;border-radius:10px;margin-bottom:4px}
+.pm small{display:block;font-size:11px;opacity:.7;margin-top:3px}
+.pvacio{color:var(--suave);font-size:14px;text-align:center;padding:10px}
+.pchat-rapido{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px}
+.pchat-rapido button{flex:none;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:999px;padding:8px 12px;font-size:13.5px}
+.pchat-escribir{display:flex;gap:8px;margin-top:6px}
+.pchat-escribir input{flex:1;min-width:0;margin:0}
+.pchat-escribir .btn{width:auto;padding:0 18px}
+.nmsj{display:inline-block;align-self:flex-start;background:var(--rojo);color:#fff;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800;margin:3px 0}
+.nprueba{display:inline-block;background:#333;color:#bbb;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px}
 /* @@LOGIN-ESTILO */
 .cuentas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
 .cuenta{border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:999px;padding:10px 14px;font-size:15px;font-weight:700}
@@ -124,7 +150,7 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--bo
 <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados } from "./fb.js";
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, guardarBreak, escucharChat, enviarMensaje } from "./fb.js";
 
 const NEGOCIO = { nombre: "Jireh Sushi" };
 /* @@DELIVERYS — correos de los repartidores (en minúscula). Al entrar con uno de estos,
@@ -168,13 +194,35 @@ const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").s
   .replace(/\{min\}/g, extra.min ?? p.minutos ?? "").replace(/\{enlace\}/g, enlaceSeguimiento(p.id)).replace(/\{motivo\}/g, extra.motivo || "");
 
 /* ---------- Estado de la pantalla ---------- */
-let rol = "cocina", usuarioActual = "";
+let rol = "cocina", usuarioActual = "", pausa = null, eligiendoBreak = false;
+const enBreak = () => !!(pausa && pausa.hasta > Date.now());
+const horaCorta = t => new Date(t).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" });
+const MINUTOS_EXTRA = [5, 10, 15];        // @@MINUTOS-EXTRA  botones para dar más tiempo a un pedido en cocina
+const MINUTOS_BREAK = [15, 30, 45, 60];   // @@BREAK  duración del break
 let vista = "pedidos", agotados = new Set(), catalogo = null, buscarAg = "", seguroTodo = false;
 let pedidos = [], filtro = "activos", abierto = null, minutosSel = 20, conectado = false, vistos = new Set(), primeraCarga = true;
 
 /* ---------- @@SONIDO: campanita con el navegador (sin archivos) ---------- */
 let audio = null, sonidoListo = false;
 function activarSonido(){ try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); sonidoListo = true; } catch(e) {} }
+
+/* ---------- @@AVISOS: notificaciones del sistema (suenan y vibran aunque la pantalla del panel no esté al frente) ----------
+   Se activan con el botón amarillo (el navegador pide permiso una vez). Funcionan mientras el panel siga abierto
+   en el celular, aunque esté detrás de otra app. Si se cierra el panel por completo, no llegan. */
+let registro = null;
+async function prepararAvisos(){
+  try {
+    if ("serviceWorker" in navigator && !registro) registro = await navigator.serviceWorker.register("sw.js");
+    if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+  } catch(e) { console.warn("avisos", e); }
+  pintar();
+}
+const avisosOK = () => "Notification" in window && Notification.permission === "granted";
+function notificar(titulo, cuerpo, tag){
+  if (!avisosOK()) return;
+  const op = { body: cuerpo, tag: tag || titulo, renotify: true, requireInteraction: true, vibrate: [300, 120, 300, 120, 300], icon: "fotos/icono-192.png", badge: "fotos/icono-192.png" };
+  try { (registro ? registro.showNotification(titulo, op) : Promise.reject()).catch(() => new Notification(titulo, op)); } catch(e) {}
+}
 function campana(){
   if (!audio) return;
   const t = audio.currentTime;
@@ -240,67 +288,117 @@ function pintarLogin(error = "", correoPrevio = ""){
 let dejarDeEscuchar = null;
 alCambiarSesion(usuario => {
   if (dejarDeEscuchar) { dejarDeEscuchar(); dejarDeEscuchar = null; }
-  if (!usuario) { pedidos = []; pintarLogin(); return; }
+  if (!usuario) { pedidos = []; Object.values(chatsOff).forEach(f => f()); chatsOff = {}; chats = {}; pintarLogin(); return; }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { registro = r; }).catch(() => {});
   usuarioActual = (usuario.email || "").toLowerCase();
   rol = DELIVERYS.map(x => x.trim().toLowerCase()).includes(usuarioActual) ? "delivery" : "cocina";
   vista = "pedidos"; abierto = null;
   let listosAntes = null;
   pantallaEncendida();
   primeraCarga = true;
-  escucharDisponibilidad(lista => { agotados = new Set(lista); if (vista === "agotados") pintar(); });
+  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; if (rol !== "delivery") pintar(); });
   dejarDeEscuchar = escucharPedidosDeHoy((lista, nuevos) => {
     conectado = true;
     pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
     if (rol === "delivery") {   // al delivery le suena cuando un pedido queda listo para salir
       const listos = new Set(pedidos.filter(p => p.modo === "delivery" && p.estado === "listo").map(p => p.id));
-      if (listosAntes && [...listos].some(id => !listosAntes.has(id))) { campana(); avisar("🛵 ¡Pedido listo para salir!"); }
+      if (listosAntes && [...listos].some(id => !listosAntes.has(id))) { campana(); avisar("🛵 ¡Pedido listo para salir!"); notificar("🛵 Pedido listo para salir", "Ábrelo en Entregas de hoy", "listo"); }
       listosAntes = listos;
-    } else if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); }
+    } else if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); nuevos.forEach(n => notificar(`🔔 Pedido nuevo #${n.codigo || ""}`, `${n.nombre || ""} · ${n.modo === "delivery" ? "Delivery" : "Para llevar"} · ${dinero(n.total)}`, "p-" + n.id)); }
+    escucharChats();
     primeraCarga = false;
     pintar();
   }, err => { conectado = false; console.error(err); avisar("Sin conexión con los pedidos. Revisa el internet."); pintar(); });
 });
 
+/* ---------- @@CHAT: mensajes de los clientes (sala de espera) ---------- */
+let chats = {}, chatsOff = {}, chatsCargados = {};
+const vistoChat = id => { try { return +localStorage.getItem("pchat-" + id) || 0; } catch(e) { return 0; } };
+const marcarChat = id => { try { localStorage.setItem("pchat-" + id, String((chats[id] || []).filter(m => m.de === "cliente").length)); } catch(e) {} };
+const sinLeer = id => Math.max(0, (chats[id] || []).filter(m => m.de === "cliente").length - vistoChat(id));
+function escucharChats(){
+  if (rol === "delivery") return;
+  pedidos.filter(p => !p.archivado).forEach(p => {
+    if (chatsOff[p.id]) return;
+    chatsOff[p.id] = escucharChat(p.id, lista => {
+      if (!lista) return;
+      const antes = (chats[p.id] || []).filter(m => m.de === "cliente").length;
+      chats[p.id] = lista;
+      const ahora = lista.filter(m => m.de === "cliente").length;
+      if (chatsCargados[p.id] && ahora > antes) {
+        const u = lista.filter(m => m.de === "cliente").pop();
+        campana(); avisar(`💬 Mensaje de ${p.nombre} (#${p.codigo})`);
+        notificar(`💬 #${p.codigo} · ${p.nombre}`, u.foto ? "📷 Envió una foto" + (u.texto ? ": " + u.texto : "") : u.texto, "c-" + p.id);
+      }
+      chatsCargados[p.id] = true;
+      if (abierto === p.id) marcarChat(p.id);
+      pintar();
+    });
+  });
+}
+function chatHTML(p){
+  const l = chats[p.id] || [];
+  return `<h2>💬 Chat con ${esc(p.nombre.split(" ")[0])}</h2>
+    <div class="pchat" id="pchat">${l.length ? l.map(m => `<div class="pm ${m.de}">${m.foto ? `<a href="${esc(m.foto)}" target="_blank" rel="noopener"><img src="${esc(m.foto)}" alt="Foto"></a>` : ""}${esc(m.texto)}<small>${hora(m.creado)}</small></div>`).join("")
+      : `<div class="pvacio">Aún no hay mensajes. Si el cliente escribe o manda el comprobante, aparece aquí con sonido.</div>`}</div>
+    <div class="pchat-rapido">${["¡Recibido! Ya lo estamos preparando 🍣", "Recibimos tu transferencia ✅", "Tu pedido va en camino 🛵", "¿Nos confirmas la dirección?"].map(t => `<button data-resp="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+    <div class="pchat-escribir"><input id="pchat-txt" type="text" placeholder="Escribe al cliente…" maxlength="1000"><button class="btn rojo" data-acc="chat-enviar">Enviar</button></div>`;
+}
+async function responder(p, texto){
+  if (!texto.trim()) return;
+  try { await enviarMensaje(p.id, "negocio", texto.trim()); } catch(e) { avisar("No se pudo enviar. Revisa el internet."); }
+}
+
 /* ---------- Lista ---------- */
+/* @@ARCHIVAR: "archivado" = se quita de la vista pero se guarda y cuenta en las ventas. "prueba" = no cuenta en ventas. */
 const GRUPOS = {
-  activos: p => ["nuevo", "preparando", "listo", "en_camino"].includes(p.estado),
-  nuevo: p => p.estado === "nuevo",
-  preparando: p => p.estado === "preparando",
-  salida: p => ["listo", "en_camino"].includes(p.estado),
-  entregado: p => ["entregado", "rechazado"].includes(p.estado)
+  activos: p => !p.archivado && ["nuevo", "preparando", "listo", "en_camino"].includes(p.estado),
+  nuevo: p => !p.archivado && p.estado === "nuevo",
+  preparando: p => !p.archivado && p.estado === "preparando",
+  salida: p => !p.archivado && ["listo", "en_camino"].includes(p.estado),
+  entregado: p => !p.archivado && ["entregado", "rechazado"].includes(p.estado),
+  archivados: p => !!p.archivado
 };
 function pintar(){
   if (rol === "delivery") return pintarDelivery();
   if (vista === "agotados") return pintarAgotados();
   if (abierto) { const p = pedidos.find(x => x.id === abierto); if (p) return pintarPedido(p); abierto = null; }
-  const entregados = pedidos.filter(p => p.estado === "entregado");
+  const entregados = pedidos.filter(p => p.estado === "entregado" && !p.prueba);
   const vendido = entregados.reduce((a, p) => a + (p.total || 0), 0);
   const lista = pedidos.filter(GRUPOS[filtro]);
   const cuenta = k => pedidos.filter(GRUPOS[k]).length;
   $("#app").innerHTML = `
     <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Pedidos de hoy</h1>
       <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"}</small></div>
+      <button class="chico" data-acc="salir">Salir</button></div>
+    <div class="herramientas">
       <button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>
-      <button class="chico" data-acc="salir" style="margin-left:0">Salir</button></div>
-    ${sonidoListo ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido de pedidos nuevos</button>`}
+      <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button></div>
+    ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
+      : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}
+    ${sonidoListo && (avisosOK() || !("Notification" in window)) ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido y los avisos de pedidos nuevos</button>`}
     <div class="resumen">
-      <div><b>${pedidos.filter(p => p.estado !== "rechazado").length}</b><small>Pedidos</small></div>
+      <div><b>${pedidos.filter(p => p.estado !== "rechazado" && !p.prueba).length}</b><small>Pedidos</small></div>
       <div><b>${cuenta("activos")}</b><small>En curso</small></div>
       <div><b style="font-size:19px">${dinero(vendido)}</b><small>Vendido (entregados)</small></div>
     </div>
     <div class="filtros">
-      ${[["activos","En curso"],["nuevo","Nuevos"],["preparando","En cocina"],["salida","Para salir"],["entregado","Terminados"]]
+      ${[["activos","En curso"],["nuevo","Nuevos"],["preparando","En cocina"],["salida","Para salir"],["entregado","Terminados"],["archivados","Archivados"]]
         .map(([k, t]) => `<button class="${filtro === k ? "activo" : ""}" data-filtro="${k}">${t}<span class="n">${cuenta(k)}</span></button>`).join("")}
     </div>
     ${lista.length ? lista.map(p => `
       <button class="pedido ${p.estado === "nuevo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}">
         <span class="num">#${esc(p.codigo)}</span>
-        <span class="info"><b>${esc(p.nombre)}</b>
+        <span class="info"><b>${esc(p.nombre)}${p.prueba ? ` <span class="nprueba">prueba</span>` : ""}</b>
+          ${sinLeer(p.id) ? `<span class="nmsj">💬 ${sinLeer(p.id)} ${sinLeer(p.id) > 1 ? "nuevos" : "nuevo"}</span>` : ""}
           <small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)} · ${dinero(p.total)}</small>
           ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}</span>
         <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
       </button>`).join("")
-      : `<div class="vacio">${filtro === "activos" ? "No hay pedidos en curso.<br>Cuando un cliente pida desde el menú, aparecerá aquí con sonido 🔔" : "Nada por aquí."}</div>`}
+      : ""}
+    ${filtro === "entregado" && lista.length ? `<button class="btn borde" data-acc="archivar-todos" style="margin-top:6px">🗂️ Archivar todos los terminados</button>` : ""}
+    ${filtro === "archivados" ? `<p class="ayuda" style="margin-top:8px">Los archivados no se ven en "En curso" ni "Terminados", pero se guardan y cuentan en las ventas del día (menos los marcados como prueba).</p>` : ""}
+    ${lista.length ? "" : `<div class="vacio">${filtro === "activos" ? "No hay pedidos en curso.<br>Cuando un cliente pida desde el menú, aparecerá aquí con sonido 🔔" : "Nada por aquí."}</div>`}
   `;
   relojes();
 }
@@ -317,6 +415,9 @@ function mapa(p){
 }
 function pintarPedido(p){
   const entrega = p.modo === "delivery";
+  // conserva lo que se está escribiendo en el chat aunque la pantalla se actualice
+  const txtPrevio = $("#pchat-txt") ? $("#pchat-txt").value : "", conFoco = document.activeElement && document.activeElement.id === "pchat-txt";
+  marcarChat(p.id);
   let acciones = "";
   if (p.estado === "nuevo") acciones = `
     <h2>Aceptar · tiempo de preparación (máximo 50 min)</h2>
@@ -326,6 +427,7 @@ function pintarPedido(p){
     <div id="caja-rechazo" hidden style="margin-top:10px"><textarea id="motivo" placeholder="Motivo para el cliente (ej.: se nos acabó el salmón)"></textarea>
       <div class="botones" style="margin-top:8px"><button class="btn rojo" data-acc="confirmar-rechazo">Rechazar y avisar al cliente</button></div></div>`;
   if (p.estado === "preparando") acciones = `
+    <div class="extra"><span>¿Necesitas más tiempo?</span>${MINUTOS_EXTRA.map(m => `<button data-acc="extra" data-mas="${m}">+${m} min</button>`).join("")}</div>
     <div class="botones"><button class="btn verde" data-acc="listo">${entrega ? "✅ Listo para salir" : "✅ Listo para buscar"}</button>
       ${entrega && AVISOS_WA ? `<button class="btn" data-acc="grupo">🛵 Mandar al grupo de delivery</button>` : ""}</div>
     ${entrega ? `<p class="ayuda" style="margin-top:8px">Al tocar "Listo", al delivery le suena en su celular.</p>` : ""}`;
@@ -359,8 +461,14 @@ function pintarPedido(p){
     <h2>Cliente</h2>
     <div class="dos"><a class="btn" href="tel:${esc(String(p.tel).replace(/\D/g, ""))}">📞 Llamar</a><button class="btn" data-acc="wa">💬 WhatsApp</button></div>
     <div class="dos" style="margin-top:10px"><button class="btn" data-acc="pago">${p.pagado ? "✅ Pago recibido" : "💰 Pago recibido"}</button><button class="btn" data-acc="seguimiento">📍 Enviar seguimiento</button></div>
+    ${chatHTML(p)}
+    <div class="dos" style="margin-top:18px">
+      ${["entregado", "rechazado"].includes(p.estado) && !p.archivado ? `<button class="btn borde" data-acc="archivar">🗂️ Archivar (quitar de la vista)</button>` : p.archivado ? `<button class="btn borde" data-acc="desarchivar">↩️ Sacar de archivados</button>` : ""}
+      <button class="btn borde" data-acc="prueba">${p.prueba ? "↩️ No es prueba" : "🧪 Es un pedido de prueba"}</button></div>
   `;
   relojes();
+  const c = $("#pchat"); if (c) c.scrollTop = c.scrollHeight;
+  if ($("#pchat-txt")) { $("#pchat-txt").value = txtPrevio; if (conFoco) $("#pchat-txt").focus(); $("#pchat-txt").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); responder(p, e.target.value); e.target.value = ""; } }); }
 }
 
 /* ---------- Relojes en vivo ---------- */
@@ -369,6 +477,7 @@ function relojes(){
   document.querySelectorAll("[data-reloj]").forEach(el => el.classList.toggle("tarde", +el.dataset.reloj < Date.now()));
 }
 setInterval(relojes, 1000);
+setInterval(() => { if (pausa && !enBreak()) { pausa = null; if (rol !== "delivery") pintar(); } }, 30000);
 
 /* ---------- @@VISTA-DELIVERY: pantalla de los repartidores ---------- */
 const nombreUsuario = () => usuarioActual.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -394,7 +503,7 @@ function pintarDelivery(){
     <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Entregas de hoy</h1>
       <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"} · ${esc(nombreUsuario())}</small></div>
       <button class="chico" data-acc="salir">Salir</button></div>
-    ${sonidoListo ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido cuando un pedido esté listo</button>`}
+    ${sonidoListo && (avisosOK() || !("Notification" in window)) ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido y los avisos cuando un pedido esté listo</button>`}
     <div class="resumen">
       <div><b>${listos.length}</b><small>Para salir</small></div>
       <div><b>${camino.length}</b><small>En camino</small></div>
@@ -504,6 +613,24 @@ document.addEventListener("click", e => {
   const b = e.target.closest("button, [data-abrir]"); if (!b) return;
   activarSonido();
   if (b.dataset.k) return cambiarAgotado(b.dataset.k);
+  if (b.dataset.acc === "break") { eligiendoBreak = !eligiendoBreak && !enBreak(); if (enBreak()) eligiendoBreak = false; return pintar(); }
+  if (b.dataset.acc === "ini-break") {
+    const hasta = Date.now() + (+b.dataset.dur) * 60000; eligiendoBreak = false;
+    pausa = { hasta }; pintar();
+    guardarBreak(hasta).then(() => avisar(`🍽️ Break hasta las ${horaCorta(hasta)}`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "fin-break") {
+    pausa = null; pintar();
+    guardarBreak(null).then(() => avisar("✅ De vuelta: el aviso se quitó del menú")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.resp) { const pp = pedidos.find(x => x.id === abierto); if (pp) responder(pp, b.dataset.resp); return; }
+  if (b.dataset.acc === "archivar-todos") {
+    const t = pedidos.filter(GRUPOS.entregado);
+    Promise.all(t.map(x => actualizarPedido(x.id, { archivado: true }))).then(() => avisar(`🗂️ ${t.length} archivados`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
   if (b.dataset.acc === "ver-agotados") { vista = "agotados"; abierto = null; seguroTodo = false; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.acc === "ver-pedidos") { vista = "pedidos"; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.acc === "todo-disponible") {
@@ -517,9 +644,22 @@ document.addEventListener("click", e => {
   if (b.dataset.min) { minutosSel = +b.dataset.min; return pintar(); }
   const p = pedidos.find(x => x.id === abierto);
   switch (b.dataset.acc) {
-    case "sonido": campana(); pintar(); break;
+    case "sonido": campana(); prepararAvisos(); break;
     case "salir": salir(); break;
     case "volver": abierto = null; pintar(); break;
+    case "chat-enviar": { const t = $("#pchat-txt"); responder(p, t.value); t.value = ""; break; }
+    case "archivar": cambiar(p, { archivado: true }, null, "🗂️ Archivado: sigue contando en las ventas"); abierto = null; break;
+    case "desarchivar": cambiar(p, { archivado: false }, null, "↩️ De vuelta en la lista"); break;
+    case "prueba":
+      if (p.prueba) cambiar(p, { prueba: false, archivado: false }, null, "Ya no está marcado como prueba");
+      else { cambiar(p, { prueba: true, archivado: true }, null, "🧪 Marcado como prueba: no cuenta en las ventas"); abierto = null; }
+      break;
+    case "extra": {   // @@MINUTOS-EXTRA: suma minutos al tiempo de preparación; el cliente lo ve en su pantalla
+      const m = +b.dataset.mas, base = Math.max(ms(p.listoEn) || Date.now(), Date.now());
+      const listoEn = new Date(base + m * 60000), minutos = (p.minutos || 0) + m;
+      cambiar(p, { listoEn, minutos }, { listoEn, minutos }, `+${m} min · el cliente ya ve el tiempo nuevo`);
+      break;
+    }
     case "aceptar":
       cambiar(p, { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel), aceptado: new Date() },
         { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel) }, "Aceptado ✅ El cliente ya lo ve en su pantalla");

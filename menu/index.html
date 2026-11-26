@@ -406,6 +406,8 @@ a.pie-dato:hover{border-color:var(--acento)}
   .lista{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
+/* @@BREAK-ESTILO */
+.aviso-break{position:relative;z-index:45;padding:11px 16px;background:#3A2A08;border-bottom:1px solid #8A6A1A;color:#FFD27A;text-align:center;font-weight:700;font-size:14.5px;line-height:1.35}
 /* @@DESCUENTO-BARRA */
 .barra-descuento{display:flex;align-items:center;justify-content:center;gap:8px 14px;flex-wrap:wrap;padding:10px 16px;background:linear-gradient(90deg,#0B0B0C,#3A0A0D 25%,#B30E15 50%,#3A0A0D 75%,#0B0B0C);border-bottom:1px solid #5A1418;color:#fff;text-align:center;font-weight:700;font-size:14.5px;line-height:1.3}
 .barra-descuento b{font-size:17px;font-weight:900;letter-spacing:.04em}
@@ -543,6 +545,8 @@ const NEGOCIO = {
   rebajaTodo: 0,                      // @@REBAJA-TODO
   llamadas: false,                    // @@LLAMADAS
   panelDemo: false,
+  pedidoPorWhatsApp: false,           // @@SALA-DE-ESPERA  false = el cliente NO sale a WhatsApp: va directo a "Mi pedido" (seguimiento + chat).
+                                       //   WhatsApp solo se usa si Firebase falla. true = también abre WhatsApp como antes.
   prefijoPedido: "SAGRADO",           // @@CODIGO-PEDIDO  Los pedidos salen como SAGRADO-1, SAGRADO-2… (vuelve a 1 cada día)
   firebase: true,                    // @@FIREBASE  true = cada pedido se guarda en Firebase y entra solo al panel (menu/panel.html)
   panelAvisos: false,                 // @@PANEL-AVISOS  false = el cliente NO ve enlace; el negocio pega el mensaje en el panel (botón "Pegar pedido"). true = vuelve a poner el enlace al final
@@ -561,7 +565,7 @@ const NEGOCIO = {
   /* @@DELIVERY-KM — cálculo del delivery por distancia */
   local: { lat: 18.5253433, lng: -69.8228972 },  // @@UBICACION-LOCAL  Jireh Sushi (Google Maps), cerca de la bomba Credigas, Carr. Mella
   deliveryPorKm: 30,       // RD$ por cada kilómetro
-  deliveryMinimo: 100,      // lo mínimo que se cobra de delivery
+  deliveryMinimo: 50,      // lo mínimo que se cobra de delivery
   factorCalles: 1.3,       // distancia en línea recta × 1.3 ≈ distancia por las calles
   deliveryMaxKm: 20        // más lejos de esto: el delivery se coordina con el cliente por WhatsApp
 };
@@ -651,9 +655,9 @@ const MENU = [
   ]},
   /* ---------- @@ROLLS-CASA (se muestra como "Aplatanao") ---------- */
   { id:"rolls-casa", nombre:"Aplatanao", tab:"Aplatanao", arte:"burger", sub:"Rolls con plátano maduro, creación de la casa.", grupos:[{ items:[
-    { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:710, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
-    { id:"cheddar-roll", nombre:"Cheddar Roll", precio:720, desc:"Empanizado, relleno de pollo empanizado, queso crema y plátano maduro, bañado en queso cheddar y tocino. 8 unidades.", img:"fotos/cheddar-roll.jpg" },
-    { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:610, desc:"Pollo empanizado, queso crema y puerro, envuelto en plátano maduro. 8 unidades.", img:"fotos/chicken-aplatanao.jpg" }
+    { id:"eby-banana", nombre:"Eby Banana Rolls", tag:"NUEVO", precio:695, desc:"Camarón empanizado y queso crema, cubierto de plátano maduro caramelizado.", img:"fotos/eby-banana.jpg" },
+    { id:"cheddar-roll", nombre:"Cheddar Roll", precio:710, desc:"Empanizado, relleno de pollo empanizado, queso crema y plátano maduro, bañado en queso cheddar y tocino. 8 unidades.", img:"fotos/cheddar-roll.jpg" },
+    { id:"chicken-aplatanao", nombre:"Chicken Aplatanao", tag:"NUEVO", precio:600, desc:"Pollo empanizado, queso crema y puerro, envuelto en plátano maduro. 8 unidades.", img:"fotos/chicken-aplatanao.jpg" }
   ]}]},
   /* ---------- @@CALIFORNIA ---------- */
   { id:"california", nombre:"California", tab:"California", arte:"burger", sub:"Rolls envueltos en ajonjolí o en puerro.", grupos:[{ items:[
@@ -754,7 +758,7 @@ const MENU = [
   ]}]},
   /* ---------- @@HAND-ROLLS (precios reales) ---------- */
   { id:"hand-rolls", nombre:"Hand Rolls", tab:"Hand Rolls", arte:"burger", sub:"Rolls empanizados enteros, sin cortar.", grupos:[{ items:[
-    { id:"hand-roll-pollo", nombre:"Hand Roll Pollo", precio:380, desc:"Pollo empanizado, queso crema y puerro. Empanizado, sin corte.", img:"fotos/hand-roll-pollo.jpg" },
+    { id:"hand-roll-pollo", nombre:"Hand Roll Pollo", precio:390, desc:"Pollo empanizado, queso crema y puerro. Empanizado, sin corte.", img:"fotos/hand-roll-pollo.jpg" },
     { id:"hand-roll-cangrejo", nombre:"Hand Roll Cangrejo", precio:450, desc:"Palito de cangrejo, puerro y queso crema. Empanizado, sin corte.", img:"fotos/hand-roll-cangrejo.jpg" },
     { id:"hand-roll-camaron", nombre:"Hand Roll Camarón", precio:495, desc:"Camarón, puerro y queso crema. Empanizado, sin corte.", img:"fotos/hand-roll-camaron.jpg" },
     { id:"hand-roll-salmon", nombre:"Hand Roll Salmón", precio:530, desc:"Salmón, queso crema y puerro. Empanizado, sin corte.", img:"fotos/hand-roll-salmon.jpg" }
@@ -841,7 +845,21 @@ const estaAgotado = p => !!p && (AGOTADOS.has(p.id) || (!!p.salsa && AGOTADOS.ha
 const protAgotada = n => AGOTADOS.has("prot:" + n);
 const salsaAgotada = n => AGOTADOS.has("salsa:" + n);
 const lineaAgotada = l => estaAgotado(PRODUCTOS[l.id]) || (!!l.prot && protAgotada(l.prot)) || (l.salsas || []).some(salsaAgotada);
-window.aplicarAgotados = lista => {
+/* @@BREAK: si el negocio está en break, sale un aviso arriba y en el carrito. Igual se puede pedir. */
+let PAUSA = null;
+const horaCorta = ms => new Date(ms).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" });
+const enBreak = () => !!(PAUSA && PAUSA.hasta > Date.now());
+const textoBreak = () => `Estamos en break 🍽️ Volvemos a las ${horaCorta(PAUSA.hasta)} · Puedes hacer tu pedido y lo preparamos al volver.`;
+function pintarBreak(){
+  let b = document.getElementById("aviso-break");
+  if (!enBreak()) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement("div"); b.id = "aviso-break"; b.className = "aviso-break"; const h = document.querySelector("header"); h ? h.after(b) : document.body.prepend(b); }
+  b.textContent = textoBreak();
+}
+setInterval(() => { if (PAUSA && !enBreak()) { PAUSA = null; pintarBreak(); actualizarCarrito(); } }, 30000);
+window.aplicarAgotados = (lista, config) => {
+  PAUSA = config && config.pausa && config.pausa.hasta ? config.pausa : null;
+  pintarBreak();
   AGOTADOS = new Set(lista || []);
   pintarHero(); pintarMenu($("#buscar") ? $("#buscar").value : ""); actualizarCarrito();
 };
@@ -1176,6 +1194,7 @@ function htmlDatos(){
   return `<div class="carrito-cab"><h2 class="display">Tus datos</h2>${cerrarBtn()}</div>
     <div class="carrito-cuerpo">
       <button class="volver" data-acc="volver">← Volver al pedido</button>
+      ${estaAbierto() && enBreak() ? `<div class="aviso-cerrado">${esc(textoBreak())}</div>` : ""}
       ${!estaAbierto() ? `<div class="aviso-cerrado">Ahora estamos cerrados. Puedes enviar tu pedido y lo atendemos al abrir (${esc(NEGOCIO.horario.texto)}).</div>` : ""}
       <div class="campo"><label for="f-nombre">Nombre y apellido</label><input id="f-nombre" type="text" placeholder="Tu nombre completo" value="${esc(d.nombre)}" autocomplete="name"></div>
       <div class="campo"><label for="f-tel">Teléfono / WhatsApp</label><input id="f-tel" type="tel" placeholder="809-000-0000" value="${esc(d.tel)}" autocomplete="tel"></div>
@@ -1186,7 +1205,7 @@ function htmlDatos(){
       </div>
       ${pago === "Efectivo" ? `<div class="campo"><label for="f-cambio">¿Con cuánto vas a pagar? (para tu cambio)</label><input id="f-cambio" type="text" inputmode="numeric" placeholder="${NEGOCIO.moneda} 2,000" value="${esc(d.cambio)}"></div>` : ""}
       ${pago === "Transferencia" ? `<div class="bancos">
-        <p class="bancos-tit">Elige a qué cuenta vas a transferir. Después envía el comprobante por WhatsApp.</p>
+        <p class="bancos-tit">Elige a qué cuenta vas a transferir. Después envía el comprobante desde el chat de tu pedido.</p>
         ${NEGOCIO.bancos.map((b, i) => `<div class="banco${bancoSel === i ? " activa" : ""}" data-acc="banco" data-i="${i}" role="radio" aria-checked="${bancoSel === i}" tabindex="0">
           <span class="marca-sel"></span>
           <span class="datos"><b>${esc(b.banco)}</b><span>${esc(b.tipo)} · ${esc(b.numero)}</span><span>${esc(b.titular)}</span></span>
@@ -1290,7 +1309,7 @@ async function enviarPedido(raiz){
     return `• ${l.cant} x ${nombreLinea(l)} — ${dinero(precioUnidad(l) * l.cant)}` + detallesLinea(l).map(x => `\n   ${x}`).join("");
   }).join("\n");
   const servicio = modo === "local" ? `para comer en el local${d.mesa.trim() ? " (mesa " + d.mesa.trim() + ")" : ""}` : modo === "delivery" ? "para delivery" : "para llevar";
-  let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY ? `🖤 *${DESCUENTO.titulo}: -${DESCUENTO.porcentaje}% aplicado*\n\n` : ""}${lineas}\n\n`;
+  let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY ? `🖤 *${DESCUENTO.titulo}: -${DESCUENTO.porcentaje}% aplicado*\n\n` : ""}${enBreak() ? `(Pedido hecho durante el break; entiendo que lo preparan al volver a las ${horaCorta(PAUSA.hasta)})\n\n` : ""}${lineas}\n\n`;
   if (modo === "delivery") {
     msg += `Subtotal: ${dinero(totalDinero())}\n`;
     msg += ubic && !ubic.lejos ? `Delivery (${ubic.km} km): ${dinero(ubic.costo)}\n` : `Delivery: por confirmar\n`;
@@ -1360,11 +1379,16 @@ async function enviarPedido(raiz){
     const primer = pedido.nombre.split(/\s+/)[0];
     try {
       const espera = new Promise((_, no) => setTimeout(() => no(new Error("sin respuesta")), 8000));
-      const r = await Promise.race([window.JirehFB.crearPedido(pedido, { nombre: primer, modo: pedido.modo }, NEGOCIO.prefijoPedido), espera]);
+      const r = await Promise.race([window.JirehFB.crearPedido(pedido, { nombre: primer, modo: pedido.modo, pago: pedido.pago }, NEGOCIO.prefijoPedido), espera]);
       const id = r.id; idPedido = r.codigo;
       miPedido = { id, codigo: idPedido };
       try { localStorage.setItem("jireh-mi-pedido", JSON.stringify({ id, codigo: idPedido, t: Date.now() })); } catch(e) {}
       carrito = []; guardar(); vistaCarrito = "registrado"; actualizarCarrito();
+      if (!NEGOCIO.pedidoPorWhatsApp) {   // @@SALA-DE-ESPERA: directo a la pantalla del pedido (como Uber)
+        enviando = false;
+        location.href = "pedido.html?id=" + encodeURIComponent(id) + "&nuevo=1";
+        return;
+      }
     } catch (e) {
       console.warn("No se pudo guardar en Firebase; el pedido sale solo por WhatsApp.", e);
     }
@@ -1637,7 +1661,7 @@ mostrarSplash(1300, () => { if (!modo) mostrarLobby(); });
 <script type="module">
 import { crearPedido, escucharDisponibilidad, escucharSeguimiento } from "./fb.js";
 window.JirehFB = { crearPedido };
-escucharDisponibilidad(lista => window.aplicarAgotados(lista));   // @@AGOTADOS en vivo
+escucharDisponibilidad((lista, config) => window.aplicarAgotados(lista, config));   // @@AGOTADOS en vivo
 
 /* @@MI-PEDIDO: botón flotante "Ver mi pedido" si el cliente tiene un pedido en curso (últimas 8 horas).
    Muestra el estado en vivo y DESAPARECE solo cuando el pedido se entrega o se rechaza. */

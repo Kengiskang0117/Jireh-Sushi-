@@ -24,10 +24,25 @@ const DESCUENTO = {
   imagen: "menu/fotos/pasarela/black-friday.jpg"
 };
 
+/* @@AVISO-ANTES — foto de cuenta regresiva ("Falta 1 día") que sale primero en el carrusel SOLO esos días.
+   Se quita sola. Para no usarla: activo: false */
+const AVISO_ANTES = {
+  activo: true,
+  desde: "2026-11-26",
+  hasta: "2026-11-26",
+  imagen: "menu/fotos/pasarela/falta-1-dia.jpg"
+};
+
 /* --- no tocar de aquí para abajo --- */
 const DESCUENTO_HOY = (function(){
   if (/[?&]descuento=ver\b/.test(location.search)) return true;
   if (!DESCUENTO.activo) return false;
   const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   return hoy >= DESCUENTO.desde && hoy <= DESCUENTO.hasta;
+})();
+
+const AVISO_HOY = (function(){
+  if (!AVISO_ANTES.activo || DESCUENTO_HOY) return false;
+  const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  return hoy >= AVISO_ANTES.desde && hoy <= AVISO_ANTES.hasta;
 })();
