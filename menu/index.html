@@ -252,6 +252,9 @@ img{display:block;max-width:100%}
 /* @@ESTILO-PAGOS — bancos y ubicación */
 .bancos{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--tarjeta);border:1px solid var(--borde)}
 .bancos-tit{margin:0;font-size:13px;color:#C9C3B8}
+.total-pagar{padding:12px 14px;border-radius:14px;background:var(--tarjeta);border:1px solid var(--borde);font-size:15px;color:#E9E4DA}.total-pagar b{font-size:19px;color:#fff}
+.total-pagar.falta{color:#F2C230;border-color:#5A4A14;background:#2A2410}
+.paso-pago .monto{font-size:20px}
 .paso-pago{margin:0;font-size:14px;line-height:1.45;color:#E9E4DA}.paso-pago b{color:#fff}
 .subir-comp{display:flex;align-items:center;justify-content:center;height:54px;width:100%;cursor:pointer;font-weight:800;text-align:center}
 .comp-listo{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;background:#0F2A1A;border:1px solid #1F6B3E;color:#7BE3A4;font-size:13.5px;font-weight:700}
@@ -1013,6 +1016,7 @@ let bancoSel = 0;              // banco que eligió el cliente para transferir
 /* @@PAGO-OBLIGATORIO: con Transferencia, el cliente tiene que subir la foto del comprobante ANTES de enviar el pedido.
    La foto se manda sola al chat del pedido (el equipo la ve en el panel). Efectivo no pide nada. */
 let comprobanteFoto = null, comprobanteEstado = "";
+const totalListo = () => modo !== "delivery" || !NEGOCIO.soloUbicacion || !!(ubic && !ubic.aprox && !ubic.lejos);   // ya se sabe el total exacto
 function reducirFoto(f){
   return new Promise((ok, no) => {
     const img = new Image(), url = URL.createObjectURL(f);
@@ -1253,32 +1257,34 @@ function htmlDatos(){
       ${!cerradoHoy() && !estaAbierto() ? `<div class="aviso-cerrado">Ahora estamos cerrados. Puedes enviar tu pedido y lo atendemos al abrir (${esc(NEGOCIO.horario.texto)}).</div>` : ""}
       <div class="campo"><label for="f-nombre">Nombre y apellido</label><input id="f-nombre" type="text" placeholder="Tu nombre completo" value="${esc(d.nombre)}" autocomplete="name"></div>
       <div class="campo"><label for="f-tel">Teléfono / WhatsApp</label><input id="f-tel" type="tel" placeholder="809-000-0000" value="${esc(d.tel)}" autocomplete="tel"></div>
-      <div class="campo"><span class="lbl">Método de pago</span>
+      ${modo === "delivery" && NEGOCIO.soloUbicacion ? `<div class="campo"><span class="lbl">📍 Tu ubicación</span>
+        <button class="${ubic && !ubic.aprox ? "btn-borde" : "btn-acento"} ubic-btn" data-acc="ubicacion" style="height:54px;width:100%">📍 ${ubic && !ubic.aprox ? "Actualizar mi ubicación" : "Usar mi ubicación actual"}</button>
+        ${ubicEstado ? `<small class="ubic-estado ${ubicFallo ? "aviso" : ""}">${esc(ubicEstado)}</small>${ubicFallo ? `<small class="ubic-estado">¿No te funciona? <a href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Escríbenos por WhatsApp</a> y te ayudamos.</small>` : ""}`
+          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás lejos (${ubic.km} km). Te escribimos para el delivery.</small>`
+          : ubic && !ubic.aprox ? `<small class="ubic-estado ok">✓ Lista · Delivery <b>${dinero(ubic.costo)}</b>${ubicTexto ? "<br>" + esc(ubicTexto) : ""}</small>`
+          : `<small class="ubic-estado">Cuando el teléfono pregunte, toca <b>Permitir</b>.</small>`}
+      </div>
+      <div class="campo"><label for="f-ref">Indicaciones (opcional)</label><input id="f-ref" type="text" placeholder="Ej.: casa verde, apto. 3B" value="${esc(d.ref)}"></div>` : ""}
+      <div class="campo"><span class="lbl">💳 ¿Cómo vas a pagar?</span>
         <div class="opciones" role="radiogroup" aria-label="Método de pago">
           ${NEGOCIO.pagos.map(o => `<button class="opcion${pago === o ? " activa" : ""}" role="radio" aria-checked="${pago === o}" data-acc="pago" data-v="${o}">${o}</button>`).join("")}
         </div>
       </div>
-      ${pago === "Efectivo" ? `<div class="campo"><label for="f-cambio">¿Con cuánto vas a pagar? (para tu cambio)</label><input id="f-cambio" type="text" inputmode="numeric" placeholder="${NEGOCIO.moneda} 2,000" value="${esc(d.cambio)}"></div>` : ""}
-      ${pago === "Transferencia" ? `<div class="bancos">
-        <p class="paso-pago"><b>Paso 1 ·</b> Transfiere <b>${dinero(totalConDelivery())}</b> a una de estas cuentas (toca <b>Copiar</b> para copiar el número):</p>
+      ${pago === "Efectivo" && totalListo() ? `<div class="total-pagar">Total a pagar: <b>${dinero(totalConDelivery())}</b></div>` : ""}
+      ${pago === "Efectivo" ? `<div class="campo"><label for="f-cambio">¿Con cuánto pagas? (para el cambio)</label><input id="f-cambio" type="text" inputmode="numeric" placeholder="${NEGOCIO.moneda} 2,000" value="${esc(d.cambio)}"></div>` : ""}
+      ${pago === "Transferencia" && !totalListo() ? `<div class="total-pagar falta">${ubic && ubic.lejos ? "Te escribimos con el total para transferir." : "📍 Primero pon tu ubicación para ver el total."}</div>` : ""}
+      ${pago === "Transferencia" && totalListo() ? `<div class="bancos">
+        <p class="paso-pago"><b>1.</b> Transfiere <b class="monto">${dinero(totalConDelivery())}</b> a una cuenta:</p>
         ${NEGOCIO.bancos.map((b, i) => `<div class="banco${bancoSel === i ? " activa" : ""}" data-acc="banco" data-i="${i}" role="radio" aria-checked="${bancoSel === i}" tabindex="0">
           <span class="marca-sel"></span>
           <span class="datos"><b>${esc(b.banco)}</b><span>${esc(b.tipo)} · ${esc(b.numero)}</span><span>${esc(b.titular)}</span></span>
           <button class="copiar" data-acc="copiar" data-v="${esc(b.numero)}">Copiar</button>
         </div>`).join("")}
-        <p class="paso-pago" style="margin-top:6px"><b>Paso 2 ·</b> Sube la foto o captura del comprobante. <b>Sin el comprobante no se puede enviar el pedido.</b></p>
-        <label class="${comprobanteFoto ? "btn-borde" : "btn-acento"} subir-comp">📎 ${comprobanteFoto ? "Cambiar la foto del comprobante" : "Subir comprobante de la transferencia"}<input class="f-comp-foto" type="file" accept="image/*" hidden></label>
+        <p class="paso-pago" style="margin-top:6px"><b>2.</b> Sube el comprobante:</p>
+        <label class="${comprobanteFoto ? "btn-borde" : "btn-acento"} subir-comp">📎 ${comprobanteFoto ? "Cambiar foto" : "Subir comprobante"}<input class="f-comp-foto" type="file" accept="image/*" hidden></label>
         ${comprobanteEstado ? `<small class="ubic-estado aviso">${esc(comprobanteEstado)}</small>`
-          : comprobanteFoto ? `<div class="comp-listo"><img src="${comprobanteFoto}" alt="Comprobante"><span>✓ Comprobante listo. Se enviará con tu pedido.</span></div>` : ""}
+          : comprobanteFoto ? `<div class="comp-listo"><img src="${comprobanteFoto}" alt="Comprobante"><span>✓ Comprobante listo</span></div>` : ""}
       </div>` : ""}
-      ${modo === "delivery" && NEGOCIO.soloUbicacion ? `<div class="campo"><span class="lbl">Tu ubicación para el delivery</span>
-        <button class="${ubic && !ubic.aprox ? "btn-borde" : "btn-acento"} ubic-btn" data-acc="ubicacion" style="height:54px;width:100%">📍 ${ubic && !ubic.aprox ? "Actualizar mi ubicación" : "Usar mi ubicación actual"}</button>
-        ${ubicEstado ? `<small class="ubic-estado ${ubicFallo ? "aviso" : ""}">${esc(ubicEstado)}</small>${ubicFallo ? `<small class="ubic-estado">¿No te funciona? <a href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Escríbenos por WhatsApp</a> y te ayudamos.</small>` : ""}`
-          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${ubic.km} km. Por la distancia, coordinamos el delivery contigo.</small>`
-          : ubic && !ubic.aprox ? `<small class="ubic-estado ok">✓ Ubicación lista${ubicTexto ? " · " + esc(ubicTexto) : ""} · aprox. ${ubic.km} km · Delivery ${dinero(ubic.costo)}</small>`
-          : `<small class="ubic-estado">Es necesaria para que el delivery llegue exacto a tu puerta. Cuando el teléfono pregunte, toca <b>Permitir</b>.</small>`}
-      </div>
-      <div class="campo"><label for="f-ref">Indicaciones para el delivery (recomendado)</label><input id="f-ref" type="text" placeholder="Ej.: casa verde de 2 niveles, apto. 3B, al lado del colmado" value="${esc(d.ref)}"></div>` : ""}
       ${modo === "delivery" && !NEGOCIO.soloUbicacion ? `<div class="campo campo-dir"><label for="f-dir">Dirección de entrega</label><input id="f-dir" type="text" placeholder="Ej.: Calle Central #18, Hainamosa" value="${esc(d.dir)}" autocomplete="off" aria-autocomplete="list"><div class="sugerencias" role="listbox" hidden></div><small class="ayuda-dir" aria-live="polite"></small></div>
       <div class="campo"><label for="f-ref">Referencia (opcional)</label><input id="f-ref" type="text" placeholder="Ej.: casa blanca, al lado del colmado" value="${esc(d.ref)}"></div>
       <div class="campo"><span class="lbl">Ubicación para el delivery</span>
@@ -1339,12 +1345,12 @@ function validar(raiz, paraCocina){
   leerDatos(raiz);
   const d = datosGuardados, err = raiz.querySelector("#f-error");
   if (d.nombre.trim().length < 2) { err.textContent = "Escribe tu nombre para el pedido."; raiz.querySelector("#f-nombre").focus(); return null; }
-  if (pago === "Transferencia" && !comprobanteFoto && !paraCocina) {   // @@PAGO-OBLIGATORIO
-    err.textContent = "📎 Falta subir el comprobante de la transferencia. Sin el comprobante no podemos recibir tu pedido.";
+  if (pago === "Transferencia" && !comprobanteFoto && !paraCocina && totalListo()) {   // @@PAGO-OBLIGATORIO
+    err.textContent = "📎 Falta subir el comprobante.";
     const c = raiz.querySelector(".subir-comp"); if (c) c.scrollIntoView({ block: "center", behavior: "smooth" }); return null;
   }
   if (modo === "delivery" && NEGOCIO.soloUbicacion) {
-    if (!ubic || ubic.aprox) { err.textContent = "📍 Falta poner tu ubicación. Toca \"Usar mi ubicación actual\" para seguir."; const u = raiz.querySelector('[data-acc="ubicacion"]'); if (u) u.focus(); return null; }
+    if (!ubic || ubic.aprox) { err.textContent = "📍 Falta poner tu ubicación."; const u = raiz.querySelector('[data-acc="ubicacion"]'); if (u) u.focus(); return null; }
     d.dir = ubicTexto || "Ubicación compartida por GPS (ver mapa)";
   }
   else if (modo === "delivery" && d.dir.trim().length < 5) { err.textContent = "Escribe la dirección de entrega."; raiz.querySelector("#f-dir").focus(); return null; }

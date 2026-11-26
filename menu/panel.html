@@ -123,6 +123,11 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .pchat-escribir{display:flex;gap:8px;margin-top:6px}
 .pchat-escribir input{flex:1;min-width:0;margin:0}
 .pchat-escribir .btn{width:auto;padding:0 18px}
+.ncomp{display:inline-block;white-space:nowrap;align-self:flex-start;background:#3A2A08;color:#FFD27A;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800;margin:3px 0}
+.ncomp.ok{background:#0F2A1A;color:#7BE3A4}.ncomp.no{background:#3A0F0F;color:#FF9A9A}
+.caja-pago{margin-top:14px;padding:14px;border-radius:16px;background:#2A2410;border:1px solid #8A6A1A}
+.caja-pago.ok{background:#0F2A1A;border-color:#1F6B3E}
+.caja-pago img{display:block;width:100%;max-height:380px;object-fit:contain;border-radius:12px;background:#000}
 .nmsj{display:inline-block;align-self:flex-start;background:var(--rojo);color:#fff;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800;margin:3px 0}
 .nprueba{display:inline-block;background:#333;color:#bbb;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px}
 /* @@LOGIN-ESTILO */
@@ -341,6 +346,8 @@ alCambiarSesion(usuario => {
 /* ---------- @@CHAT: mensajes de los clientes (sala de espera) ---------- */
 let chats = {}, chatsOff = {}, chatsCargados = {};
 const vistoChat = id => { try { return +localStorage.getItem("pchat-" + id) || 0; } catch(e) { return 0; } };
+/* @@COMPROBANTE-PANEL: la foto del comprobante que el cliente subió al hacer el pedido (o luego por el chat) */
+const comprobanteDe = p => p.pago === "Transferencia" ? ((chats[p.id] || []).filter(m => m.de === "cliente" && m.foto).pop() || null) : null;
 const marcarChat = id => { try { localStorage.setItem("pchat-" + id, String((chats[id] || []).filter(m => m.de === "cliente").length)); } catch(e) {} };
 const sinLeer = id => Math.max(0, (chats[id] || []).filter(m => m.de === "cliente").length - vistoChat(id));
 function escucharChats(){
@@ -443,6 +450,7 @@ function pintar(){
       <button class="pedido ${p.estado === "nuevo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}">
         <span class="num">#${esc(p.codigo)}</span>
         <span class="info"><b>${esc(p.nombre)}${p.prueba ? ` <span class="nprueba">prueba</span>` : ""}</b>
+          ${p.pago === "Transferencia" ? (p.pagado ? `<span class="ncomp ok">✅ Pagado</span>` : comprobanteDe(p) ? `<span class="ncomp">🧾 Revisar pago</span>` : `<span class="ncomp no">🧾 Sin comprobante</span>`) : ""}
           ${sinLeer(p.id) ? `<span class="nmsj">💬 ${sinLeer(p.id)} ${sinLeer(p.id) > 1 ? "nuevos" : "nuevo"}</span>` : ""}
           <small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)} · ${dinero(p.total)}</small>
           ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}</span>
@@ -509,6 +517,12 @@ function pintarPedido(p){
       ${p.repartidor ? `<div class="fila"><span>Delivery</span><span>🛵 ${esc(p.repartidor)}</span></div>` : ""}
       <div class="fila"><span>Pago</span><span>${esc(p.pago)}${p.banco ? " · " + esc(p.banco) : ""}${p.cambio ? " (paga con " + esc(p.cambio) + ")" : ""}${p.pagado ? " ✅ recibido" : ""}</span></div>
     </div>
+    ${p.pago === "Transferencia" ? (() => { const c = comprobanteDe(p); return `<div class="caja-pago ${p.pagado ? "ok" : ""}">
+      <h2 style="margin:0 0 8px">🧾 Pago por transferencia · ${esc(p.totalTexto || dinero(p.total))}${p.banco ? " · " + esc(p.banco) : ""}</h2>
+      ${c ? `<a href="${c.foto}" target="_blank" rel="noopener"><img src="${c.foto}" alt="Comprobante"></a>` : `<p style="margin:0;color:var(--amarillo)">Todavía no hay comprobante.</p>`}
+      ${p.pagado ? `<p style="margin:8px 0 0;color:#7BE3A4;font-weight:800">✅ Pago confirmado</p>`
+        : c ? `<p class="ayuda" style="margin:8px 0">Mira en tu banco si llegó el dinero.</p><button class="btn verde" data-acc="pago">✅ Sí llegó el dinero</button>` : ""}
+    </div>`; })() : ""}
     ${p.estado === "preparando" && p.listoEn ? `<div class="reloj" data-reloj="${ms(p.listoEn)}"><span style="font-size:30px">⏱️</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Tiempo de preparación (${p.minutos} min)</small></div></div>` : ""}
     ${acciones}
     <h2>Cliente</h2>
