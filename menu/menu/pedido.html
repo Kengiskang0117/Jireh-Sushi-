@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tu pedido · Jireh Sushi</title>
+<link rel="icon" type="image/png" sizes="64x64" href="fotos/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="fotos/icono-180.png">
+<meta name="theme-color" content="#0B0B0C">
+<!--
+  =========================================================
+  SEGUIMIENTO DEL PEDIDO EN VIVO (para el cliente) · Kenmake Soluciones
+  ---------------------------------------------------------
+  - Se abre con pedido.html?id=XXXX (el enlace largo y único de cada pedido).
+  - Lee el estado desde Firebase y cambia solo cuando el negocio toca un botón.
+  - Cada estado tiene su escena animada:
+      Recibido   → logo latiendo
+      Preparando → rolls armándose + barra con el tiempo de la cocina
+      Listo      → bolsa de Jireh con ✓
+      En camino  → motorcito avanzando de Jireh a la casa (por tiempo estimado)
+      Entregado  → confeti
+  - DEMO (para enseñarlo sin pedido real):
+      pedido.html?demo=nuevo | preparando | listo | en_camino | entregado | todo
+      ("todo" pasa por todos los estados solo)
+
+  Para cambiar algo, busca con Ctrl+F:
+  @@TEXTOS   Frases que ve el cliente en cada estado
+  @@COLORES  Colores
+  =========================================================
+-->
+<style>
+/* @@COLORES */
+:root{--fondo:#0B0B0C;--tarjeta:#17171A;--borde:#2A2A2E;--rojo:#E3121B;--texto:#F4F1EC;--suave:#A9A39A;--verde:#2FD47A}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3A0D10 0%,var(--fondo) 60%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:22px 16px}
+.caja{width:100%;max-width:420px;text-align:center}
+.top{display:flex;align-items:center;gap:12px;text-align:left;margin-bottom:14px}
+.top img{width:52px;height:52px;border-radius:50%;background:#0B0B0B;border:2px solid var(--rojo);object-fit:cover;flex:none}
+.top h1{font-size:18px;margin:0;line-height:1.2}
+.top small{color:var(--suave);font-size:13px}
+.escena{position:relative;height:250px;border-radius:22px;background:linear-gradient(180deg,#1B1416 0%,#121214 100%);border:1px solid var(--borde);overflow:hidden;margin-bottom:14px}
+.escena svg{position:absolute;inset:0;width:100%;height:100%}
+.frase{font-size:19px;font-weight:700;margin:0 0 4px;min-height:26px;transition:opacity .35s}
+.sub{color:var(--suave);font-size:14.5px;margin:0 0 14px;min-height:20px}
+.barra{height:10px;border-radius:99px;background:#26262A;overflow:hidden;margin:0 0 6px}
+.barra i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#B30E15,var(--rojo),#FF4D55);transition:width 1s linear;background-size:200% 100%;animation:brillo 2s linear infinite}
+.barra.ok i{background:var(--verde);animation:none}
+@keyframes brillo{to{background-position:-200% 0}}
+.tiempo{display:flex;justify-content:space-between;color:var(--suave);font-size:13px;margin-bottom:16px;font-variant-numeric:tabular-nums}
+.tiempo b{color:var(--texto)}
+.pasos{display:flex;justify-content:space-between;gap:6px;margin:0 0 14px;padding:12px 8px;border-radius:16px;background:var(--tarjeta);border:1px solid var(--borde)}
+.paso{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--suave)}
+.paso i{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#222226;font-style:normal;font-size:15px}
+.paso.on{color:var(--texto);font-weight:700}.paso.on i{background:var(--rojo);box-shadow:0 0 0 0 rgba(227,18,27,.6);animation:latido 1.6s infinite}
+.paso.ok i{background:#1E7A45}
+@keyframes latido{70%{box-shadow:0 0 0 10px rgba(227,18,27,0)}100%{box-shadow:0 0 0 0 rgba(227,18,27,0)}}
+.nota{color:var(--suave);font-size:13px;line-height:1.5;margin:0}
+.btn{display:inline-block;margin-top:14px;padding:13px 20px;border-radius:14px;background:#1E7A45;color:#fff;text-decoration:none;font-weight:700}
+.contacto{display:inline-block;background:transparent;font:inherit;cursor:pointer;line-height:1.4;margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--borde);color:var(--texto);text-decoration:none;font-size:14px;font-weight:600}   /* @@CONTACTO: botón discreto para escribir al negocio */
+/* @@CHAT — sala de espera: chat del pedido con el negocio */
+.chat-boton{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;display:flex;align-items:center;gap:10px;padding:14px 22px;border-radius:999px;border:0;background:var(--rojo);color:#fff;font-weight:800;font-size:16px;box-shadow:0 12px 30px rgba(0,0,0,.5);cursor:pointer;white-space:nowrap}
+.chat-boton .n{min-width:22px;height:22px;border-radius:99px;background:#fff;color:var(--rojo);font-size:13px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.chat-boton .n:empty{display:none}
+.chat-fondo{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:none}
+.chat-hoja{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;height:min(78vh,640px);background:#141416;border:1px solid var(--borde);border-radius:22px 22px 0 0;display:none;flex-direction:column;text-align:left}
+.chat-abierto .chat-fondo{display:block}.chat-abierto .chat-hoja{display:flex}.chat-abierto .chat-boton{display:none}
+.chat-cab{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--borde)}
+.chat-cab img{width:40px;height:40px;border-radius:50%;border:2px solid var(--rojo);background:#0B0B0B}
+.chat-cab b{display:block;font-size:16px}.chat-cab small{color:var(--suave);font-size:12.5px}
+.chat-cab button{margin-left:auto;width:40px;height:40px;border-radius:50%;border:1px solid var(--borde);background:transparent;color:var(--texto);font-size:20px;cursor:pointer}
+.chat-msjs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.msj{max-width:80%;padding:10px 13px;border-radius:16px;font-size:15px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.msj.cliente{align-self:flex-end;background:var(--rojo);color:#fff;border-bottom-right-radius:4px}
+.msj.negocio{align-self:flex-start;background:#26262A;border-bottom-left-radius:4px}
+.msj img{display:block;max-width:220px;border-radius:10px;margin-bottom:4px}
+.msj small{display:block;font-size:11px;opacity:.7;margin-top:3px}
+.chat-vacio{color:var(--suave);font-size:14px;text-align:center;margin:auto;padding:20px;line-height:1.5}
+.chat-rapido{display:flex;gap:8px;overflow-x:auto;padding:8px 14px 0}
+.chat-rapido button{flex:none;border:1px solid var(--borde);background:#1C1C20;color:var(--texto);border-radius:999px;padding:8px 12px;font-size:13.5px;cursor:pointer}
+.chat-escribir{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom))}
+.chat-escribir input[type=text]{flex:1;min-width:0;height:46px;border-radius:999px;border:1px solid var(--borde);background:#0F0F11;color:var(--texto);padding:0 16px;font-size:16px}
+.chat-escribir .redondo{width:46px;height:46px;flex:none;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.chat-escribir .adjuntar{background:#26262A;color:var(--texto)}.chat-escribir .enviar{background:var(--rojo);color:#fff}
+.chat-wa{display:block;text-align:center;color:var(--suave);font-size:12.5px;padding:0 0 10px;text-decoration:underline}
+body{padding-bottom:90px}
+.pie{color:#6E6862;font-size:12px;margin-top:18px}
+.vivo{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--suave);margin-top:10px}
+.vivo i{width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 4px rgba(47,212,122,.18)}
+
+/* ---- animaciones de las escenas ---- */
+@keyframes pulso{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@keyframes onda{0%{r:58;opacity:.55}100%{r:118;opacity:0}}
+@keyframes punto{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@keyframes cae{0%{transform:translateY(-70px);opacity:0}35%{transform:translateY(4px);opacity:1}45%{transform:translateY(0)}88%{opacity:1}100%{opacity:0}}
+@keyframes palillos{0%,100%{transform:translate(0,0) rotate(0)}50%{transform:translate(-6px,8px) rotate(-4deg)}}
+@keyframes vapor{0%{transform:translateY(8px);opacity:0}40%{opacity:.6}100%{transform:translateY(-22px);opacity:0}}
+@keyframes rueda{to{transform:rotate(360deg)}}
+@keyframes rebote{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes ciudad{to{transform:translateX(-200px)}}
+@keyframes humo{0%{transform:translate(0,0) scale(.6);opacity:.6}100%{transform:translate(-26px,-6px) scale(1.4);opacity:0}}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes bolsa{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-6px) rotate(-2deg)}}
+@keyframes confeti{0%{transform:translateY(-30px) rotate(0)}100%{transform:translateY(280px) rotate(540deg)}}
+@keyframes pin{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.pulso{transform-origin:180px 112px;animation:pulso 1.6s ease-in-out infinite}
+.onda{animation:onda 2.4s ease-out infinite}
+.pieza{animation:cae 3.6s ease-in-out infinite}
+.palillos{transform-origin:260px 40px;animation:palillos 1.2s ease-in-out infinite}
+.vapor{animation:vapor 2.2s ease-out infinite}
+.rueda{transform-box:fill-box;transform-origin:center;animation:rueda .5s linear infinite}
+.rebote{animation:rebote .35s ease-in-out infinite}
+.ciudad{animation:ciudad 14s linear infinite}
+.humo{transform-box:fill-box;transform-origin:center;animation:humo .9s ease-out infinite}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .6s ease-out both}
+.bolsa{transform-origin:180px 200px;animation:bolsa 2s ease-in-out infinite}
+.pin{animation:pin 1.4s ease-in-out infinite}
+#moto{transition:transform 1s linear}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<main class="caja" id="app">
+  <div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>Tu pedido</h1><small>Buscando tu pedido…</small></div></div>
+</main>
+
+<script type="module">
+/* @@TEXTOS */
+const NEGOCIO = { nombre: "Jireh Sushi", whatsapp: "18493604892" };   // PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
+const TEXTOS = {
+  nuevo: ["Tu pedido llegó 🙌", "Estamos por confirmarlo, un momentito"],
+  preparando: [["Estamos armando tus rolls 🍣", "Hecho al momento, con ingredientes frescos"],
+               ["Cortando con cariño… 🔪", "Ya mismo queda"],
+               ["Poniéndole el toque final ✨", "Salsas, toppings y a la caja"]],
+  listoLlevar: ["¡Tu pedido está listo! 🙌", "Puedes pasar a buscarlo"],
+  listoDelivery: ["¡Tu pedido está listo! 🛍️", "El delivery sale en un momento"],
+  en_camino: [["Tu pedido va saliendo 🛵", "El delivery ya arrancó"],
+              ["Ya va por el camino 🛵", "Pendiente al teléfono"],
+              ["¡Casi llega! 📍", "Ten el teléfono a mano"]],
+  entregado: ["¡Pedido entregado! 🎉", "Buen provecho, gracias por pedir en Jireh Sushi"],
+  rechazado: ["Lo sentimos 😔", "No pudimos preparar tu pedido."],
+  noExiste: "No encontramos este pedido. Revisa el enlace o escríbenos por WhatsApp."
+};
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const ms = t => t && t.toMillis ? t.toMillis() : (t || 0);
+const mmss = m => { const s = Math.max(0, Math.ceil(m / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+const app = document.getElementById("app");
+const q = new URLSearchParams(location.search);
+const id = q.get("id") || "";
+let actual = null, escenaDe = "", vuelta = 0, PAUSA = null;
+
+/* ---------- Dibujos (SVG, 360 x 250) ---------- */
+const LOGO = `<clipPath id="cl"><circle cx="180" cy="112" r="52"/></clipPath>`;
+const ESC = {
+  nuevo: () => `<svg viewBox="0 0 360 250"><defs>${LOGO}</defs>
+    <circle class="onda" cx="180" cy="112" r="58" fill="none" stroke="#E3121B" stroke-width="3"/>
+    <circle class="onda" style="animation-delay:1.2s" cx="180" cy="112" r="58" fill="none" stroke="#E3121B" stroke-width="3"/>
+    <g class="pulso"><circle cx="180" cy="112" r="56" fill="#0B0B0B" stroke="#E3121B" stroke-width="3"/>
+    <image href="fotos/logo.png" x="128" y="60" width="104" height="104" clip-path="url(#cl)"/></g>
+    ${[0,1,2].map(i => `<circle cx="${165 + i * 15}" cy="210" r="5" fill="#F4F1EC" style="animation:punto 1.2s ${i * .2}s infinite"/>`).join("")}
+  </svg>`,
+
+  preparando: () => {
+    const maki = (x, d) => `<g class="pieza" style="animation-delay:${d}s"><g transform="translate(${x} 160)">
+      <ellipse cx="0" cy="22" rx="30" ry="6" fill="#000" opacity=".35"/>
+      <rect x="-28" y="-8" width="56" height="28" rx="6" fill="#1D2A1F"/>
+      <ellipse cx="0" cy="-8" rx="28" ry="15" fill="#22301F"/>
+      <ellipse cx="0" cy="-8" rx="23" ry="12" fill="#F6F2EA"/>
+      <ellipse cx="-4" cy="-9" rx="9" ry="5.5" fill="#FF7A45"/><ellipse cx="7" cy="-7" rx="5" ry="3.5" fill="#7BC043"/>
+      <circle cx="-12" cy="-12" r="1.4" fill="#E9E2D6"/><circle cx="13" cy="-13" r="1.3" fill="#E9E2D6"/></g></g>`;
+    return `<svg viewBox="0 0 360 250">
+      <rect x="40" y="186" width="280" height="22" rx="8" fill="#6B4425"/><rect x="40" y="186" width="280" height="6" rx="3" fill="#8A5A33"/>
+      ${maki(110, 0)}${maki(180, .5)}${maki(250, 1)}
+      ${[150,180,210].map((x,i) => `<path class="vapor" style="animation-delay:${i*.6}s" d="M${x} 110 q-8 -10 0 -20 q8 -10 0 -20" fill="none" stroke="#F4F1EC" stroke-width="3" stroke-linecap="round" opacity=".5"/>`).join("")}
+      <g class="palillos"><rect x="240" y="20" width="7" height="120" rx="3" fill="#E3121B" transform="rotate(28 243 80)"/>
+      <rect x="258" y="18" width="7" height="120" rx="3" fill="#B30E15" transform="rotate(22 261 78)"/></g>
+    </svg>`;
+  },
+
+  listo: () => `<svg viewBox="0 0 360 250">
+    <ellipse cx="180" cy="212" rx="70" ry="9" fill="#000" opacity=".4"/>
+    <g class="bolsa"><path d="M150 78 q0 -30 30 -30 q30 0 30 30" fill="none" stroke="#E3121B" stroke-width="7"/>
+    <path d="M118 80 h124 l-10 128 h-104 z" fill="#141416" stroke="#E3121B" stroke-width="3"/>
+    <text x="180" y="140" text-anchor="middle" font-family="Georgia,serif" font-size="30" font-weight="700" fill="#E3121B">Jireh</text>
+    <text x="180" y="162" text-anchor="middle" font-size="12" letter-spacing="5" fill="#F4F1EC">SUSHI</text></g>
+    <g class="pop" style="animation-delay:.2s"><circle cx="248" cy="76" r="24" fill="#2FD47A"/><path d="M237 76 l8 8 l15 -16" fill="none" stroke="#0B0B0C" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g>
+  </svg>`,
+
+  en_camino: () => {
+    const edif = x => [[0,40,60],[46,28,85],[80,36,50],[122,24,70],[152,42,95],[200,30,55]].map(([dx,w,h]) => `<rect x="${x+dx}" y="${150-h}" width="${w}" height="${h}" rx="3" fill="#221B1D"/>`).join("");
+    return `<svg viewBox="0 0 360 250">
+      <g class="ciudad" opacity=".9">${edif(0)}${edif(200)}${edif(400)}</g>
+      <rect x="0" y="150" width="360" height="100" fill="#141012"/>
+      <path id="ruta" d="M44 196 C 120 196, 120 176, 180 176 S 250 196, 316 196" fill="none" stroke="#3A3236" stroke-width="22" stroke-linecap="round"/>
+      <path d="M44 196 C 120 196, 120 176, 180 176 S 250 196, 316 196" fill="none" stroke="#F4F1EC" stroke-width="2" stroke-dasharray="10 10" opacity=".55"/>
+      <path id="hecho" d="M44 196 C 120 196, 120 176, 180 176 S 250 196, 316 196" fill="none" stroke="#E3121B" stroke-width="5" stroke-linecap="round" stroke-dasharray="0 999"/>
+      <!-- Jireh -->
+      <g transform="translate(22 150)"><rect x="0" y="10" width="44" height="34" rx="4" fill="#E3121B"/><path d="M-4 12 L22 -6 L48 12 z" fill="#B30E15"/>
+      <text x="22" y="34" text-anchor="middle" font-family="Georgia,serif" font-size="17" font-weight="700" fill="#fff">J</text></g>
+      <!-- casa del cliente -->
+      <g transform="translate(296 150)"><rect x="0" y="12" width="40" height="32" rx="4" fill="#F4F1EC"/><path d="M-4 14 L20 -4 L44 14 z" fill="#A9A39A"/>
+      <rect x="15" y="26" width="10" height="18" fill="#2A2A2E"/></g>
+      <g transform="translate(316 112)"><g class="pin"><path d="M0 26 C -14 10 -12 0 -12 -2 a12 12 0 0 1 24 0 c0 2 2 12 -12 28z" fill="#E3121B"/><circle cx="0" cy="-2" r="5" fill="#fff"/></g></g>
+      <!-- motorcito -->
+      <g id="moto" transform="translate(44 196)"><g transform="scale(1.55) translate(-33 -44)"><g class="rebote">
+        <circle class="humo" cx="2" cy="34" r="5" fill="#A9A39A"/>
+        <rect x="4" y="12" width="20" height="18" rx="3" fill="#E3121B"/><text x="14" y="26" text-anchor="middle" font-family="Georgia,serif" font-size="12" font-weight="700" fill="#fff">J</text>
+        <path d="M14 34 h26 l8 -12 h6" fill="none" stroke="#F4F1EC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 30 h22 q6 0 8 6 h-34 z" fill="#E3121B"/>
+        <path d="M28 30 l6 -14 l6 2" fill="none" stroke="#1B1B1E" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="35" cy="10" r="7" fill="#E3121B"/><rect x="36" y="7" width="7" height="4" rx="2" fill="#1B1B1E"/>
+        <line x1="40" y1="20" x2="52" y2="22" stroke="#1B1B1E" stroke-width="4" stroke-linecap="round"/>
+      </g>
+      <g class="rueda"><circle cx="16" cy="40" r="8" fill="#0B0B0C" stroke="#F4F1EC" stroke-width="2.5"/><path d="M16 33 v14 M9 40 h14" stroke="#A9A39A" stroke-width="1.5"/></g>
+      <g class="rueda"><circle cx="50" cy="40" r="8" fill="#0B0B0C" stroke="#F4F1EC" stroke-width="2.5"/><path d="M50 33 v14 M43 40 h14" stroke="#A9A39A" stroke-width="1.5"/></g>
+      </g></g>
+    </svg>`;
+  },
+
+  entregado: () => {
+    const col = ["#E3121B","#2FD47A","#F4F1EC","#FFB020","#FF7A45"];
+    let c = ""; for (let i = 0; i < 34; i++) c += `<rect x="${(i * 53) % 350 + 5}" y="-20" width="7" height="12" rx="2" fill="${col[i % 5]}" style="animation:confeti ${2.4 + (i % 5) * .35}s ${(i % 7) * .3}s linear infinite"/>`;
+    return `<svg viewBox="0 0 360 250"><defs>${LOGO}</defs>${c}
+      <g class="pop"><circle cx="180" cy="112" r="56" fill="#0B0B0B" stroke="#2FD47A" stroke-width="4"/>
+      <image href="fotos/logo.png" x="128" y="60" width="104" height="104" clip-path="url(#cl)"/></g>
+      <g class="pop" style="animation-delay:.3s"><circle cx="222" cy="72" r="18" fill="#2FD47A"/><path d="M214 72 l6 6 l11 -12" fill="none" stroke="#0B0B0C" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </svg>`;
+  }
+};
+
+/* ---------- Pantalla ---------- */
+function pintar(s){
+  actual = s; escenaDe = "";
+  // pedido terminado: se borra el aviso "Ver mi pedido" del menú (@@MI-PEDIDO)
+  if (!demo && (!s || s.estado === "entregado" || s.estado === "rechazado")) { try { const m = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); if (m && m.id === id) localStorage.removeItem("jireh-mi-pedido"); } catch(e) {} }
+  if (!s) {
+    app.innerHTML = `<div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>Tu pedido</h1></div></div>
+      <p class="sub">${TEXTOS.noExiste}</p><a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>`;
+    return;
+  }
+  const delivery = s.modo === "delivery";
+  const rechazado = s.estado === "rechazado";
+  const orden = delivery ? ["nuevo", "preparando", "listo", "en_camino", "entregado"] : ["nuevo", "preparando", "listo", "entregado"];
+  const pasos = delivery
+    ? [["nuevo","✓","Recibido"],["preparando","👨‍🍳","Preparando"],["en_camino","🛵","En camino"],["entregado","🎉","Entregado"]]
+    : [["nuevo","✓","Recibido"],["preparando","👨‍🍳","Preparando"],["listo","🙌","Listo"],["entregado","🎉","Entregado"]];
+  const pos = orden.indexOf(s.estado === "listo" && delivery ? "preparando" : s.estado);
+  app.innerHTML = `
+    <div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>${s.nombre ? esc(s.nombre) + ", t" : "T"}u pedido #${esc(s.codigo)}</h1><small>${delivery ? "Delivery" : "Para llevar"}</small></div></div>
+    ${rechazado ? `<p class="frase">${TEXTOS.rechazado[0]}</p><p class="sub">${TEXTOS.rechazado[1]}${s.motivo ? "<br>" + esc(s.motivo) : ""}</p>
+      <a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>` : `
+    <div class="escena" id="escena"></div>
+    <p class="frase" id="frase"></p><p class="sub" id="sub"></p>
+    <div id="medidor"><div class="barra" id="barra"><i></i></div><div class="tiempo"><span id="izq"></span><span id="der"></span></div></div>
+    <div class="pasos">${pasos.map(([k, ic, t]) => {
+      const i = orden.indexOf(k);
+      const cls = i < pos || (k === "entregado" && s.estado === "entregado") ? "ok" : (i === pos || (k === "en_camino" && s.estado === "en_camino") ? "on" : "");
+      return `<div class="paso ${cls}"><i>${cls === "ok" ? "✓" : ic}</i>${t}</div>`;
+    }).join("")}</div>
+    <p class="nota">Esta pantalla se actualiza sola. Los tiempos son aproximados.</p>
+    ${s.estado !== "entregado" && s.estado !== "rechazado" ? `<button class="contacto" data-chat>💬 ¿Una pregunta, algo extra o el comprobante? Escríbenos aquí</button>` : ""}`}
+    <div class="vivo"><i></i>En vivo</div>
+    <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
+  tick();
+}
+
+function textos(par){ const f = document.getElementById("frase"), d = document.getElementById("sub");
+  if (f.textContent !== par[0]) { f.style.opacity = 0; setTimeout(() => { f.textContent = par[0]; d.textContent = par[1]; f.style.opacity = 1; }, 200); } }
+
+function medidor(pct, izq, der, ok){
+  const m = document.getElementById("medidor"); if (!m) return;
+  m.style.display = pct == null ? "none" : "";
+  if (pct == null) return;
+  const b = document.getElementById("barra"); b.classList.toggle("ok", !!ok);
+  b.firstElementChild.style.width = Math.round(pct * 100) + "%";
+  document.getElementById("izq").innerHTML = izq; document.getElementById("der").innerHTML = der;
+}
+
+function tick(){
+  const s = actual; if (!s || s.estado === "rechazado") return;
+  const caja = document.getElementById("escena"); if (!caja) return;
+  const delivery = s.modo === "delivery";
+  const estado = s.estado;
+  if (escenaDe !== estado) { caja.innerHTML = ESC[estado] ? ESC[estado]() : ""; escenaDe = estado; }
+  vuelta++;
+
+  if (estado === "nuevo") {   // @@BREAK: si el negocio está en break, se le avisa al cliente
+    textos(PAUSA && PAUSA.hasta > Date.now() ? [TEXTOS.nuevo[0], "Estamos en break 🍽️ Lo confirmamos al volver, a las " + new Date(PAUSA.hasta).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" })] : TEXTOS.nuevo);
+    medidor(null); return;
+  }
+
+  if (estado === "preparando") {
+    const r = TEXTOS.preparando[Math.floor(vuelta / 5) % 3];
+    textos(r);
+    if (s.listoEn) {
+      const total = (s.minutos || 30) * 60000, falta = ms(s.listoEn) - Date.now();
+      const pct = Math.max(.03, Math.min(1, 1 - falta / total));
+      if (falta > 0) medidor(pct, "Listo en aprox.", `<b>${mmss(falta)}</b>`);
+      else medidor(.97, "Casi listo", "<b>Unos minutos más</b>");
+    } else medidor(null);
+    return;
+  }
+
+  if (estado === "listo") { textos(delivery ? TEXTOS.listoDelivery : TEXTOS.listoLlevar); medidor(1, "Preparado", "<b>✓</b>", true); return; }
+
+  if (estado === "en_camino") {
+    const viaje = (s.viaje || 20) * 60000, salio = ms(s.salio) || Date.now();
+    const pasado = Date.now() - salio, falta = viaje - pasado;
+    const pct = Math.max(.04, Math.min(.94, pasado / viaje));      // nunca llega a la casa hasta que marquen "Entregado"
+    const ruta = document.getElementById("ruta"), moto = document.getElementById("moto"), hecho = document.getElementById("hecho");
+    if (ruta && moto) {
+      const L = ruta.getTotalLength(), p = ruta.getPointAtLength(L * pct);
+      moto.setAttribute("transform", `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`);
+      hecho.setAttribute("stroke-dasharray", `${(L * pct).toFixed(1)} 999`);
+    }
+    textos(TEXTOS.en_camino[pct < .35 ? 0 : pct < .75 ? 1 : 2]);
+    medidor(pct, "Llega en aprox.", falta > 60000 ? `<b>${Math.ceil(falta / 60000)} min</b>` : "<b>Ya casi</b>");
+    return;
+  }
+
+  if (estado === "entregado") { textos(TEXTOS.entregado); medidor(null); }
+}
+setInterval(tick, 1000);
+
+
+/* =========================================================
+   @@CHAT — sala de espera: el cliente escribe al negocio sin salir de la página
+   (preguntas, algo extra, foto del comprobante de transferencia). El negocio contesta desde el panel.
+   ========================================================= */
+const ICO_CLIP = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>';
+const ICO_ENVIAR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1.1L4 11l9 1-9 1-2 6.3a1 1 0 0 0 1.4 1.1z"/></svg>';
+let chatMsjs = [], chatEnviar = null, chatListo = false;
+const vistoKey = "chat-visto-" + (id || "demo");
+const horaMsj = m => { const t = ms(m.creado) || Date.now(); return new Date(t).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" }); };
+function montarChat(){
+  if (chatListo || (!id && !demo)) return; chatListo = true;
+  document.body.insertAdjacentHTML("beforeend", `
+    <button class="chat-boton" data-chat>💬 Chat con Jireh <span class="n" id="chat-n"></span></button>
+    <div class="chat-fondo" data-chat-cerrar></div>
+    <section class="chat-hoja" aria-label="Chat con Jireh Sushi">
+      <div class="chat-cab"><img src="fotos/logo.png" alt=""><div><b>Chat con Jireh Sushi</b><small>Te respondemos aquí mismo</small></div><button data-chat-cerrar aria-label="Cerrar">×</button></div>
+      <div class="chat-msjs" id="chat-msjs"></div>
+      <div class="chat-rapido">
+        <button data-rapido="ubicacion">📍 Mi ubicación</button>
+        <button data-rapido="foto">📎 Enviar comprobante</button>
+        <button data-rapido="¿Cuánto le falta a mi pedido?">¿Cuánto falta?</button>
+        <button data-rapido="Quisiera agregar algo a mi pedido: ">Agregar algo</button>
+      </div>
+      <form class="chat-escribir" id="chat-form" onsubmit="return false">
+        <button type="button" class="redondo adjuntar" data-rapido="foto" aria-label="Adjuntar foto">${ICO_CLIP}</button>
+        <input type="text" id="chat-txt" placeholder="Escribe tu mensaje…" maxlength="1000" autocomplete="off">
+        <button type="submit" class="redondo enviar" aria-label="Enviar">${ICO_ENVIAR}</button>
+      </form>
+      <input type="file" id="chat-foto" accept="image/*" hidden>
+      <a class="chat-wa" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}" target="_blank" rel="noopener">¿Prefieres WhatsApp? Escríbenos allá</a>
+    </section>`);
+  document.getElementById("chat-form").addEventListener("submit", e => { e.preventDefault(); mandarTexto(); });
+  document.getElementById("chat-foto").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) mandarFoto(f); });
+  pintarChat();
+}
+function abrirChat(){ document.body.classList.add("chat-abierto"); marcarVisto(); setTimeout(() => { const c = document.getElementById("chat-msjs"); c.scrollTop = c.scrollHeight; }, 50); }
+function cerrarChat(){ document.body.classList.remove("chat-abierto"); }
+function marcarVisto(){ try { localStorage.setItem(vistoKey, String(chatMsjs.filter(m => m.de === "negocio").length)); } catch(e) {} pintarBadge(); }
+function pintarBadge(){
+  const n = document.getElementById("chat-n"); if (!n) return;
+  let visto = 0; try { visto = +localStorage.getItem(vistoKey) || 0; } catch(e) {}
+  const nuevos = chatMsjs.filter(m => m.de === "negocio").length - visto;
+  n.textContent = nuevos > 0 && !document.body.classList.contains("chat-abierto") ? nuevos : "";
+}
+function pintarChat(){
+  const c = document.getElementById("chat-msjs"); if (!c) return;
+  const abajo = c.scrollHeight - c.scrollTop - c.clientHeight < 80;
+  c.innerHTML = chatMsjs.length ? chatMsjs.map(m => `<div class="msj ${m.de === "negocio" ? "negocio" : "cliente"}">${m.foto ? `<img src="${esc(m.foto)}" alt="Foto enviada">` : ""}${esc(m.texto).replace(/(https:\/\/www\.google\.com\/maps\/\?q=[-\d.,]+)/, '<a href="$1" target="_blank" rel="noopener" style="color:inherit">ver mapa</a>')}<small>${m.de === "negocio" ? "Jireh Sushi · " : ""}${horaMsj(m)}</small></div>`).join("")
+    : `<div class="chat-vacio">Escríbenos si tienes alguna pregunta o quieres agregar algo.<br>${actual && actual.pago === "Transferencia" ? "<b>Envía aquí la foto del comprobante de tu transferencia.</b>" : ""}</div>`;
+  if (abajo || document.body.classList.contains("chat-abierto")) c.scrollTop = c.scrollHeight;
+  if (document.body.classList.contains("chat-abierto")) marcarVisto(); else pintarBadge();
+}
+async function mandarTexto(){
+  const i = document.getElementById("chat-txt"), t = i.value.trim(); if (!t) return;
+  i.value = "";
+  try { await chatEnviar(t, null); } catch(e) { i.value = t; alert("No se pudo enviar. Revisa tu internet."); }
+}
+function reducirFoto(f){
+  return new Promise((ok, no) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      let w = img.width, h = img.height, max = 1100; const k = Math.min(1, max / Math.max(w, h)); w = Math.round(w * k); h = Math.round(h * k);
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      let q = .72, d = cv.toDataURL("image/jpeg", q);
+      while (d.length > 850000 && q > .3) { q -= .12; d = cv.toDataURL("image/jpeg", q); }
+      URL.revokeObjectURL(url); ok(d);
+    };
+    img.onerror = no; img.src = url;
+  });
+}
+async function mandarFoto(f){
+  try { const d = await reducirFoto(f); await chatEnviar(actual && actual.pago === "Transferencia" ? "Comprobante de transferencia" : "Foto", d); }
+  catch(e) { alert("No se pudo enviar la foto. Prueba otra vez."); }
+}
+/* 📍 Mi ubicación: manda un enlace de Google Maps con el punto exacto; el panel calcula el delivery con él */
+function mandarUbicacion(btn){
+  if (!navigator.geolocation) return alert("Tu teléfono no permite compartir la ubicación desde aquí.");
+  const t = btn.textContent; btn.textContent = "Buscando…";
+  navigator.geolocation.getCurrentPosition(async pos => {
+    btn.textContent = t;
+    const q = pos.coords.latitude.toFixed(6) + "," + pos.coords.longitude.toFixed(6);
+    try { await chatEnviar("📍 Mi ubicación: https://www.google.com/maps/?q=" + q, null); } catch(e) { alert("No se pudo enviar. Revisa tu internet."); }
+  }, err => {
+    btn.textContent = t;
+    alert(err && err.code === 1 ? "Activa la ubicación y permite el acceso para esta página, luego toca otra vez." : "No pudimos obtener tu ubicación. Enciende el GPS y prueba otra vez.");
+  }, { enableHighAccuracy: true, timeout: 15000 });
+}
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-chat]")) return abrirChat();
+  if (e.target.closest("[data-chat-cerrar]")) return cerrarChat();
+  const r = e.target.closest("[data-rapido]");
+  if (r) {
+    if (r.dataset.rapido === "foto") return document.getElementById("chat-foto").click();
+    if (r.dataset.rapido === "ubicacion") return mandarUbicacion(r); const i = document.getElementById("chat-txt"); i.value = r.dataset.rapido; i.focus(); }
+});
+
+/* ---------- Demo o Firebase ---------- */
+const demo = q.get("demo");
+if (demo) {
+  chatEnviar = async (t, f) => { chatMsjs.push({ de: "cliente", texto: t, foto: f, creado: Date.now() }); pintarChat(); };
+  setTimeout(() => { chatMsjs.push({ de: "negocio", texto: "¡Hola María! Ya estamos preparando tu pedido 🍣", creado: Date.now() }); montarChat(); pintarChat(); }, 300);
+  const base = { codigo: "SAGRADO-7", nombre: "María", modo: "delivery", pago: "Transferencia" };
+  const de = e => ({ ...base, estado: e, minutos: 25, listoEn: Date.now() + (e === "preparando" ? 14 * 60000 : 0), salio: Date.now() - 7 * 60000, viaje: 18 });
+  if (demo === "todo") {
+    const lista = ["nuevo", "preparando", "listo", "en_camino", "entregado"]; let i = 0;
+    const sig = () => { const s = de(lista[i]); if (s.estado === "en_camino") { s.salio = Date.now(); s.viaje = .1; } pintar(s); i = (i + 1) % lista.length; };
+    sig(); setInterval(sig, 6000);
+  } else pintar(de(demo));
+} else if (!id) pintar(null);
+else import("./fb.js").then(({ escucharSeguimiento, escucharDisponibilidad, escucharChat, enviarMensaje }) => {
+  escucharSeguimiento(id, s => { pintar(s); if (s) montarChat(); }, () => pintar(null));
+  chatEnviar = (t, f) => enviarMensaje(id, "cliente", t, f);
+  escucharChat(id, l => { if (l) { chatMsjs = l; pintarChat(); } });
+  escucharDisponibilidad((l, c) => { PAUSA = c && c.pausa ? c.pausa : null; });
+}).catch(() => pintar(null));
+</script>
+</body>
+</html>

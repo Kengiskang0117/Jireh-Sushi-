@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panel en vivo · Jireh Sushi</title>
+<link rel="icon" type="image/png" sizes="64x64" href="fotos/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="fotos/icono-180.png">
+<meta name="theme-color" content="#0B0B0C">
+<link rel="manifest" href="panel.webmanifest">
+<!--
+  =========================================================
+  PANEL EN VIVO (para el negocio) · Kenmake Soluciones
+  ---------------------------------------------------------
+  - Los pedidos del menú entran solos (Firebase), con sonido.
+  - Se entra con correo y contraseña (los crea Kengis en la consola de Firebase).
+  - Pensado para el celular de la cocina: queda abierto y la pantalla no se apaga.
+  - Si algún día falla internet, el panel viejo de "pegar pedido" sigue en menu/aviso.html.
+
+  Para cambiar algo, busca con Ctrl+F:
+  @@DELIVERYS     Correos de los delivery: entran a una pantalla solo de entregas
+  @@AGOTADOS      Botón "Agotados": marcar lo que no hay hoy (los productos salen solos del menú)
+  @@MINUTOS       Opciones del tiempo de preparación (máximo 50)
+  @@AVISOS-WHATSAPP  Abrir o no WhatsApp en cada paso (apagado: todo en la app)
+  @@MENSAJES      Mensajes que se le mandan al cliente por WhatsApp
+  @@DELIVERY-MSG  Mensaje para el grupo de delivery
+  @@SONIDO        Sonido de pedido nuevo
+  @@COLORES       Colores
+  =========================================================
+-->
+<style>
+/* @@COLORES */
+:root{--fondo:#0E0E0E;--tarjeta:#1A1A1A;--borde:#2E2E2E;--rojo:#E3121B;--rojo-claro:#FF4D55;--texto:#F4F1EC;--suave:#A9A39A;--verde:#1E7A45;--verde-claro:#7BE3A0;--amarillo:#FFD27A}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(120% 60% at 50% 0%,#2A0E10 0%,var(--fondo) 55%);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;font-size:17px}
+.caja{max-width:620px;margin:0 auto;padding:16px 14px 60px}
+.cab{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.cab img{width:50px;height:50px;border-radius:50%;background:#0B0B0B;border:2px solid var(--rojo);object-fit:cover}
+.cab h1{margin:0;font-size:22px}
+.cab small{display:flex;align-items:center;gap:6px;color:var(--suave);font-size:14px}
+.punto{width:9px;height:9px;border-radius:50%;background:#666}
+.punto.on{background:#2FD47A;box-shadow:0 0 0 4px rgba(47,212,122,.18)}
+.cab button{margin-left:auto}
+button{font:inherit;cursor:pointer}
+.chico{background:transparent;border:1px solid var(--borde);color:var(--suave);border-radius:12px;padding:8px 12px;font-size:14px}
+.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.resumen div{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:12px}
+.resumen b{display:block;font-size:24px;color:var(--rojo-claro)}
+.resumen small{color:var(--suave);font-size:13px}
+.filtros{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px}
+.filtros button{flex:none;height:42px;padding:0 14px;border-radius:999px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:15px;font-weight:700}
+.filtros button.activo{background:var(--rojo);border-color:var(--rojo)}
+.filtros .n{display:inline-block;min-width:22px;margin-left:6px;padding:1px 6px;border-radius:999px;background:rgba(255,255,255,.18);font-size:13px}
+.pedido{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px;border-radius:16px;background:var(--tarjeta);border:1px solid var(--borde);color:inherit;margin-bottom:10px}
+.pedido.nuevo{border-color:var(--rojo);background:#2A0E10;animation:latir 1.4s ease-in-out infinite}
+@keyframes latir{50%{box-shadow:0 0 0 6px rgba(227,18,27,.25)}}
+.pedido .num{font-weight:800;font-size:18px;min-width:68px}
+.pedido .info{flex:1;min-width:0}
+.pedido .info b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pedido .info small{color:var(--suave);font-size:14px}
+.pedido .tiempo{display:block;margin-top:2px;font-size:13px;font-weight:800;color:var(--amarillo);font-variant-numeric:tabular-nums}
+.est{flex:none;font-size:12px;font-weight:800;padding:5px 10px;border-radius:999px;background:#222;color:var(--suave);text-transform:uppercase;letter-spacing:.04em}
+.est.nuevo{background:var(--rojo);color:#fff}.est.preparando{background:#3A2A0A;color:var(--amarillo)}
+.est.listo,.est.en_camino{background:#0F2A3A;color:#8FD3FF}.est.entregado{background:#132219;color:var(--verde-claro)}.est.rechazado{background:#222;color:#888}
+.vacio{text-align:center;color:var(--suave);padding:40px 10px;line-height:1.6}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:18px;padding:16px;margin-bottom:14px}
+.fila{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:16px}
+.fila span:first-child{color:var(--suave)}
+.fila span:last-child{text-align:right;font-weight:600}
+.total{font-size:24px;font-weight:800;color:var(--rojo-claro)}
+.items{margin:8px 0 4px;padding-left:20px;font-size:16px;line-height:1.5}
+.items li{margin-bottom:6px}
+.items small{display:block;color:var(--suave);font-size:14px}
+.items small.cambio{color:var(--amarillo);font-weight:700}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);margin:20px 0 10px}
+.botones{display:flex;flex-direction:column;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:58px;padding:0 16px;border-radius:16px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:17px;font-weight:700;text-decoration:none}
+.btn.rojo{background:var(--rojo);border-color:var(--rojo)}
+.btn.verde{background:var(--verde);border-color:var(--verde)}
+.btn.borde{background:transparent}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.minutos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.minutos button{height:52px;border-radius:12px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:17px;font-weight:700}
+.minutos button.activo{background:var(--rojo);border-color:var(--rojo)}
+.reloj{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#2A0E10;border:1px solid #5E1A1E;margin-bottom:14px}
+.reloj b{font-size:34px;font-variant-numeric:tabular-nums}
+.reloj small{display:block;color:#FFB4B8;font-size:14px}
+.reloj.tarde{background:#3A0A0A;border-color:var(--rojo)}
+.volver{background:none;border:0;color:var(--rojo-claro);font-weight:700;font-size:16px;padding:6px 0;margin-bottom:8px}
+.login{max-width:380px;margin:12vh auto 0;text-align:center}
+.login img{width:96px;height:96px;border-radius:50%;border:2px solid var(--rojo);background:#0B0B0B}
+.login h1{font-size:24px;margin:14px 0 4px}
+.login p{color:var(--suave);margin:0 0 20px}
+label{display:block;text-align:left;font-size:14px;color:var(--suave);margin:12px 0 6px}
+input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:0 14px}
+.error{color:#FF8A8F;min-height:22px;font-size:15px;margin:10px 0}
+.aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#1E7A45;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;transition:transform .25s;z-index:20;max-width:90vw;text-align:center}
+.aviso.ver{transform:translateX(-50%) translateY(0)}
+.sonido{background:#3A2A0A;border:1px solid #6A4E14;color:var(--amarillo);border-radius:14px;padding:12px 14px;margin-bottom:12px;font-weight:700;width:100%}
+/* @@BREAK-ESTILO y @@MINUTOS-EXTRA */
+.herramientas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:-4px 0 14px}
+.herramientas .chico{padding:11px 12px;font-size:15px;font-weight:700;color:var(--texto)}
+.chico.on{background:#3A2A08;border-color:#8A6A1A;color:#FFD27A}
+.banda-break{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:16px;background:#3A2A08;border:1px solid #8A6A1A;color:#FFD27A;margin-bottom:14px}
+.banda-break b{display:block;font-size:17px}.banda-break small{color:#E9C98A;font-size:13.5px}
+.banda-break button{border:1px solid #8A6A1A;background:#1A1405;color:#FFD27A;border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px}
+.extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.extra span{color:var(--suave);font-size:14px;margin-right:4px}
+.extra button{border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:12px;padding:10px 14px;font-weight:800;font-size:15px}
+/* @@CHAT-ESTILO y @@ARCHIVAR */
+.pchat{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}
+.pm{max-width:82%;padding:9px 12px;border-radius:14px;font-size:15px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.pm.cliente{align-self:flex-start;background:#26262A;border-bottom-left-radius:4px}
+.pm.negocio{align-self:flex-end;background:var(--rojo);color:#fff;border-bottom-right-radius:4px}
+.pm img{display:block;max-width:220px;border-radius:10px;margin-bottom:4px}
+.pm small{display:block;font-size:11px;opacity:.7;margin-top:3px}
+.pvacio{color:var(--suave);font-size:14px;text-align:center;padding:10px}
+.pchat-rapido{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px}
+.pchat-rapido button{flex:none;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:999px;padding:8px 12px;font-size:13.5px}
+.pchat-escribir{display:flex;gap:8px;margin-top:6px}
+.pchat-escribir input{flex:1;min-width:0;margin:0}
+.pchat-escribir .btn{width:auto;padding:0 18px}
+.nmsj{display:inline-block;align-self:flex-start;background:var(--rojo);color:#fff;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800;margin:3px 0}
+.nprueba{display:inline-block;background:#333;color:#bbb;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px}
+/* @@LOGIN-ESTILO */
+.check-recordar{display:flex;align-items:center;gap:10px;margin:12px 0 4px;color:var(--suave);font-size:14.5px}
+.check-recordar input{width:20px;height:20px;margin:0;accent-color:var(--rojo)}
+.cuentas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.cuenta{border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);border-radius:999px;padding:10px 14px;font-size:15px;font-weight:700}
+.cuenta.sel{border-color:var(--rojo);background:#2A1214}
+.clave-caja{position:relative}
+.clave-caja input{padding-right:54px}
+.ojito{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:transparent;color:var(--suave);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ojito:hover{color:var(--texto)}
+/* @@AGOTADOS-ESTILO */
+.lista-p{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;overflow:hidden;margin-bottom:8px}
+.fila-p{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 14px;border-bottom:1px solid var(--borde)}
+.fila-p:last-child{border-bottom:0}
+.fila-p span{font-size:16px}
+.fila-p.off span{color:var(--suave);text-decoration:line-through}
+.sw{flex:none;min-width:118px;height:42px;border-radius:999px;border:1px solid #2C5A3C;background:#132219;color:var(--verde-claro);font-weight:800;font-size:14px}
+.sw.off{background:var(--rojo);border-color:var(--rojo);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.chips button{border:0;border-radius:999px;background:var(--rojo);color:#fff;font-weight:700;font-size:14px;padding:8px 12px}
+.ayuda{color:var(--suave);font-size:14px;line-height:1.5;margin:0 0 12px}
+textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:12px}
+</style>
+</head>
+<body>
+<div class="caja" id="app"><p class="vacio">Cargando…</p></div>
+<div class="aviso" id="aviso" role="status" aria-live="polite"></div>
+
+<script type="module">
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, guardarBreak, escucharChat, enviarMensaje } from "./fb.js";
+
+const NEGOCIO = { nombre: "Jireh Sushi" };
+/* @@DELIVERYS — correos de los repartidores (en minúscula). Al entrar con uno de estos,
+   el panel muestra SOLO las entregas: pedidos de delivery listos para salir, en camino y entregados.
+   Para agregar otro delivery: créalo en Firebase → Authentication y pon su correo aquí, separado por coma. */
+const DELIVERYS = ["delivery@jirehsushi.com"];
+/* @@AVISOS-WHATSAPP — false = todo se queda en la app: el panel NO abre WhatsApp en cada paso
+   (aceptar, listo, en camino, rechazar, pago). El cliente ve cada cambio en vivo en "Ver mi pedido".
+   Para hablar con un cliente (retraso, pregunta) están los botones 💬 WhatsApp y 📞 Llamar.
+   true = vuelve a abrir WhatsApp con el mensaje listo en cada paso. */
+const AVISOS_WA = false;
+/* @@MINUTOS */
+const MINUTOS = [10, 15, 20, 25, 30, 35, 40, 50];
+/* @@MENSAJES — {nombre}, {id}, {min} y {enlace} se rellenan solos */
+const MSG = {
+  aceptado: "¡Hola {nombre}! 🍣 Recibimos tu pedido #{id}. Estará listo en aproximadamente {min} minutos.\n\n⏱️ Síguelo en vivo aquí: {enlace}",
+  listoLlevar: "¡{nombre}, tu pedido #{id} está listo! 🙌 Puedes pasar a buscarlo.",
+  enCamino: "¡{nombre}, tu pedido #{id} va en camino! 🛵",
+  pago: "¡Gracias {nombre}! Recibimos tu pago del pedido #{id} ✅",
+  gracias: "¡Gracias por tu compra, {nombre}! Esperamos que lo disfrutes 🍣 ¡Te esperamos pronto en Jireh Sushi!",
+  rechazado: "Hola {nombre}, lo sentimos mucho: no podemos preparar tu pedido #{id} en este momento. {motivo}"
+};
+const ESTADOS = { nuevo: "Nuevo", preparando: "En cocina", listo: "Listo", en_camino: "En camino", entregado: "Entregado", rechazado: "Rechazado" };
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const dinero = n => "RD$ " + Number(n || 0).toLocaleString("en-US");
+const ms = t => t && t.toMillis ? t.toMillis() : (t || 0);
+const hora = t => ms(t) ? new Date(ms(t)).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" }) : "";
+const mmss = x => { const s = Math.max(0, Math.round(x / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+function avisar(t){ const a = $("#aviso"); a.textContent = t; a.classList.add("ver"); clearTimeout(avisar.t); avisar.t = setTimeout(() => a.classList.remove("ver"), 2400); }
+function telWA(t){ let n = String(t).replace(/\D/g, ""); if (n.length === 10) n = "1" + n; return n; }
+// Abre WhatsApp en otra pestaña para que el panel siga abierto y escuchando pedidos
+function abrirWA(numero, texto){
+  const movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = `${movil ? "https://api.whatsapp.com/send" : "https://web.whatsapp.com/send"}?${numero ? "phone=" + numero + "&" : ""}text=${encodeURIComponent(texto)}`;
+  if (!window.open(url, "_blank")) location.href = url;
+}
+const enlaceSeguimiento = id => new URL("pedido.html?id=" + encodeURIComponent(id), location.href).href;
+const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").split(/\s+/)[0]).replace(/\{id\}/g, p.codigo)
+  .replace(/\{min\}/g, extra.min ?? p.minutos ?? "").replace(/\{enlace\}/g, enlaceSeguimiento(p.id)).replace(/\{motivo\}/g, extra.motivo || "");
+
+/* ---------- Estado de la pantalla ---------- */
+let rol = "cocina", usuarioActual = "", pausa = null, eligiendoBreak = false;
+const enBreak = () => !!(pausa && pausa.hasta > Date.now());
+const horaCorta = t => new Date(t).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" });
+const MINUTOS_EXTRA = [5, 10, 15];
+/* @@DELIVERY-MANUAL: para pedidos sin ubicación. Mismos datos que el menú. */
+const LOCAL = { lat: 18.5253433, lng: -69.8228972 }, POR_KM = 30, MINIMO = 50, FACTOR = 1.3;
+const OPCIONES_DELIVERY = [50, 100, 150, 200, 250];
+function kmHasta(pt){ const R = 6371, r = x => x * Math.PI / 180, dLa = r(pt.lat - LOCAL.lat), dLo = r(pt.lng - LOCAL.lng);
+  const h = Math.sin(dLa/2) ** 2 + Math.cos(r(LOCAL.lat)) * Math.cos(r(pt.lat)) * Math.sin(dLo/2) ** 2; return Math.max(1, Math.ceil(2 * R * Math.asin(Math.sqrt(h)) * FACTOR)); }
+function ubicDelChat(id){   // última ubicación que el cliente mandó por el chat (botón "Mi ubicación")
+  const m = (chats[id] || []).filter(x => x.de === "cliente").map(x => /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/.exec(x.texto || "")).filter(Boolean).pop();
+  return m ? { lat: +m[1], lng: +m[2] } : null;
+}        // @@MINUTOS-EXTRA  botones para dar más tiempo a un pedido en cocina
+const MINUTOS_BREAK = [15, 30, 45, 60];   // @@BREAK  duración del break
+let vista = "pedidos", agotados = new Set(), catalogo = null, buscarAg = "", seguroTodo = false;
+let pedidos = [], filtro = "activos", abierto = null, minutosSel = 20, conectado = false, vistos = new Set(), primeraCarga = true;
+
+/* ---------- @@SONIDO: campanita con el navegador (sin archivos) ---------- */
+let audio = null, sonidoListo = false;
+function activarSonido(){ try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); sonidoListo = true; } catch(e) {} }
+
+/* ---------- @@AVISOS: notificaciones del sistema (suenan y vibran aunque la pantalla del panel no esté al frente) ----------
+   Se activan con el botón amarillo (el navegador pide permiso una vez). Funcionan mientras el panel siga abierto
+   en el celular, aunque esté detrás de otra app. Si se cierra el panel por completo, no llegan. */
+let registro = null;
+async function prepararAvisos(){
+  try {
+    if ("serviceWorker" in navigator && !registro) registro = await navigator.serviceWorker.register("sw.js");
+    if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+  } catch(e) { console.warn("avisos", e); }
+  pintar();
+}
+const avisosOK = () => "Notification" in window && Notification.permission === "granted";
+function notificar(titulo, cuerpo, tag){
+  if (!avisosOK()) return;
+  const op = { body: cuerpo, tag: tag || titulo, renotify: true, requireInteraction: true, vibrate: [300, 120, 300, 120, 300], icon: "fotos/icono-192.png", badge: "fotos/icono-192.png" };
+  try { (registro ? registro.showNotification(titulo, op) : Promise.reject()).catch(() => new Notification(titulo, op)); } catch(e) {}
+}
+function campana(){
+  if (!audio) return;
+  const t = audio.currentTime;
+  [[880, 0], [1175, .18], [1568, .36]].forEach(([f, d]) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(0, t + d); g.gain.linearRampToValueAtTime(.35, t + d + .02); g.gain.exponentialRampToValueAtTime(.001, t + d + .6);
+    o.start(t + d); o.stop(t + d + .65);
+  });
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+// Mientras haya pedidos nuevos sin aceptar, la campana suena cada 20 segundos
+setInterval(() => {
+  if (rol === "delivery" ? pedidos.some(p => p.modo === "delivery" && p.estado === "listo") : pedidos.some(p => p.estado === "nuevo")) campana();
+}, rol === "delivery" ? 30000 : 20000);
+
+/* ---------- Pantalla siempre encendida ---------- */
+let wake = null;
+async function pantallaEncendida(){ try { if ("wakeLock" in navigator && document.visibilityState === "visible") wake = await navigator.wakeLock.request("screen"); } catch(e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pantallaEncendida(); });
+
+/* ---------- Inicio de sesión ---------- */
+const ICONO_OJO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>', ICONO_OJO_CERRADO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.9 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+/* @@LOGIN: recuerda las cuentas usadas en este celular y tiene "ojito" para ver la contraseña */
+const cuentasGuardadas = () => { try { return JSON.parse(localStorage.getItem("panel-cuentas") || "[]"); } catch(e) { return []; } };
+function recordarCuenta(correo){
+  const l = [correo, ...cuentasGuardadas().filter(c => c !== correo)].slice(0, 4);
+  try { localStorage.setItem("panel-cuentas", JSON.stringify(l)); } catch(e) {}
+}
+/* @@RECORDAR-CLAVE: guarda la contraseña SOLO en este celular (si la casilla está marcada) para no escribirla otra vez.
+   No viaja a ningún lado. Si se pierde o se presta el celular, se cambia la contraseña en Firebase. */
+const claves = () => { try { return JSON.parse(localStorage.getItem("panel-claves") || "{}"); } catch(e) { return {}; } };
+const claveDe = c => { const v = claves()[c]; try { return v ? decodeURIComponent(escape(atob(v))) : ""; } catch(e) { return ""; } };
+function guardarClave(correo, clave, si){
+  const k = claves(); if (si) k[correo] = btoa(unescape(encodeURIComponent(clave))); else delete k[correo];
+  try { localStorage.setItem("panel-claves", JSON.stringify(k)); } catch(e) {}
+  if (si && window.PasswordCredential) try { navigator.credentials.store(new PasswordCredential({ id: correo, password: clave })).catch(() => {}); } catch(e) {}
+}
+function pintarLogin(error = "", correoPrevio = ""){
+  const cuentas = cuentasGuardadas();
+  const correo = correoPrevio || cuentas[0] || "";
+  $("#app").innerHTML = `<form class="login" id="form-login">
+    <img src="fotos/logo.png" alt="Jireh Sushi">
+    <h1>Panel de pedidos</h1><p>Entra con el usuario del negocio</p>
+    ${cuentas.length ? `<label>Cuentas en este celular</label><div class="cuentas">${cuentas.map(c => `<button type="button" class="cuenta${c === correo ? " sel" : ""}" data-cuenta="${esc(c)}">${esc(c.split("@")[0])}</button>`).join("")}</div>` : ""}
+    <label for="correo">Correo</label><input id="correo" name="username" type="email" autocomplete="username" required value="${esc(correo)}">
+    <label for="clave">Contraseña</label>
+    <div class="clave-caja"><input id="clave" name="password" type="password" autocomplete="current-password" required value="${esc(claveDe(correo))}">
+      <button type="button" class="ojito" id="ojito" aria-label="Mostrar contraseña">${ICONO_OJO}</button></div>
+    <label class="check-recordar"><input type="checkbox" id="recordar" checked> Recordar correo y contraseña en este celular</label>
+    <div class="error">${esc(error)}</div>
+    <button class="btn rojo" type="submit">Entrar</button>
+  </form>`;
+  if (correo) $("#clave").focus(); else $("#correo").focus();
+  $("#form-login").addEventListener("click", e => {
+    const c = e.target.closest("[data-cuenta]");
+    if (c) { $("#correo").value = c.dataset.cuenta; document.querySelectorAll(".cuenta").forEach(x => x.classList.toggle("sel", x === c)); $("#clave").value = claveDe(c.dataset.cuenta); $("#clave").focus(); }
+    if (e.target.closest("#ojito")) {
+      const k = $("#clave"), ver = k.type === "password";
+      k.type = ver ? "text" : "password"; $("#ojito").innerHTML = ver ? ICONO_OJO_CERRADO : ICONO_OJO;
+      $("#ojito").setAttribute("aria-label", ver ? "Ocultar contraseña" : "Mostrar contraseña"); k.focus();
+    }
+  });
+  $("#form-login").addEventListener("submit", async e => {
+    e.preventDefault(); activarSonido();
+    const b = e.target.querySelector("button[type=submit]"); b.disabled = true; b.textContent = "Entrando…";
+    const correo = $("#correo").value.trim().toLowerCase();
+    const clave = $("#clave").value, si = $("#recordar").checked;
+    try { await entrar(correo, clave); recordarCuenta(correo); guardarClave(correo, clave, si); }
+    catch (err) { guardarClave(correo, "", false); pintarLogin("Correo o contraseña incorrectos.", correo); }
+  });
+}
+
+let dejarDeEscuchar = null;
+alCambiarSesion(usuario => {
+  if (dejarDeEscuchar) { dejarDeEscuchar(); dejarDeEscuchar = null; }
+  if (!usuario) { pedidos = []; Object.values(chatsOff).forEach(f => f()); chatsOff = {}; chats = {}; pintarLogin(); return; }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { registro = r; }).catch(() => {});
+  usuarioActual = (usuario.email || "").toLowerCase();
+  rol = DELIVERYS.map(x => x.trim().toLowerCase()).includes(usuarioActual) ? "delivery" : "cocina";
+  vista = "pedidos"; abierto = null;
+  let listosAntes = null;
+  pantallaEncendida();
+  primeraCarga = true;
+  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; if (rol !== "delivery") pintar(); });
+  dejarDeEscuchar = escucharPedidosDeHoy((lista, nuevos) => {
+    conectado = true;
+    pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
+    if (rol === "delivery") {   // al delivery le suena cuando un pedido queda listo para salir
+      const listos = new Set(pedidos.filter(p => p.modo === "delivery" && p.estado === "listo").map(p => p.id));
+      if (listosAntes && [...listos].some(id => !listosAntes.has(id))) { campana(); avisar("🛵 ¡Pedido listo para salir!"); notificar("🛵 Pedido listo para salir", "Ábrelo en Entregas de hoy", "listo"); }
+      listosAntes = listos;
+    } else if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); nuevos.forEach(n => notificar(`🔔 Pedido nuevo #${n.codigo || ""}`, `${n.nombre || ""} · ${n.modo === "delivery" ? "Delivery" : "Para llevar"} · ${dinero(n.total)}`, "p-" + n.id)); }
+    escucharChats();
+    primeraCarga = false;
+    pintar();
+  }, err => { conectado = false; console.error(err); avisar("Sin conexión con los pedidos. Revisa el internet."); pintar(); });
+});
+
+/* ---------- @@CHAT: mensajes de los clientes (sala de espera) ---------- */
+let chats = {}, chatsOff = {}, chatsCargados = {};
+const vistoChat = id => { try { return +localStorage.getItem("pchat-" + id) || 0; } catch(e) { return 0; } };
+const marcarChat = id => { try { localStorage.setItem("pchat-" + id, String((chats[id] || []).filter(m => m.de === "cliente").length)); } catch(e) {} };
+const sinLeer = id => Math.max(0, (chats[id] || []).filter(m => m.de === "cliente").length - vistoChat(id));
+function escucharChats(){
+  if (rol === "delivery") return;
+  pedidos.filter(p => !p.archivado).forEach(p => {
+    if (chatsOff[p.id]) return;
+    chatsOff[p.id] = escucharChat(p.id, lista => {
+      if (!lista) return;
+      const antes = (chats[p.id] || []).filter(m => m.de === "cliente").length;
+      chats[p.id] = lista;
+      const ahora = lista.filter(m => m.de === "cliente").length;
+      if (chatsCargados[p.id] && ahora > antes) {
+        const u = lista.filter(m => m.de === "cliente").pop();
+        campana(); avisar(`💬 Mensaje de ${p.nombre} (#${p.codigo})`);
+        notificar(`💬 #${p.codigo} · ${p.nombre}`, u.foto ? "📷 Envió una foto" + (u.texto ? ": " + u.texto : "") : u.texto, "c-" + p.id);
+      }
+      chatsCargados[p.id] = true;
+      if (abierto === p.id) marcarChat(p.id);
+      pintar();
+    });
+  });
+}
+function chatHTML(p){
+  const l = chats[p.id] || [];
+  return `<h2>💬 Chat con ${esc(p.nombre.split(" ")[0])}</h2>
+    <div class="pchat" id="pchat">${l.length ? l.map(m => `<div class="pm ${m.de}">${m.foto ? `<a href="${esc(m.foto)}" target="_blank" rel="noopener"><img src="${esc(m.foto)}" alt="Foto"></a>` : ""}${esc(m.texto).replace(/(https:\/\/www\.google\.com\/maps\/\?q=[-\d.,]+)/, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">abrir en el mapa</a>')}<small>${hora(m.creado)}</small></div>`).join("")
+      : `<div class="pvacio">Aún no hay mensajes. Si el cliente escribe o manda el comprobante, aparece aquí con sonido.</div>`}</div>
+    <div class="pchat-rapido">${["¡Recibido! Ya lo estamos preparando 🍣", "Recibimos tu transferencia ✅", "Tu pedido va en camino 🛵", "¿Nos confirmas la dirección?"].map(t => `<button data-resp="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+    <div class="pchat-escribir"><input id="pchat-txt" type="text" placeholder="Escribe al cliente…" maxlength="1000"><button class="btn rojo" data-acc="chat-enviar">Enviar</button></div>`;
+}
+let editandoDelivery = null;
+function deliveryHTML(p){
+  const u = ubicDelChat(p.id) || (p.ubic && !p.ubic.aprox ? p.ubic : null);
+  const sug = u ? (() => { const km = kmHasta(u); return { km, costo: Math.max(MINIMO, km * POR_KM) }; })() : null;
+  return `<div class="tarjeta" style="border-color:#8A6A1A;margin-top:12px">
+    <h2 style="margin-top:0;color:var(--amarillo)">🛵 Poner precio del delivery</h2>
+    ${sug ? `<p class="ayuda">El cliente compartió su ubicación: aprox. <b>${sug.km} km</b> → <b>${dinero(sug.costo)}</b> (${dinero(POR_KM)} por km, mínimo ${dinero(MINIMO)}).</p>
+      <button class="btn verde" data-acc="fijar-delivery" data-monto="${sug.costo}" data-km="${sug.km}" style="margin-bottom:10px">✅ Cobrar ${dinero(sug.costo)} de delivery</button>`
+      : `<p class="ayuda">Este pedido llegó sin ubicación. Pídele que la mande por el chat (un toque) y aquí se calcula sola, o elige un precio.</p>
+      <button class="btn rojo" data-acc="pedir-ubicacion" style="margin-bottom:10px">📍 Pedir ubicación al cliente</button>`}
+    <div class="extra" style="margin:0">${OPCIONES_DELIVERY.map(m => `<button data-acc="fijar-delivery" data-monto="${m}">${dinero(m)}</button>`).join("")}</div>
+    <div class="pchat-escribir"><input id="delivery-otro" type="number" inputmode="numeric" placeholder="Otro monto (RD$)"><button class="btn borde" data-acc="fijar-delivery-otro">Poner</button></div>
+  </div>`;
+}
+function fijarDelivery(p, monto, km){
+  monto = Math.round(+monto); if (!(monto >= 0)) return;
+  const sub = p.subtotal != null ? p.subtotal : (p.total || 0);
+  const total = sub + monto, cambios = { delivery: monto, total, totalTexto: dinero(total) };
+  if (km) cambios.km = +km;
+  editandoDelivery = null;
+  cambiar(p, cambios, null, `Delivery ${dinero(monto)} · total ${dinero(total)}`);
+  responder(p, `El delivery a tu ubicación es ${dinero(monto)}. Total a pagar: ${dinero(total)}.${p.pago === "Transferencia" ? " Puedes transferir ese monto y mandarnos el comprobante por aquí." : ""}`);
+}
+async function responder(p, texto){
+  if (!texto.trim()) return;
+  try { await enviarMensaje(p.id, "negocio", texto.trim()); } catch(e) { avisar("No se pudo enviar. Revisa el internet."); }
+}
+
+/* ---------- Lista ---------- */
+/* @@ARCHIVAR: "archivado" = se quita de la vista pero se guarda y cuenta en las ventas. "prueba" = no cuenta en ventas. */
+const GRUPOS = {
+  activos: p => !p.archivado && ["nuevo", "preparando", "listo", "en_camino"].includes(p.estado),
+  nuevo: p => !p.archivado && p.estado === "nuevo",
+  preparando: p => !p.archivado && p.estado === "preparando",
+  salida: p => !p.archivado && ["listo", "en_camino"].includes(p.estado),
+  entregado: p => !p.archivado && ["entregado", "rechazado"].includes(p.estado),
+  archivados: p => !!p.archivado
+};
+function pintar(){
+  if (rol === "delivery") return pintarDelivery();
+  if (vista === "agotados") return pintarAgotados();
+  if (abierto) { const p = pedidos.find(x => x.id === abierto); if (p) return pintarPedido(p); abierto = null; }
+  const entregados = pedidos.filter(p => p.estado === "entregado" && !p.prueba);
+  const vendido = entregados.reduce((a, p) => a + (p.total || 0), 0);
+  const lista = pedidos.filter(GRUPOS[filtro]);
+  const cuenta = k => pedidos.filter(GRUPOS[k]).length;
+  $("#app").innerHTML = `
+    <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Pedidos de hoy</h1>
+      <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"}</small></div>
+      <button class="chico" data-acc="salir">Salir</button></div>
+    <div class="herramientas">
+      <button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>
+      <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button></div>
+    ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
+      : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}
+    ${sonidoListo && (avisosOK() || !("Notification" in window)) ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido y los avisos de pedidos nuevos</button>`}
+    <div class="resumen">
+      <div><b>${pedidos.filter(p => p.estado !== "rechazado" && !p.prueba).length}</b><small>Pedidos</small></div>
+      <div><b>${cuenta("activos")}</b><small>En curso</small></div>
+      <div><b style="font-size:19px">${dinero(vendido)}</b><small>Vendido (entregados)</small></div>
+    </div>
+    <div class="filtros">
+      ${[["activos","En curso"],["nuevo","Nuevos"],["preparando","En cocina"],["salida","Para salir"],["entregado","Terminados"],["archivados","Archivados"]]
+        .map(([k, t]) => `<button class="${filtro === k ? "activo" : ""}" data-filtro="${k}">${t}<span class="n">${cuenta(k)}</span></button>`).join("")}
+    </div>
+    ${lista.length ? lista.map(p => `
+      <button class="pedido ${p.estado === "nuevo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}">
+        <span class="num">#${esc(p.codigo)}</span>
+        <span class="info"><b>${esc(p.nombre)}${p.prueba ? ` <span class="nprueba">prueba</span>` : ""}</b>
+          ${sinLeer(p.id) ? `<span class="nmsj">💬 ${sinLeer(p.id)} ${sinLeer(p.id) > 1 ? "nuevos" : "nuevo"}</span>` : ""}
+          <small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)} · ${dinero(p.total)}</small>
+          ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}</span>
+        <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
+      </button>`).join("")
+      : ""}
+    ${filtro === "entregado" && lista.length ? `<button class="btn borde" data-acc="archivar-todos" style="margin-top:6px">🗂️ Archivar todos los terminados</button>` : ""}
+    ${filtro === "archivados" ? `<p class="ayuda" style="margin-top:8px">Los archivados no se ven en "En curso" ni "Terminados", pero se guardan y cuentan en las ventas del día (menos los marcados como prueba).</p>` : ""}
+    ${lista.length ? "" : `<div class="vacio">${filtro === "activos" ? "No hay pedidos en curso.<br>Cuando un cliente pida desde el menú, aparecerá aquí con sonido 🔔" : "Nada por aquí."}</div>`}
+  `;
+  relojes();
+}
+
+/* ---------- Detalle de un pedido ---------- */
+function itemsHTML(p){
+  return (p.items || []).map(it => `<li>${it.cant} x ${esc(it.nombre)} <span style="color:var(--suave)">· ${dinero(it.precio * it.cant)}</span>
+    ${(it.detalles || []).map(d => `<small class="${/^Cambio a/i.test(d) ? "cambio" : ""}">${/^Cambio a/i.test(d) ? "🔁 " : /^Extra/i.test(d) ? "➕ " : ""}${esc(d)}</small>`).join("")}</li>`).join("");
+}
+function mapa(p){
+  if (p.ubic) return "https://maps.google.com/?q=" + p.ubic.lat + "," + p.ubic.lng;
+  if (p.dir) return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p.dir + ", Santo Domingo Este");
+  return "";
+}
+function pintarPedido(p){
+  const entrega = p.modo === "delivery";
+  // conserva lo que se está escribiendo en el chat aunque la pantalla se actualice
+  const txtPrevio = $("#pchat-txt") ? $("#pchat-txt").value : "", conFoco = document.activeElement && document.activeElement.id === "pchat-txt";
+  marcarChat(p.id);
+  let acciones = "";
+  if (p.estado === "nuevo") acciones = `
+    <h2>Aceptar · tiempo de preparación (máximo 50 min)</h2>
+    <div class="minutos">${MINUTOS.map(m => `<button class="${m === minutosSel ? "activo" : ""}" data-min="${m}">${m}</button>`).join("")}</div>
+    <div class="botones"><button class="btn verde" data-acc="aceptar">✅ Aceptar · listo en ${minutosSel} min</button>
+      <button class="btn borde" data-acc="rechazar">No se puede preparar</button></div>
+    <div id="caja-rechazo" hidden style="margin-top:10px"><textarea id="motivo" placeholder="Motivo para el cliente (ej.: se nos acabó el salmón)"></textarea>
+      <div class="botones" style="margin-top:8px"><button class="btn rojo" data-acc="confirmar-rechazo">Rechazar y avisar al cliente</button></div></div>`;
+  if (p.estado === "preparando") acciones = `
+    <div class="extra"><span>¿Necesitas más tiempo?</span>${MINUTOS_EXTRA.map(m => `<button data-acc="extra" data-mas="${m}">+${m} min</button>`).join("")}</div>
+    <div class="botones"><button class="btn verde" data-acc="listo">${entrega ? "✅ Listo para salir" : "✅ Listo para buscar"}</button>
+      ${entrega && AVISOS_WA ? `<button class="btn" data-acc="grupo">🛵 Mandar al grupo de delivery</button>` : ""}</div>
+    ${entrega ? `<p class="ayuda" style="margin-top:8px">Al tocar "Listo", al delivery le suena en su celular.</p>` : ""}`;
+  if (p.estado === "listo") acciones = `
+    <div class="botones">${entrega ? `<button class="btn rojo" data-acc="camino">🛵 Salió · va en camino</button>${AVISOS_WA ? `<button class="btn" data-acc="grupo">Mandar al grupo de delivery</button>` : ""}` : ""}
+      <button class="btn verde" data-acc="entregado">📦 Entregado</button></div>`;
+  if (p.estado === "en_camino") acciones = `<div class="botones"><button class="btn verde" data-acc="entregado">📦 Entregado</button></div>`;
+  if (p.estado === "entregado" || p.estado === "rechazado") acciones = `<div class="botones"><button class="btn borde" data-acc="reabrir">Reabrir pedido</button></div>`;
+
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="volver">← Pedidos de hoy</button>
+    <div class="tarjeta">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1 style="margin:0;font-size:26px">#${esc(p.codigo)}</h1><span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
+      <div class="fila"><span>Cliente</span><span>${esc(p.nombre)}</span></div>
+      <div class="fila"><span>Teléfono</span><span>${esc(p.tel)}</span></div>
+      <div class="fila"><span>Tipo</span><span>${entrega ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)}</span></div>
+      ${entrega ? `<div class="fila"><span>Dirección</span><span>${esc(p.dir)}</span></div>
+        ${p.ref ? `<div class="fila"><span>Referencia</span><span>${esc(p.ref)}</span></div>` : ""}
+        ${mapa(p) ? `<div class="fila"><span>Ubicación</span><span><a href="${esc(mapa(p))}" target="_blank" rel="noopener" style="color:var(--rojo-claro)">${p.ubic && !p.ubic.aprox ? "Ver en el mapa" : "Buscar en el mapa"}</a>${p.ubic && !p.ubic.aprox ? "" : `<br><small style="color:var(--amarillo)">Dirección aproximada: confirmar</small>`}</span></div>` : ""}` : ""}
+      <ul class="items">${itemsHTML(p)}</ul>
+      ${p.notas ? `<div class="fila"><span>Notas</span><span>${esc(p.notas)}</span></div>` : ""}
+      ${entrega ? `<div class="fila"><span>Subtotal</span><span>${dinero(p.subtotal)}</span></div>
+        <div class="fila"><span>Delivery</span><span>${p.delivery != null ? dinero(p.delivery) + (p.km ? " (" + p.km + " km)" : "") : `<b style="color:var(--amarillo)">Por confirmar</b>`}</span></div>` : ""}
+      <div class="fila"><span>Total</span><span class="total">${esc(p.totalTexto || dinero(p.total))}</span></div>
+      ${p.repartidor ? `<div class="fila"><span>Delivery</span><span>🛵 ${esc(p.repartidor)}</span></div>` : ""}
+      <div class="fila"><span>Pago</span><span>${esc(p.pago)}${p.banco ? " · " + esc(p.banco) : ""}${p.cambio ? " (paga con " + esc(p.cambio) + ")" : ""}${p.pagado ? " ✅ recibido" : ""}</span></div>
+    </div>
+    ${p.estado === "preparando" && p.listoEn ? `<div class="reloj" data-reloj="${ms(p.listoEn)}"><span style="font-size:30px">⏱️</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Tiempo de preparación (${p.minutos} min)</small></div></div>` : ""}
+    ${acciones}
+    <h2>Cliente</h2>
+    <div class="dos"><a class="btn" href="tel:${esc(String(p.tel).replace(/\D/g, ""))}">📞 Llamar</a><button class="btn" data-acc="wa">💬 WhatsApp</button></div>
+    <div class="dos" style="margin-top:10px"><button class="btn" data-acc="pago">${p.pagado ? "✅ Pago recibido" : "💰 Pago recibido"}</button><button class="btn" data-acc="seguimiento">📍 Enviar seguimiento</button></div>
+    ${entrega && (p.delivery == null || editandoDelivery === p.id) ? deliveryHTML(p) : entrega ? `<button class="btn borde" data-acc="editar-delivery" style="margin-top:10px">✏️ Cambiar precio del delivery</button>` : ""}
+    ${chatHTML(p)}
+    <div class="dos" style="margin-top:18px">
+      ${["entregado", "rechazado"].includes(p.estado) && !p.archivado ? `<button class="btn borde" data-acc="archivar">🗂️ Archivar (quitar de la vista)</button>` : p.archivado ? `<button class="btn borde" data-acc="desarchivar">↩️ Sacar de archivados</button>` : ""}
+      <button class="btn borde" data-acc="prueba">${p.prueba ? "↩️ No es prueba" : "🧪 Es un pedido de prueba"}</button></div>
+  `;
+  relojes();
+  const c = $("#pchat"); if (c) c.scrollTop = c.scrollHeight;
+  if ($("#pchat-txt")) { $("#pchat-txt").value = txtPrevio; if (conFoco) $("#pchat-txt").focus(); $("#pchat-txt").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); responder(p, e.target.value); e.target.value = ""; } }); }
+}
+
+/* ---------- Relojes en vivo ---------- */
+function relojes(){
+  document.querySelectorAll("[data-fin]").forEach(el => { const f = +el.dataset.fin - Date.now(); el.textContent = f > 0 ? mmss(f) : "¡Ya!"; });
+  document.querySelectorAll("[data-reloj]").forEach(el => el.classList.toggle("tarde", +el.dataset.reloj < Date.now()));
+}
+setInterval(relojes, 1000);
+setInterval(() => { if (pausa && !enBreak()) { pausa = null; if (rol !== "delivery") pintar(); } }, 30000);
+
+/* ---------- @@VISTA-DELIVERY: pantalla de los repartidores ---------- */
+const nombreUsuario = () => usuarioActual.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+const cobrar = p => p.pago === "Transferencia"
+  ? (p.pagado ? "💳 Transferencia ✅ pagado" : "💳 Transferencia · verificar")
+  : (p.pagado ? "💵 Cobrado ✅" : `💵 Cobrar ${p.totalTexto || dinero(p.total)}${p.cambio ? " · paga con " + p.cambio : ""}`);
+function tarjetaEntrega(p, apagado){
+  return `<button class="pedido ${p.estado === "listo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}" ${apagado ? 'style="opacity:.6"' : ""}>
+    <span class="info"><small style="color:var(--rojo-claro);font-weight:800">#${esc(p.codigo)}</small><b>${esc(p.nombre)}</b><small>📍 ${esc(p.dir || "Sin dirección")}</small>
+      <span class="tiempo" style="color:${p.pagado || p.pago === "Transferencia" ? "var(--suave)" : "var(--amarillo)"}">${esc(cobrar(p))}</span>
+      ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ Sale en <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}
+      ${p.estado === "en_camino" && p.repartidor ? `<span class="tiempo" style="color:#8FD3FF">🛵 ${esc(p.repartidor)}</span>` : ""}</span>
+    <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
+  </button>`;
+}
+function pintarDelivery(){
+  const mios = pedidos.filter(p => p.modo === "delivery");
+  if (abierto) { const p = mios.find(x => x.id === abierto); if (p) return pintarEntrega(p); abierto = null; }
+  const listos = mios.filter(p => p.estado === "listo"), camino = mios.filter(p => p.estado === "en_camino");
+  const cocina = mios.filter(p => p.estado === "preparando"), hechos = mios.filter(p => p.estado === "entregado");
+  const efectivo = hechos.filter(p => p.pago !== "Transferencia").reduce((a, p) => a + (p.total || 0), 0);
+  $("#app").innerHTML = `
+    <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Entregas de hoy</h1>
+      <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"} · ${esc(nombreUsuario())}</small></div>
+      <button class="chico" data-acc="salir">Salir</button></div>
+    ${sonidoListo && (avisosOK() || !("Notification" in window)) ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido y los avisos cuando un pedido esté listo</button>`}
+    <div class="resumen">
+      <div><b>${listos.length}</b><small>Para salir</small></div>
+      <div><b>${camino.length}</b><small>En camino</small></div>
+      <div><b>${hechos.length}</b><small>Entregados</small></div>
+    </div>
+    <h2>🛵 Listos para salir</h2>
+    ${listos.length ? listos.map(p => tarjetaEntrega(p)).join("") : `<div class="vacio" style="padding:18px">Nada listo por ahora. Te suena cuando la cocina termine uno 🔔</div>`}
+    ${camino.length ? `<h2>En camino</h2>${camino.map(p => tarjetaEntrega(p)).join("")}` : ""}
+    ${cocina.length ? `<h2>En cocina (próximos)</h2>${cocina.map(p => tarjetaEntrega(p, true)).join("")}` : ""}
+    ${hechos.length ? `<h2>Entregados hoy · efectivo ${dinero(efectivo)}</h2>${hechos.map(p => tarjetaEntrega(p, true)).join("")}` : ""}`;
+  relojes();
+}
+function pintarEntrega(p){
+  let acciones = "";
+  if (p.estado === "preparando") acciones = `<div class="reloj"><span style="font-size:30px">👨‍🍳</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Todavía en cocina. Te suena cuando esté listo.</small></div></div>`;
+  if (p.estado === "listo") acciones = `<div class="botones"><button class="btn rojo" data-acc="d-camino">🛵 Lo tomo · salgo ahora</button></div>`;
+  if (p.estado === "en_camino") acciones = `<div class="botones"><button class="btn verde" data-acc="d-entregado">📦 Entregado</button>
+    ${p.pago !== "Transferencia" ? `<button class="btn" data-acc="d-cobrado">${p.pagado ? "✅ Cobrado" : "💵 Marcar cobrado"}</button>` : ""}</div>`;
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="volver">← Entregas de hoy</button>
+    <div class="tarjeta">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1 style="margin:0;font-size:26px">#${esc(p.codigo)}</h1><span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
+      <div class="fila"><span>Cliente</span><span>${esc(p.nombre)}</span></div>
+      <div class="fila"><span>Teléfono</span><span>${esc(p.tel)}</span></div>
+      <div class="fila"><span>Dirección</span><span>${esc(p.dir)}</span></div>
+      ${p.ref ? `<div class="fila"><span>Referencia</span><span>${esc(p.ref)}</span></div>` : ""}
+      ${p.notas ? `<div class="fila"><span>Notas</span><span>${esc(p.notas)}</span></div>` : ""}
+      <ul class="items">${itemsHTML(p)}</ul>
+      <div class="fila"><span>Total</span><span class="total">${esc(p.totalTexto || dinero(p.total))}</span></div>
+      <div class="fila"><span>Pago</span><span style="color:${p.pagado || p.pago === "Transferencia" ? "inherit" : "var(--amarillo)"}">${esc(cobrar(p))}</span></div>
+      ${p.repartidor ? `<div class="fila"><span>Delivery</span><span>🛵 ${esc(p.repartidor)}</span></div>` : ""}
+    </div>
+    ${mapa(p) ? `<a class="btn" href="${esc(mapa(p))}" target="_blank" rel="noopener" style="margin-bottom:10px">📍 Abrir en el mapa${p.ubic && !p.ubic.aprox ? "" : " (aprox.)"}</a>` : ""}
+    ${acciones}
+    <h2>Cliente</h2>
+    <div class="dos"><a class="btn" href="tel:${esc(String(p.tel).replace(/\D/g, ""))}">📞 Llamar</a><button class="btn" data-acc="wa">💬 WhatsApp</button></div>`;
+  relojes();
+}
+
+/* ---------- @@AGOTADOS: marcar lo que no hay hoy ----------
+   La lista de productos se lee del mismo menú (index.html), así cualquier producto nuevo sale aquí solo. */
+async function cargarCatalogo(){
+  const txt = await (await fetch("index.html", { cache: "no-store" })).text();
+  const a = txt.indexOf("const CAMBIO_PROTEINA"), b = txt.indexOf("/* Ilustraciones");
+  const { CAMBIO_PROTEINA, SALSAS_EXTRA, MENU } = new Function(txt.slice(a, b) + "\nreturn { CAMBIO_PROTEINA, SALSAS_EXTRA, MENU };")();
+  const secciones = MENU.map(sec => ({ nombre: sec.nombre, items: sec.grupos.flatMap(g => g.items).filter(p => !p.oculto && !p.salsa).map(p => ({ k: p.id, n: p.nombre })) }))
+    .filter(s => s.items.length);
+  secciones.push({ nombre: "Salsas y extras", items: SALSAS_EXTRA.opciones.map(o => ({ k: "salsa:" + o.nombre, n: o.nombre })) });
+  secciones.push({ nombre: "Cambio de proteína", items: CAMBIO_PROTEINA.opciones.map(o => ({ k: "prot:" + o.nombre, n: "Cambio a " + o.nombre.toLowerCase() })) });
+  return secciones;
+}
+const nombreDe = k => { for (const s of catalogo || []) for (const it of s.items) if (it.k === k) return it.n; return k; };
+function pintarAgotados(){
+  if (!catalogo) {
+    $("#app").innerHTML = `<p class="vacio">Cargando productos…</p>`;
+    cargarCatalogo().then(c => { catalogo = c; pintar(); }).catch(() => { $("#app").innerHTML = `<button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button><p class="vacio">No se pudo cargar el menú. Revisa el internet.</p>`; });
+    return;
+  }
+  const lista = [...agotados];
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button>
+    <div class="cab"><div><h1>Agotados de hoy</h1><small>Toca un producto para marcarlo. El menú cambia al instante.</small></div></div>
+    <div class="tarjeta">
+      <h2 style="margin-top:0">Agotado ahora (${lista.length})</h2>
+      ${lista.length ? `<div class="chips">${lista.map(k => `<button data-k="${esc(k)}">✕ ${esc(nombreDe(k))}</button>`).join("")}</div>
+        <button class="btn borde" data-acc="todo-disponible" style="margin-top:10px;min-height:48px">${seguroTodo ? "¿Seguro? Toca otra vez" : "Poner todo disponible"}</button>`
+        : `<p class="ayuda" style="margin:0">Todo está disponible ✅</p>`}
+    </div>
+    <input id="buscar-ag" type="search" placeholder="Buscar producto…" value="${esc(buscarAg)}" style="margin-bottom:6px">
+    ${catalogo.map(sec => `<div class="sec-ag"><h2>${esc(sec.nombre)}</h2><div class="lista-p">
+      ${sec.items.map(it => { const off = agotados.has(it.k); return `<div class="fila-p${off ? " off" : ""}" data-n="${esc(it.n.toLowerCase())}"><span>${esc(it.n)}</span>
+        <button class="sw${off ? " off" : ""}" data-k="${esc(it.k)}">${off ? "Agotado" : "Disponible"}</button></div>`; }).join("")}
+    </div></div>`).join("")}`;
+  filtrarAg();
+  $("#buscar-ag").addEventListener("input", e => { buscarAg = e.target.value; filtrarAg(); });
+}
+function filtrarAg(){
+  const q = buscarAg.trim().toLowerCase();
+  document.querySelectorAll(".fila-p").forEach(f => f.style.display = !q || f.dataset.n.includes(q) ? "" : "none");
+  document.querySelectorAll(".sec-ag").forEach(s => s.style.display = [...s.querySelectorAll(".fila-p")].some(f => f.style.display !== "none") ? "" : "none");
+}
+async function cambiarAgotado(k){
+  const nuevo = new Set(agotados); nuevo.has(k) ? nuevo.delete(k) : nuevo.add(k);
+  const quedo = nuevo.has(k);
+  agotados = nuevo; pintar();
+  try { await guardarAgotados([...nuevo]); avisar(quedo ? `🚫 ${nombreDe(k)}: agotado` : `✅ ${nombreDe(k)}: disponible`); }
+  catch (e) { console.error(e); avisar("No se pudo guardar. Revisa el internet."); }
+}
+
+/* ---------- Acciones ---------- */
+async function cambiar(p, cambios, cambiosCli, texto){
+  try { await actualizarPedido(p.id, cambios, cambiosCli); if (texto) avisar(texto); }
+  catch (e) { console.error(e); avisar("No se pudo guardar. Revisa el internet."); }
+}
+/* @@DELIVERY-MSG */
+function mensajeDelivery(p){
+  let m = `🛵 PEDIDO #${p.codigo} · ${p.nombre}\n📞 ${p.tel}\n📍 ${p.dir}${p.ref ? "\nReferencia: " + p.ref : ""}`;
+  if (mapa(p)) m += `\nMapa: ${mapa(p)}`;
+  m += "\n\n" + (p.items || []).map(it => `• ${it.cant} x ${it.nombre}` + (it.detalles || []).map(d => "\n   " + d).join("")).join("\n");
+  if (p.notas) m += `\nNotas: ${p.notas}`;
+  m += p.pago === "Transferencia" ? `\n\n💳 Pagó por transferencia${p.pagado ? " ✅" : " (verificar comprobante)"}` : `\n\n💵 COBRAR: ${p.totalTexto || dinero(p.total)}${p.cambio ? " · paga con " + p.cambio : ""}`;
+  return m + `\n\nResponde "Lo tomo ✋" si vas tú.`;
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button, [data-abrir]"); if (!b) return;
+  activarSonido();
+  if (b.dataset.k) return cambiarAgotado(b.dataset.k);
+  if (b.dataset.acc === "break") { eligiendoBreak = !eligiendoBreak && !enBreak(); if (enBreak()) eligiendoBreak = false; return pintar(); }
+  if (b.dataset.acc === "ini-break") {
+    const hasta = Date.now() + (+b.dataset.dur) * 60000; eligiendoBreak = false;
+    pausa = { hasta }; pintar();
+    guardarBreak(hasta).then(() => avisar(`🍽️ Break hasta las ${horaCorta(hasta)}`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "fin-break") {
+    pausa = null; pintar();
+    guardarBreak(null).then(() => avisar("✅ De vuelta: el aviso se quitó del menú")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.resp) { const pp = pedidos.find(x => x.id === abierto); if (pp) responder(pp, b.dataset.resp); return; }
+  if (b.dataset.acc === "archivar-todos") {
+    const t = pedidos.filter(GRUPOS.entregado);
+    Promise.all(t.map(x => actualizarPedido(x.id, { archivado: true }))).then(() => avisar(`🗂️ ${t.length} archivados`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "ver-agotados") { vista = "agotados"; abierto = null; seguroTodo = false; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.acc === "ver-pedidos") { vista = "pedidos"; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.acc === "todo-disponible") {
+    if (!seguroTodo) { seguroTodo = true; return pintar(); }
+    seguroTodo = false; agotados = new Set(); pintar();
+    guardarAgotados([]).then(() => avisar("✅ Todo disponible")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.filtro) { filtro = b.dataset.filtro; return pintar(); }
+  if (b.dataset.abrir) { abierto = b.dataset.abrir; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.min) { minutosSel = +b.dataset.min; return pintar(); }
+  const p = pedidos.find(x => x.id === abierto);
+  switch (b.dataset.acc) {
+    case "sonido": campana(); prepararAvisos(); break;
+    case "salir": salir(); break;
+    case "volver": abierto = null; pintar(); break;
+    case "editar-delivery": editandoDelivery = p.id; pintar(); break;
+    case "pedir-ubicacion": responder(p, "¡Hola! Para calcular el delivery, toca el botón 📍 \"Mi ubicación\" aquí en el chat. Así el delivery llega exacto."); avisar("Le pedimos la ubicación por el chat"); break;
+    case "fijar-delivery": fijarDelivery(p, b.dataset.monto, b.dataset.km); break;
+    case "fijar-delivery-otro": { const v = $("#delivery-otro").value; if (v) fijarDelivery(p, v); break; }
+    case "chat-enviar": { const t = $("#pchat-txt"); responder(p, t.value); t.value = ""; break; }
+    case "archivar": cambiar(p, { archivado: true }, null, "🗂️ Archivado: sigue contando en las ventas"); abierto = null; break;
+    case "desarchivar": cambiar(p, { archivado: false }, null, "↩️ De vuelta en la lista"); break;
+    case "prueba":
+      if (p.prueba) cambiar(p, { prueba: false, archivado: false }, null, "Ya no está marcado como prueba");
+      else { cambiar(p, { prueba: true, archivado: true }, null, "🧪 Marcado como prueba: no cuenta en las ventas"); abierto = null; }
+      break;
+    case "extra": {   // @@MINUTOS-EXTRA: suma minutos al tiempo de preparación; el cliente lo ve en su pantalla
+      const m = +b.dataset.mas, base = Math.max(ms(p.listoEn) || Date.now(), Date.now());
+      const listoEn = new Date(base + m * 60000), minutos = (p.minutos || 0) + m;
+      cambiar(p, { listoEn, minutos }, { listoEn, minutos }, `+${m} min · el cliente ya ve el tiempo nuevo`);
+      break;
+    }
+    case "aceptar":
+      cambiar(p, { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel), aceptado: new Date() },
+        { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel) }, "Aceptado ✅ El cliente ya lo ve en su pantalla");
+      if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.aceptado, p, { min: minutosSel }));
+      break;
+    case "rechazar": $("#caja-rechazo").hidden = false; $("#motivo").focus(); break;
+    case "confirmar-rechazo": {
+      const motivo = $("#motivo").value.trim();
+      cambiar(p, { estado: "rechazado", motivo }, { estado: "rechazado", motivo }, "Pedido rechazado · el cliente lo ve en su pantalla");
+      if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.rechazado, p, { motivo }));
+      break;
+    }
+    case "listo":
+      cambiar(p, { estado: "listo" }, { estado: "listo" }, "Marcado como listo");
+      if (AVISOS_WA && p.modo !== "delivery") abrirWA(telWA(p.tel), llenar(MSG.listoLlevar, p));
+      break;
+    case "camino":
+    { // @@VIAJE: minutos estimados del viaje (3 min por km + 5, entre 10 y 40) para mover el motorcito del cliente
+      const viaje = Math.min(40, Math.max(10, Math.round((Number(p.km) || 3) * 3 + 5)));
+      const salio = enMinutos(0);
+      cambiar(p, { estado: "en_camino", salio, viaje }, { estado: "en_camino", salio, viaje }, "Va en camino");
+    }
+      if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.enCamino, p));
+      break;
+    case "entregado": cambiar(p, { estado: "entregado" }, { estado: "entregado" }, "Pedido entregado"); break;
+    case "reabrir": cambiar(p, { estado: "preparando" }, { estado: "preparando" }, "Pedido reabierto"); break;
+    case "grupo": abrirWA("", mensajeDelivery(p)); break;
+    case "wa": abrirWA(telWA(p.tel), `Hola ${(p.nombre || "").split(/\s+/)[0]}, te escribimos de Jireh Sushi sobre tu pedido #${p.codigo}. `); break;
+    case "seguimiento": abrirWA(telWA(p.tel), `Sigue tu pedido #${p.codigo} en vivo aquí: ${enlaceSeguimiento(p.id)}`); break;
+    case "d-camino": {   // el delivery toma el pedido: queda a su nombre y el cliente ve el motorcito
+      const viaje = Math.min(40, Math.max(10, Math.round((Number(p.km) || 3) * 3 + 5)));
+      const salio = enMinutos(0);
+      cambiar(p, { estado: "en_camino", salio, viaje, repartidor: nombreUsuario() }, { estado: "en_camino", salio, viaje }, "¡Buen viaje! 🛵");
+      break;
+    }
+    case "d-entregado": cambiar(p, { estado: "entregado", entregado: new Date() }, { estado: "entregado" }, "Pedido entregado ✅"); abierto = null; break;
+    case "d-cobrado": cambiar(p, { pagado: !p.pagado }, null, p.pagado ? "Cobro desmarcado" : "Cobrado ✅"); break;
+    case "pago":
+      if (!p.pagado) { cambiar(p, { pagado: true }, null, "Pago marcado"); if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.pago, p)); }
+      else cambiar(p, { pagado: false }, null, "Pago desmarcado");
+      break;
+  }
+});
+</script>
+</body>
+</html>
