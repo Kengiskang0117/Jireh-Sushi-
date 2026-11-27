@@ -535,7 +535,7 @@ a.pie-dato:hover{border-color:var(--acento)}
    ========================================================= */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
-  whatsapp: "18493604892",           // @@WHATSAPP  PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
+  whatsapp: "18498846470",           // @@WHATSAPP  TEMPORAL (27 nov): número de Kengis. Para volver al dueño: 18493604892
   telefono: "(849) 360-4892",         // @@TELEFONO
   direccion: "Calle Central #18, Ana Teresa Balaguer",    // @@DIRECCION  (versión corta que se ve en la página)
   direccionCompleta: "Calle Central #18, Ana Teresa Balaguer, Hainamosa, Santo Domingo Este",   // la completa, para el mapa y los mensajes
@@ -639,10 +639,12 @@ const MENU = [
       { id:"mixta-16", nombre:"16 Piezas Mixta", precio:890, desc:"8 Hot Pollo (pollo empanizado, queso crema y puerro) · 8 Avocado Kani (palitos de cangrejo, queso crema y aguacate, envuelto en aguacate).", img:"fotos/mixta-16.jpg" },
       { id:"combo-clasico", nombre:"Combo Clásico", precio:920, desc:"16 piezas: 8 Chicken Avocado (pollo empanizado, queso crema y puerro, envuelto en aguacate) · 8 Eby Hot (camarón empanizado, puerro y queso crema, empanizado).", img:"fotos/combo-clasico.jpg" },
       { id:"combo-crunch", nombre:"Crunch Rolls", precio:920, desc:"16 piezas: 8 Kobe Roll (camarón empanizado, queso crema y aguacate) · 8 Hot Pollo Roll (pollo empanizado, queso crema y puerro).", img:"fotos/combo-crunch.jpg" },
-      { id:"combo-fusion", nombre:"Combo Fusión", precio:950, desc:"8 Avocado Salmón (salmón fresco, aguacate y queso crema, envuelto en aguacate) · 8 Hot Pollo (pollo empanizado, queso crema y puerro, empanizado).", img:"fotos/combo-fusion.jpg" }
+      { id:"combo-fusion", nombre:"Combo Fusión", precio:950, desc:"8 Avocado Salmón (salmón fresco, aguacate y queso crema, envuelto en aguacate) · 8 Hot Pollo (pollo empanizado, queso crema y puerro, empanizado).", img:"fotos/combo-fusion.jpg" },
+      { id:"new-mix-16", nombre:"New Mix 16", tag:"NUEVO", precio:950, desc:"8 Avocado Camarón Acevichado (camarón, envuelto en aguacate) · 8 Hot Camarón (camarón, queso crema y puerro).", img:"fotos/new-mix-16.jpg" }
     ]},
     { titulo:"24 piezas", items:[
       { id:"antojo-24", nombre:"Antojo 24", precio:1050, desc:"8 Avocado Pollo (envuelto en aguacate) · 8 California Cheese Cangrejo · 8 Hot Pollo.", img:"fotos/antojo-24.jpg" },
+      { id:"mix-pollo", nombre:"Mix Pollo", tag:"NUEVO", precio:1060, desc:"8 Avocado Acevichado Pollo (envuelto en aguacate y salsa acevichada) · 8 Green Roll (pollo, queso crema y aguacate, envuelto en puerro) · 8 Hot Pollo (pollo, queso crema y puerro, empanizado).", img:"fotos/mix-pollo.jpg" },
       { id:"combo-select", nombre:"Combo Select", precio:1090, desc:"8 Hot Pollo (pollo empanizado, queso crema y puerro, envuelto en panko) · 8 California Cheese Pollo (pollo, aguacate y queso crema, envuelto en sésamo) · 8 Avocado Camarón (camarón empanizado, queso crema y puerro, envuelto en aguacate).", img:"fotos/combo-select.jpg" },
       { id:"combo-prestige", nombre:"Combo Prestige", precio:1180, desc:"8 Avocado Chicken (pollo, queso crema y aguacate, envuelto en aguacate) · 8 Eby Cheese (camarón empanizado, aguacate y puerro, envuelto en queso crema) · 8 Hot Pollo (pollo empanizado, queso crema y puerro, envuelto en panko).", img:"fotos/combo-prestige.jpg" },
       { id:"combo-kani", nombre:"Combo Kani", precio:1180, desc:"8 Avocado Kani (palitos de cangrejo, queso crema y aguacate, envuelto en aguacate) · 8 Cheese Pollo (pollo y aguacate, envuelto en queso crema) · 8 Hot Camarón (camarones, queso crema y puerro, empanizado).", img:"fotos/combo-kani.jpg" },
@@ -1016,6 +1018,7 @@ let bancoSel = 0;              // banco que eligió el cliente para transferir
 /* @@PAGO-OBLIGATORIO: con Transferencia, el cliente tiene que subir la foto del comprobante ANTES de enviar el pedido.
    La foto se manda sola al chat del pedido (el equipo la ve en el panel). Efectivo no pide nada. */
 let comprobanteFoto = null, comprobanteEstado = "";
+const limpiarError = () => document.querySelectorAll("#f-error").forEach(e => e.textContent = "");
 const totalListo = () => modo !== "delivery" || !NEGOCIO.soloUbicacion || !!(ubic && !ubic.aprox && !ubic.lejos);   // ya se sabe el total exacto
 function reducirFoto(f){
   return new Promise((ok, no) => {
@@ -1034,7 +1037,7 @@ document.addEventListener("change", async e => {
   if (!e.target.matches || !e.target.matches(".f-comp-foto")) return;
   const f = e.target.files && e.target.files[0]; if (!f) return;
   const raiz = e.target.closest(".carrito-cuerpo"); if (raiz) leerDatos(raiz);
-  comprobanteEstado = "Cargando la foto…"; actualizarCarrito();
+  limpiarError(); comprobanteEstado = "Cargando la foto…"; actualizarCarrito();
   try { comprobanteFoto = await reducirFoto(f); comprobanteEstado = ""; }
   catch(err) { comprobanteFoto = null; comprobanteEstado = "No se pudo leer esa foto. Prueba con otra (captura de pantalla o foto)."; }
   actualizarCarrito();
@@ -1069,7 +1072,7 @@ function pedirUbicacion(){
     const punto = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     const km = Math.max(1, Math.ceil(distanciaKm(NEGOCIO.local, punto) * NEGOCIO.factorCalles));
     const lejos = km > NEGOCIO.deliveryMaxKm;
-    ubic = { ...punto, km, lejos, costo: Math.max(NEGOCIO.deliveryMinimo, km * NEGOCIO.deliveryPorKm) };
+    ubic = { ...punto, km, lejos, costo: Math.max(NEGOCIO.deliveryMinimo, km * NEGOCIO.deliveryPorKm) }; limpiarError();
     ubicEstado = ""; ubicTexto = "";
     actualizarCarrito();
     nombreDelPunto(punto).then(t => { ubicTexto = t; actualizarCarrito(); });
@@ -1308,8 +1311,8 @@ function htmlDatos(){
         Enviar pedido a la cocina
       </button>` : ""}
       <button class="${modo === "local" && NEGOCIO.panelDemo ? "btn-borde" : "btn-acento"}" data-acc="enviar" style="height:54px;width:100%">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg>
-        Enviar pedido por WhatsApp
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Confirmar pedido
       </button>
     </div>`;
 }
@@ -1336,7 +1339,11 @@ function actualizarCarrito(){
   $("#barra-texto").textContent = `${n} ${n === 1 ? "artículo" : "artículos"} · Ver pedido`;
   $("#barra-total").textContent = dinero(totalDinero());
   if (!carrito.length && vistaCarrito !== "enviado" && vistaCarrito !== "registrado") vistaCarrito = "lista";
-  [$("#carrito-lateral"), $("#carrito-movil")].forEach(el => { el.innerHTML = htmlCarrito(); });
+  [$("#carrito-lateral"), $("#carrito-movil")].forEach(el => {
+    const e = el.querySelector("#f-error"), msg = e ? e.textContent : "";   // el aviso de error no se borra si la pantalla se actualiza sola
+    el.innerHTML = htmlCarrito();
+    const e2 = el.querySelector("#f-error"); if (msg && e2 && !e2.textContent) e2.textContent = msg;
+  });
   document.querySelectorAll("#carrito-lateral .solo-movil").forEach(b => b.remove());
 }
 
@@ -1654,7 +1661,7 @@ function elegirModo(m){
   $("#modo-texto").textContent = TEXTO_MODO[m];
   actualizarPaso3();
   actualizarCarrito();
-  mostrarSplash(700, () => { $("#lobby").classList.add("oculto"); document.body.style.overflow = ""; window.scrollTo(0, 0); });
+  mostrarSplash(700, () => { $("#lobby").classList.add("oculto"); document.body.style.overflow = ""; window.scrollTo(0, 0); irACategoriaDeLaPortada(); });
 }
 $("#lobby").addEventListener("click", e => { const b = e.target.closest(".modo"); if (b) elegirModo(b.dataset.modo); });
 $("#cambiar-modo").addEventListener("click", mostrarLobby);
@@ -1745,7 +1752,14 @@ if (modo) $("#modo-texto").textContent = TEXTO_MODO[modo];
 actualizarPaso3();
 actualizarCarrito();
 // Al abrir la página (por ejemplo, al escanear el QR): logo cargando → lobby
-mostrarSplash(1300, () => { if (!modo) mostrarLobby(); });
+/* @@CATEGORIA-PORTADA: si viene de una categoría de la portada (menu/#cajas), la abre directo */
+function irACategoriaDeLaPortada(){
+  const id = decodeURIComponent((location.hash || "").slice(1)); if (!id) return;
+  const sec = document.getElementById(id); if (!sec || !sec.classList.contains("seccion")) return;
+  const ir = () => { marcarPestana(id); scrollPorClic = true; sec.scrollIntoView({ block: "start" }); setTimeout(() => scrollPorClic = false, 400); };
+  setTimeout(ir, 60); setTimeout(ir, 700); setTimeout(ir, 1500);   // varias veces: las fotos de arriba pueden mover la página mientras cargan
+}
+mostrarSplash(1300, () => { if (!modo) mostrarLobby(); else irACategoriaDeLaPortada(); });
 </script>
 <!-- @@FIREBASE: conecta el menú con Firebase (archivo fb.js). Si no carga, el menú sigue funcionando solo con WhatsApp. -->
 <script type="module">

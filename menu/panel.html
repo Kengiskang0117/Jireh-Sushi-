@@ -204,7 +204,7 @@ const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").s
 
 /* ---------- Estado de la pantalla ---------- */
 let rol = "cocina", usuarioActual = "", pausa = null, eligiendoBreak = false;
-let cierre = null, confirmandoCierre = false;   // @@CERRAR-HOY
+let cierre = null, confirmandoCierre = false, eliminandoTodos = false;   // @@CERRAR-HOY
 const cerradoHoy = () => !!(cierre && cierre.hasta > Date.now());
 const finDelDia = () => { const d = new Date(); d.setHours(23, 59, 59, 0); return d.getTime(); };
 const enBreak = () => !!(pausa && pausa.hasta > Date.now());
@@ -346,7 +346,7 @@ alCambiarSesion(usuario => {
 /* ---------- @@CHAT: mensajes de los clientes (sala de espera) ---------- */
 let chats = {}, chatsOff = {}, chatsCargados = {};
 /* @@CHAT-APAGADO: false = no se muestra el chat (el dueño lo prefiere así). Igual se lee el comprobante que el cliente sube al pedir. */
-const CHAT_ACTIVO = false;
+const CHAT_ACTIVO = true;
 const vistoChat = id => { try { return +localStorage.getItem("pchat-" + id) || 0; } catch(e) { return 0; } };
 /* @@COMPROBANTE-PANEL: la foto del comprobante que el cliente subió al hacer el pedido (o luego por el chat) */
 const comprobanteDe = p => p.pago === "Transferencia" ? ((chats[p.id] || []).filter(m => m.de === "cliente" && m.foto).pop() || null) : null;
@@ -421,7 +421,7 @@ const GRUPOS = {
   preparando: p => !p.archivado && p.estado === "preparando",
   salida: p => !p.archivado && ["listo", "en_camino"].includes(p.estado),
   entregado: p => !p.archivado && ["entregado", "rechazado"].includes(p.estado),
-  archivados: p => !!p.archivado
+  archivados: p => !!p.archivado && !p.eliminado   // @@ELIMINAR: "eliminado" no se ve en ninguna lista, pero sigue contando en las ventas
 };
 function pintar(){
   if (rol === "delivery") return pintarDelivery();
@@ -465,7 +465,8 @@ function pintar(){
       </button>`).join("")
       : ""}
     ${filtro === "entregado" && lista.length ? `<button class="btn borde" data-acc="archivar-todos" style="margin-top:6px">🗂️ Archivar todos los terminados</button>` : ""}
-    ${filtro === "archivados" ? `<p class="ayuda" style="margin-top:8px">Los archivados no se ven en "En curso" ni "Terminados", pero se guardan y cuentan en las ventas del día (menos los marcados como prueba).</p>` : ""}
+    ${filtro === "archivados" ? `<p class="ayuda" style="margin-top:8px">Los archivados no se ven en "En curso" ni "Terminados", pero se guardan y cuentan en las ventas del día (menos los marcados como prueba).</p>
+      ${lista.length ? `<button class="btn borde" data-acc="eliminar-todos" style="margin-top:6px">🗑️ Quitar todos de la lista (siguen contando en las ventas)</button>` : ""}` : ""}
     ${lista.length ? "" : `<div class="vacio">${filtro === "activos" ? "No hay pedidos en curso.<br>Cuando un cliente pida desde el menú, aparecerá aquí con sonido 🔔" : "Nada por aquí."}</div>`}
   `;
   relojes();
@@ -490,7 +491,9 @@ function pintarPedido(p){
   if (p.estado === "nuevo") acciones = `
     <h2>Aceptar · tiempo de preparación (máximo 50 min)</h2>
     <div class="minutos">${MINUTOS.map(m => `<button class="${m === minutosSel ? "activo" : ""}" data-min="${m}">${m}</button>`).join("")}</div>
-    <div class="botones"><button class="btn verde" data-acc="aceptar">✅ Aceptar · listo en ${minutosSel} min</button>
+    <div class="botones">${p.pago === "Transferencia" && !p.pagado
+      ? `<button class="btn verde" disabled style="opacity:.45;cursor:not-allowed">🔒 Primero confirma el pago</button>`   // @@PAGO-ANTES: no se cocina sin dinero
+      : `<button class="btn verde" data-acc="aceptar">✅ Aceptar · listo en ${minutosSel} min</button>`}
       <button class="btn borde" data-acc="rechazar">No se puede preparar</button></div>
     <div id="caja-rechazo" hidden style="margin-top:10px"><textarea id="motivo" placeholder="Motivo para el cliente (ej.: se nos acabó el salmón)"></textarea>
       <div class="botones" style="margin-top:8px"><button class="btn rojo" data-acc="confirmar-rechazo">Rechazar y avisar al cliente</button></div></div>`;
@@ -513,7 +516,7 @@ function pintarPedido(p){
       <div class="fila"><span>Cliente</span><span>${esc(p.nombre)}</span></div>
       <div class="fila"><span>Teléfono</span><span>${esc(p.tel)}</span></div>
       <div class="fila"><span>Tipo</span><span>${entrega ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)}</span></div>
-      ${entrega ? `<div class="fila"><span>Dirección</span><span>${esc(p.dir)}</span></div>
+      ${entrega ? `<div class="fila"><span>${p.ubic && !p.ubic.aprox ? "Cerca de" : "Dirección"}</span><span>${esc(p.dir)}</span></div>
         ${p.ref ? `<div class="fila"><span>Referencia</span><span>${esc(p.ref)}</span></div>` : ""}
         ${mapa(p) ? `<div class="fila"><span>Ubicación</span><span><a href="${esc(mapa(p))}" target="_blank" rel="noopener" style="color:var(--rojo-claro)">${p.ubic && !p.ubic.aprox ? "Ver en el mapa" : "Buscar en el mapa"}</a>${p.ubic && !p.ubic.aprox ? "" : `<br><small style="color:var(--amarillo)">Dirección aproximada: confirmar</small>`}</span></div>` : ""}` : ""}
       <ul class="items">${itemsHTML(p)}</ul>
@@ -540,6 +543,8 @@ function pintarPedido(p){
     <div class="dos" style="margin-top:18px">
       ${["entregado", "rechazado"].includes(p.estado) && !p.archivado ? `<button class="btn borde" data-acc="archivar">🗂️ Archivar (quitar de la vista)</button>` : p.archivado ? `<button class="btn borde" data-acc="desarchivar">↩️ Sacar de archivados</button>` : ""}
       <button class="btn borde" data-acc="prueba">${p.prueba ? "↩️ No es prueba" : "🧪 Es un pedido de prueba"}</button></div>
+    ${p.archivado ? `<button class="btn borde" data-acc="eliminar" style="margin-top:10px;color:#FF9A9A;border-color:#8A2A2A">🗑️ Quitar de la lista para siempre</button>
+      <p class="ayuda" style="margin-top:6px">Desaparece del panel, pero ${p.prueba ? "(como es de prueba) no cuenta en las ventas" : "sigue contando en el total de pedidos y en lo vendido"}.</p>` : ""}
   `;
   relojes();
   const c = $("#pchat"); if (c) c.scrollTop = c.scrollHeight;
@@ -604,7 +609,7 @@ function pintarEntrega(p){
         <h1 style="margin:0;font-size:26px">#${esc(p.codigo)}</h1><span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span></div>
       <div class="fila"><span>Cliente</span><span>${esc(p.nombre)}</span></div>
       <div class="fila"><span>Teléfono</span><span>${esc(p.tel)}</span></div>
-      <div class="fila"><span>Dirección</span><span>${esc(p.dir)}</span></div>
+      <div class="fila"><span>${p.ubic && !p.ubic.aprox ? "Cerca de" : "Dirección"}</span><span>${esc(p.dir)}</span></div>
       ${p.ref ? `<div class="fila"><span>Referencia</span><span>${esc(p.ref)}</span></div>` : ""}
       ${p.notas ? `<div class="fila"><span>Notas</span><span>${esc(p.notas)}</span></div>` : ""}
       <ul class="items">${itemsHTML(p)}</ul>
@@ -712,6 +717,13 @@ document.addEventListener("click", e => {
     return;
   }
   if (b.dataset.resp) { const pp = pedidos.find(x => x.id === abierto); if (pp) responder(pp, b.dataset.resp); return; }
+  if (b.dataset.acc === "eliminar-todos") {
+    const t = pedidos.filter(GRUPOS.archivados);
+    if (!eliminandoTodos) { eliminandoTodos = true; b.textContent = `¿Seguro? Toca otra vez para quitar ${t.length}`; setTimeout(() => { eliminandoTodos = false; pintar(); }, 4000); return; }
+    eliminandoTodos = false;
+    Promise.all(t.map(x => actualizarPedido(x.id, { eliminado: true }))).then(() => avisar(`🗑️ ${t.length} quitados (siguen contando en las ventas)`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
   if (b.dataset.acc === "archivar-todos") {
     const t = pedidos.filter(GRUPOS.entregado);
     Promise.all(t.map(x => actualizarPedido(x.id, { archivado: true }))).then(() => avisar(`🗂️ ${t.length} archivados`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
@@ -740,6 +752,7 @@ document.addEventListener("click", e => {
     case "chat-enviar": { const t = $("#pchat-txt"); responder(p, t.value); t.value = ""; break; }
     case "archivar": cambiar(p, { archivado: true }, null, "🗂️ Archivado: sigue contando en las ventas"); abierto = null; break;
     case "desarchivar": cambiar(p, { archivado: false }, null, "↩️ De vuelta en la lista"); break;
+    case "eliminar": cambiar(p, { eliminado: true, archivado: true }, null, "🗑️ Quitado de la lista (sigue contando en las ventas)"); abierto = null; break;
     case "prueba":
       if (p.prueba) cambiar(p, { prueba: false, archivado: false }, null, "Ya no está marcado como prueba");
       else { cambiar(p, { prueba: true, archivado: true }, null, "🧪 Marcado como prueba: no cuenta en las ventas"); abierto = null; }

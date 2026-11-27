@@ -126,7 +126,7 @@ body{padding-bottom:90px}
 
 <script type="module">
 /* @@TEXTOS */
-const NEGOCIO = { nombre: "Jireh Sushi", whatsapp: "18493604892" };   // PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
+const NEGOCIO = { nombre: "Jireh Sushi", whatsapp: "18498846470" };   // TEMPORAL (27 nov): número de Kengis. Para volver al dueño: 18493604892
 const TEXTOS = {
   nuevo: ["Tu pedido llegó 🙌", "Estamos por confirmarlo, un momentito"],
   preparando: [["Estamos armando tus rolls 🍣", "Hecho al momento, con ingredientes frescos"],
@@ -335,7 +335,7 @@ let chatMsjs = [], chatEnviar = null, chatListo = false;
 const vistoKey = "chat-visto-" + (id || "demo");
 const horaMsj = m => { const t = ms(m.creado) || Date.now(); return new Date(t).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" }); };
 /* @@CHAT-APAGADO: el dueño prefiere sin chat. false = no hay chat; el cliente tiene el botón de WhatsApp. true = vuelve el chat. */
-const CHAT_ACTIVO = false;
+const CHAT_ACTIVO = true;
 function montarChat(){
   if (!CHAT_ACTIVO) return;
   if (chatListo || (!id && !demo)) return; chatListo = true;

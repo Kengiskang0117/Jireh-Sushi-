@@ -116,7 +116,10 @@ section{padding:70px 0}
 .promos{background:var(--fondo-2)}
 .promo{display:grid;grid-template-columns:1fr 1fr;border-radius:24px;overflow:hidden;border:1px solid var(--borde);background:var(--tarjeta)}
 .promo img{width:100%;height:100%;object-fit:cover;min-height:280px}
-.nosotros img.logo-nosotros{object-fit:contain;background:#0E0E0E;padding:36px}   /* logo completo, sin recortar */
+.nosotros .caja-nosotros{background:#0E0E0E;border-radius:22px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:6px}
+.nosotros .caja-nosotros h3{margin:0;font-size:clamp(30px,4vw,44px);font-weight:900;font-style:italic;letter-spacing:.02em;color:#fff}
+.nosotros .caja-nosotros .raya{width:70px;height:4px;border-radius:4px;background:var(--rojo);margin:2px 0 8px}
+.nosotros .caja-nosotros img{width:auto;max-width:78%;max-height:68%;aspect-ratio:auto;object-fit:contain;border-radius:0}
 .promo .texto{padding:34px;display:flex;flex-direction:column;gap:12px;justify-content:center}
 .chip{align-self:flex-start;background:var(--rojo);color:#fff;font-weight:800;font-size:12px;letter-spacing:.08em;padding:5px 12px;border-radius:999px}
 .promo h3{font-size:clamp(28px,3.6vw,40px);font-weight:900;font-style:italic;margin:0;line-height:1.05}
@@ -147,6 +150,7 @@ section{padding:70px 0}
 .panel h3{font-size:24px;font-weight:800;margin:0 0 14px}
 .linea{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;color:#D6D1CB}
 .linea svg{flex:0 0 auto;color:var(--rojo-claro);margin-top:2px}
+a.linea.ig{text-decoration:none}a.linea.ig:hover span{color:#fff;text-decoration:underline}
 .horas{display:grid;gap:8px;font-variant-numeric:tabular-nums}
 .horas div{display:flex;justify-content:space-between;border-bottom:1px solid #26262A;padding-bottom:8px;color:#D6D1CB}
 .horas div.hoy{color:#fff;font-weight:700;background:rgba(227,18,27,.12);border:1px solid rgba(227,18,27,.45);border-radius:12px;padding:10px 12px;margin:2px -12px}   /* @@HOY  día de hoy resaltado */
@@ -219,18 +223,18 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
   <section id="menu">
     <div class="contenedor">
       <div class="titulo-seccion"><h2>Nuestro <em>Menú</em></h2><div class="raya"></div><p>Toca una categoría para ver los productos y armar tu pedido.</p></div>
-      <div class="categorias">
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/tiritas-pollo.jpg" alt="" loading="lazy"><b>Para picar</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/mixta-16.jpg" alt="" loading="lazy"><b>Combos Sagrados</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/eby-banana.jpg" alt="" loading="lazy"><b>Aplatanao</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/cali-pollo.jpg" alt="" loading="lazy"><b>California</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/avocado-salmon.jpg" alt="" loading="lazy"><b>Avocado Rolls</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/sutil-roll.jpg" alt="" loading="lazy"><b>Envueltos en Salmón</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/acevichado-roll.jpg" alt="" loading="lazy"><b>Acevichado</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-salmon-acevichado.jpg" alt="" loading="lazy"><b>Sin Arroz</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Colección HOT</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/bowl-mixto.jpg" alt="" loading="lazy"><b>Signature Bowls</b></a>
-        <a class="cat js-menu" href="menu/index.html"><img src="menu/fotos/coca-cola.jpg" alt="" loading="lazy"><b>Bebidas y salsas</b></a>
+      <div class="categorias">   <!-- @@CATEGORIAS: data-sec = id de la sección en el menú; al tocarla abre el menú directo en esa sección -->
+        <a class="cat js-menu" data-sec="para-picar" href="menu/index.html#para-picar"><img src="menu/fotos/tiritas-pollo.jpg" alt="" loading="lazy"><b>Para picar</b></a>
+        <a class="cat js-menu" data-sec="cajas" href="menu/index.html#cajas"><img src="menu/fotos/mixta-16.jpg" alt="" loading="lazy"><b>Combos Sagrados</b></a>
+        <a class="cat js-menu" data-sec="rolls-casa" href="menu/index.html#rolls-casa"><img src="menu/fotos/eby-banana.jpg" alt="" loading="lazy"><b>Aplatanao</b></a>
+        <a class="cat js-menu" data-sec="california" href="menu/index.html#california"><img src="menu/fotos/cali-pollo.jpg" alt="" loading="lazy"><b>California</b></a>
+        <a class="cat js-menu" data-sec="avocado" href="menu/index.html#avocado"><img src="menu/fotos/avocado-salmon.jpg" alt="" loading="lazy"><b>Avocado Rolls</b></a>
+        <a class="cat js-menu" data-sec="salmon" href="menu/index.html#salmon"><img src="menu/fotos/sutil-roll.jpg" alt="" loading="lazy"><b>Envueltos en Salmón</b></a>
+        <a class="cat js-menu" data-sec="acevichado" href="menu/index.html#acevichado"><img src="menu/fotos/acevichado-roll.jpg" alt="" loading="lazy"><b>Acevichado Collection</b></a>
+        <a class="cat js-menu" data-sec="sin-arroz" href="menu/index.html#sin-arroz"><img src="menu/fotos/oriental-spicy.jpg" alt="" loading="lazy"><b>Sin Arroz</b></a>
+        <a class="cat js-menu" data-sec="empanizados" href="menu/index.html#empanizados"><img src="menu/fotos/hot-pollo.jpg" alt="" loading="lazy"><b>Colección HOT</b></a>
+        <a class="cat js-menu" data-sec="bowls" href="menu/index.html#bowls"><img src="menu/fotos/bowl-mixto.jpg" alt="" loading="lazy"><b>Signature Bowls</b></a>
+        <a class="cat js-menu" data-sec="bebidas" href="menu/index.html#bebidas"><img src="menu/fotos/coca-cola.jpg" alt="" loading="lazy"><b>Bebidas y extras</b></a>
       </div>
       <div class="centro"><a class="btn rojo js-menu" href="menu/index.html">Ver el menú completo y ordenar</a></div>
     </div>
@@ -254,7 +258,10 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
   <!-- @@NOSOTROS -->
   <section class="nosotros" id="nosotros">
     <div class="contenedor">
-      <img src="menu/fotos/logo.png" alt="Logo de Jireh Sushi" loading="lazy" class="logo-nosotros">
+      <div class="caja-nosotros">   <!-- @@NOSOTROS-TITULO -->
+        <h3>Nosotros</h3><div class="raya"></div>
+        <img src="menu/fotos/logo.png" alt="Logo de Jireh Sushi" loading="lazy">
+      </div>
       <div>
         <h2>Hecho al momento,<br>con <span>frescura sagrada</span></h2>
         <p>En Jireh Sushi preparamos cada roll al momento, con ingredientes frescos y porciones generosas. Nuestros clientes nos piden desde todo Santo Domingo Este para la casa, la oficina y cualquier celebración.</p>
@@ -271,6 +278,7 @@ footer .contenedor{display:flex;flex-wrap:wrap;justify-content:space-between;gap
         <h3>Contacto</h3>
         <div class="linea"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span id="c-direccion"></span></div>
         <div class="linea"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span id="c-telefono"></span></div>
+        <a class="linea ig" href="https://www.instagram.com/jirehsushird" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg><span>@jirehsushird</span></a>   <!-- @@INSTAGRAM -->
         <div class="acciones"><a class="btn rojo js-wa" href="#" target="_blank" rel="noopener">Escríbenos por WhatsApp</a><a class="btn borde" id="mapa" href="#" target="_blank" rel="noopener">Cómo llegar</a></div>
       </div>
       <div class="panel">
@@ -308,7 +316,7 @@ const PROMO = {
 /* @@NEGOCIO */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
-  whatsapp: "18493604892",          // PRUEBAS: número de Kenmake. Al entregar, cambiar a 18493604892
+  whatsapp: "18498846470",          // TEMPORAL (27 nov): número de Kengis para arreglos. Para volver al dueño: 18493604892
   telefono: "(849) 360-4892",
   direccion: "Calle Central #18, Ana Teresa Balaguer",
   direccionCompleta: "Calle Central #18, Ana Teresa Balaguer, Hainamosa, Santo Domingo Este",
@@ -321,7 +329,7 @@ const NEGOCIO = {
 const $ = s => document.querySelector(s);
 const wa = t => `https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp.replace(/\D/g, "")}&text=${encodeURIComponent(t)}`;
 document.querySelectorAll(".js-wa").forEach(a => a.href = wa(`¡Hola ${NEGOCIO.nombre}! Tengo una pregunta: `));
-document.querySelectorAll(".js-menu").forEach(a => a.href = NEGOCIO.menu);
+document.querySelectorAll(".js-menu").forEach(a => a.href = NEGOCIO.menu + (a.dataset.sec ? "#" + a.dataset.sec : ""));
 $("#c-direccion").textContent = NEGOCIO.direccion;
 $("#c-telefono").textContent = NEGOCIO.telefono;
 $("#mapa").href = NEGOCIO.mapa || "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(NEGOCIO.nombre + " " + (NEGOCIO.direccionCompleta || NEGOCIO.direccion));
