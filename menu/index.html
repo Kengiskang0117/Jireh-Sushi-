@@ -912,6 +912,7 @@ window.aplicarAdmin = config => {
   const nuevo = (config && config.admin) || {};
   if (JSON.stringify(nuevo) === JSON.stringify(ADMIN)) return false;
   ADMIN = nuevo; try { localStorage.setItem("jireh-admin", JSON.stringify(ADMIN)); } catch(e) {}
+  if (typeof CLAVE_DESCUENTO !== "undefined" && DESCUENTO_APAGADO !== (ADMIN.apagado === CLAVE_DESCUENTO) && !/descuento=ver/.test(location.search)) { location.reload(); return true; }   // el dueño apagó o encendió la promoción de descuento.js
   calcularPrecios(); pintarBarraPromo(); programarFinPromo(); return true;
 };
 window.aplicarAgotados = (lista, config) => {

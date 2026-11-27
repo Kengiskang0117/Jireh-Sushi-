@@ -173,6 +173,7 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .ayuda{color:var(--suave);font-size:14px;line-height:1.5;margin:0 0 12px}
 textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--borde);background:#121212;color:var(--texto);font:inherit;padding:12px}
 </style>
+<script src="descuento.js"></script>
 </head>
 <body>
 <div class="caja" id="app"><p class="vacio">Cargando…</p></div>
@@ -491,7 +492,7 @@ const GRUPOS = {
   preparando: p => !p.archivado && p.estado === "preparando",
   salida: p => !p.archivado && ["listo", "en_camino"].includes(p.estado),
   entregado: p => !p.archivado && ["entregado", "rechazado"].includes(p.estado),
-  archivados: p => !!p.archivado && !p.eliminado   // @@ELIMINAR: "eliminado" no se ve en ninguna lista, pero sigue contando en las ventas
+  archivados: p => !!p.archivado && (!p.eliminado || esSuper())   // @@ELIMINAR: "eliminado" no se ve (sigue contando en las ventas). La cuenta de Kengis sí los ve, para marcar sus pruebas
 };
 /* Botones de arriba (Agotados, Registro, Break, Cerrar por hoy). El delivery ve Break y Cerrar por hoy. */
 function herramientasHTML(cocina){
@@ -548,7 +549,7 @@ function pintar(){
     ${lista.length ? lista.map(p => conArchivar(p, `
       <button class="pedido ${p.estado === "nuevo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}">
         <span class="num">#${esc(p.codigo)}</span>
-        <span class="info"><b>${esc(p.nombre)}${p.prueba ? ` <span class="nprueba">prueba</span>` : ""}</b>
+        <span class="info"><b>${esc(p.nombre)}${p.prueba ? ` <span class="nprueba">prueba</span>` : ""}${p.eliminado ? ` <span class="nprueba">eliminado</span>` : ""}</b>
           ${debeDevolver(p) ? `<span class="ncomp no">💸 Devolver dinero</span>` : p.estado === "rechazado" ? "" : p.pago === "Transferencia" ? (p.pagado ? `<span class="ncomp ok">✅ Pagado</span>` : comprobanteDe(p) ? `<span class="ncomp">🧾 Revisar pago</span>` : `<span class="ncomp no">🧾 Sin comprobante</span>`) : ""}
           ${sinLeer(p.id) ? `<span class="nmsj">💬 ${sinLeer(p.id)} ${sinLeer(p.id) > 1 ? "nuevos" : "nuevo"}</span>` : ""}
           <small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)} · ${dinero(p.total)}</small>
@@ -845,7 +846,14 @@ function pintarAdmin(){
   } else {
     const pr = admin.promo || {}, activa = pr.activo && pr.hasta >= hoyAdm();
     const secs = pr.secciones || [];
-    cuerpo = `${activa ? `<div class="caja-pago ok" style="margin-top:0"><h2 style="margin:0 0 4px">🔥 Promoción activa</h2><p style="margin:0">${esc(pr.titulo)} · -${pr.porcentaje}% · ${secs.length ? secs.length + " sección" + (secs.length > 1 ? "es" : "") : "toda la carta"} · hasta el ${esc(pr.hasta.slice(8))}/${esc(pr.hasta.slice(5, 7))}${pr.horaFin ? " a las " + hora12(pr.horaFin) : ""}</p>
+    /* @@PROMO-ARCHIVO: la promoción que puso Kenmake en descuento.js (ej. Black Friday): el dueño la puede apagar o volver a encender */
+    const enFecha = typeof DESCUENTO !== "undefined" && DESCUENTO.activo && hoyAdm() >= DESCUENTO.desde && hoyAdm() <= DESCUENTO.hasta;
+    const apagada = typeof CLAVE_DESCUENTO !== "undefined" && admin.apagado === CLAVE_DESCUENTO;
+    const cajaArchivo = enFecha ? `<div class="caja-pago ${apagada ? "" : "ok"}" style="margin-top:0"><h2 style="margin:0 0 4px">🖤 ${esc(DESCUENTO.titulo)} · -${DESCUENTO.porcentaje}%</h2>
+      <p style="margin:0">${esc(DESCUENTO.texto)}</p>
+      <p class="ayuda" style="margin:6px 0 0">${apagada ? "⛔ Apagada: los clientes no la ven." : activa ? "Ahora manda la promoción de abajo (la tuya)." : "✅ Encendida: los clientes la ven ahora."} Para cambiar el porcentaje o las secciones, crea tu propia promoción abajo: tiene prioridad.</p>
+      <button class="btn borde" data-acc="${apagada ? "archivo-encender" : "archivo-apagar"}" style="margin-top:10px">${apagada ? "Volver a encenderla" : "Apagarla ahora"}</button></div>` : "";
+    cuerpo = cajaArchivo + `${activa ? `<div class="caja-pago ok" style="margin-top:0"><h2 style="margin:0 0 4px">🔥 Promoción activa</h2><p style="margin:0">${esc(pr.titulo)} · -${pr.porcentaje}% · ${secs.length ? secs.length + " sección" + (secs.length > 1 ? "es" : "") : "toda la carta"} · hasta el ${esc(pr.hasta.slice(8))}/${esc(pr.hasta.slice(5, 7))}${pr.horaFin ? " a las " + hora12(pr.horaFin) : ""}</p>
         <button class="btn borde" data-acc="promo-quitar" style="margin-top:10px">Quitar la promoción ahora</button></div>` : ""}
       <div class="tarjeta"><h2 style="margin-top:0">${activa ? "Cambiar la promoción" : "Crear una promoción"}</h2>
       <label class="adm-campo">Nombre (sale en la franja de arriba)<input id="pm-titulo" maxlength="40" placeholder="Ej.: MARTES DE HOT" value="${esc(pr.titulo || "")}"></label>
@@ -1018,6 +1026,8 @@ document.addEventListener("click", e => {
     if (!promo.texto) promo.texto = `${promo.porcentaje}% de descuento${promo.secciones.length ? " en " + menuAdmin.filter(sc => promo.secciones.includes(sc.id)).map(sc => sc.nombre).join(", ") : " en toda la carta"}`;
     return guardarYAvisar(guardarAdmin(["promo"], promo), "🔥 Promoción guardada");
   }
+  if (b.dataset.acc === "archivo-apagar") return guardarYAvisar(guardarAdmin(["apagado"], CLAVE_DESCUENTO), "⛔ Promoción apagada");
+  if (b.dataset.acc === "archivo-encender") return guardarYAvisar(guardarAdmin(["apagado"], null), "✅ Promoción encendida otra vez");
   if (b.dataset.acc === "promo-quitar") return guardarYAvisar(guardarAdmin(["promo"], null), "Promoción quitada");
   if (b.dataset.acc === "ver-registro") { vista = "registro"; abierto = null; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.periodo) { const [d, h, t] = periodo(b.dataset.periodo); return cargarRegistro(d, h, t); }

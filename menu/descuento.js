@@ -37,9 +37,12 @@ const AVISO_ANTES = {
 };
 
 /* --- no tocar de aquí para abajo --- */
+/* El dueño puede APAGAR esta promoción desde el panel (⚙️ Administrar → Promoción). Queda guardado así: */
+const CLAVE_DESCUENTO = DESCUENTO.titulo + "|" + DESCUENTO.desde;
+const DESCUENTO_APAGADO = (function(){ try { return (JSON.parse(localStorage.getItem("jireh-admin") || "{}") || {}).apagado === CLAVE_DESCUENTO; } catch(e) { return false; } })();
 const DESCUENTO_HOY = (function(){
   if (/[?&]descuento=ver\b/.test(location.search)) return true;
-  if (!DESCUENTO.activo) return false;
+  if (!DESCUENTO.activo || DESCUENTO_APAGADO) return false;
   const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   if (hoy === DESCUENTO.hasta && DESCUENTO.horaFin) {   // último día: se quita a la hora indicada
     const [hh, mm] = DESCUENTO.horaFin.split(":").map(Number);
@@ -56,7 +59,7 @@ const AVISO_HOY = (function(){
 
 /* Si la página está abierta cuando llega la hora de fin, se recarga sola para quitar el descuento (el carrito se guarda). */
 (function(){
-  if (!DESCUENTO_HOY || !DESCUENTO.horaFin || /[?&]descuento=ver\b/.test(location.search)) return;
+  if (!DESCUENTO_HOY || !DESCUENTO.horaFin || /[?&]descuento=ver\b/.test(location.search) || /panel/.test(location.pathname)) return;
   const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   if (hoy !== DESCUENTO.hasta) return;
   const [hh, mm] = DESCUENTO.horaFin.split(":").map(Number), fin = new Date(d); fin.setHours(hh, mm, 0, 0);

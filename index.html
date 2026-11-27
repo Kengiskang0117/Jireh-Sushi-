@@ -468,7 +468,11 @@ function pintarBarra(){
   el.innerHTML = pa ? `<b>🔥 ${e(pa.titulo || "PROMOCIÓN")}</b><span class="pct">-${pa.porcentaje}%</span><span>${e(pa.texto)}</span><a href="menu/index.html">Pedir ahora</a>`
     : `<b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span><a href="menu/index.html${/descuento=ver/.test(location.search) ? "?descuento=ver" : ""}">Pedir ahora</a>`;
 }
-window.aplicarPromoAdmin = config => { const n = config && config.admin && config.admin.promo || null; if (JSON.stringify(n) === JSON.stringify(PROMO_ADMIN)) return; PROMO_ADMIN = n; pintarPromos(); pintarBarra(); };
+window.aplicarPromoAdmin = config => {
+  const adm = (config && config.admin) || {};
+  try { localStorage.setItem("jireh-admin", JSON.stringify(adm)); } catch(e) {}
+  if (typeof CLAVE_DESCUENTO !== "undefined" && DESCUENTO_APAGADO !== (adm.apagado === CLAVE_DESCUENTO) && !/descuento=ver/.test(location.search)) { location.reload(); return; }   // el dueño apagó o encendió la promoción
+  const n = adm.promo || null; if (JSON.stringify(n) === JSON.stringify(PROMO_ADMIN)) return; PROMO_ADMIN = n; pintarPromos(); pintarBarra(); };
 pintarPromos(); pintarBarra();
 </script>
 <script src="menu/mantenimiento.js"></script>
