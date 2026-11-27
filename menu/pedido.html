@@ -259,7 +259,8 @@ function pintar(s){
       return `<div class="paso ${cls}"><i>${cls === "ok" ? "✓" : ic}</i>${t}</div>`;
     }).join("")}</div>
     <p class="nota">Esta pantalla se actualiza sola. Los tiempos son aproximados.</p>
-    ${s.estado !== "entregado" && s.estado !== "rechazado" ? `<button class="contacto" data-chat>💬 ¿Una pregunta, algo extra o el comprobante? Escríbenos aquí</button>` : ""}`}
+    ${s.estado !== "entregado" && s.estado !== "rechazado" ? (CHAT_ACTIVO ? `<button class="contacto" data-chat>💬 ¿Una pregunta, algo extra o el comprobante? Escríbenos aquí</button>`
+      : `<a class="contacto" href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}&text=${encodeURIComponent("Hola, es sobre mi pedido #" + (s.codigo || ""))}" target="_blank" rel="noopener" style="display:block;text-decoration:none">💬 ¿Tarda mucho? Escríbenos por WhatsApp</a>`) : ""}`}
     <div class="vivo"><i></i>En vivo</div>
     <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
   tick();
@@ -333,7 +334,10 @@ const ICO_ENVIAR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="curren
 let chatMsjs = [], chatEnviar = null, chatListo = false;
 const vistoKey = "chat-visto-" + (id || "demo");
 const horaMsj = m => { const t = ms(m.creado) || Date.now(); return new Date(t).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" }); };
+/* @@CHAT-APAGADO: el dueño prefiere sin chat. false = no hay chat; el cliente tiene el botón de WhatsApp. true = vuelve el chat. */
+const CHAT_ACTIVO = false;
 function montarChat(){
+  if (!CHAT_ACTIVO) return;
   if (chatListo || (!id && !demo)) return; chatListo = true;
   document.body.insertAdjacentHTML("beforeend", `
     <button class="chat-boton" data-chat>💬 Chat con Jireh <span class="n" id="chat-n"></span></button>

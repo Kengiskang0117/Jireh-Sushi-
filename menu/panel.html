@@ -345,11 +345,13 @@ alCambiarSesion(usuario => {
 
 /* ---------- @@CHAT: mensajes de los clientes (sala de espera) ---------- */
 let chats = {}, chatsOff = {}, chatsCargados = {};
+/* @@CHAT-APAGADO: false = no se muestra el chat (el dueño lo prefiere así). Igual se lee el comprobante que el cliente sube al pedir. */
+const CHAT_ACTIVO = false;
 const vistoChat = id => { try { return +localStorage.getItem("pchat-" + id) || 0; } catch(e) { return 0; } };
 /* @@COMPROBANTE-PANEL: la foto del comprobante que el cliente subió al hacer el pedido (o luego por el chat) */
 const comprobanteDe = p => p.pago === "Transferencia" ? ((chats[p.id] || []).filter(m => m.de === "cliente" && m.foto).pop() || null) : null;
 const marcarChat = id => { try { localStorage.setItem("pchat-" + id, String((chats[id] || []).filter(m => m.de === "cliente").length)); } catch(e) {} };
-const sinLeer = id => Math.max(0, (chats[id] || []).filter(m => m.de === "cliente").length - vistoChat(id));
+const sinLeer = id => !CHAT_ACTIVO ? 0 : Math.max(0, (chats[id] || []).filter(m => m.de === "cliente").length - vistoChat(id));
 function escucharChats(){
   if (rol === "delivery") return;
   pedidos.filter(p => !p.archivado).forEach(p => {
@@ -361,8 +363,11 @@ function escucharChats(){
       const ahora = lista.filter(m => m.de === "cliente").length;
       if (chatsCargados[p.id] && ahora > antes) {
         const u = lista.filter(m => m.de === "cliente").pop();
+        if (!CHAT_ACTIVO) { if (u.foto) { campana(); avisar(`🧾 Llegó el comprobante de ${p.nombre} (#${p.codigo})`); notificar(`🧾 #${p.codigo} · ${p.nombre}`, "Llegó el comprobante de la transferencia", "c-" + p.id); } }
+        else {
         campana(); avisar(`💬 Mensaje de ${p.nombre} (#${p.codigo})`);
         notificar(`💬 #${p.codigo} · ${p.nombre}`, u.foto ? "📷 Envió una foto" + (u.texto ? ": " + u.texto : "") : u.texto, "c-" + p.id);
+        }
       }
       chatsCargados[p.id] = true;
       if (abierto === p.id) marcarChat(p.id);
@@ -371,6 +376,7 @@ function escucharChats(){
   });
 }
 function chatHTML(p){
+  if (!CHAT_ACTIVO) return "";
   const l = chats[p.id] || [];
   return `<h2>💬 Chat con ${esc(p.nombre.split(" ")[0])}</h2>
     <div class="pchat" id="pchat">${l.length ? l.map(m => `<div class="pm ${m.de}">${m.foto ? `<a href="${esc(m.foto)}" target="_blank" rel="noopener"><img src="${esc(m.foto)}" alt="Foto"></a>` : ""}${esc(m.texto).replace(/(https:\/\/www\.google\.com\/maps\/\?q=[-\d.,]+)/, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">abrir en el mapa</a>')}<small>${hora(m.creado)}</small></div>`).join("")
@@ -386,8 +392,9 @@ function deliveryHTML(p){
     <h2 style="margin-top:0;color:var(--amarillo)">🛵 Poner precio del delivery</h2>
     ${sug ? `<p class="ayuda">El cliente compartió su ubicación: aprox. <b>${sug.km} km</b> → <b>${dinero(sug.costo)}</b> (${dinero(POR_KM)} por km, mínimo ${dinero(MINIMO)}).</p>
       <button class="btn verde" data-acc="fijar-delivery" data-monto="${sug.costo}" data-km="${sug.km}" style="margin-bottom:10px">✅ Cobrar ${dinero(sug.costo)} de delivery</button>`
-      : `<p class="ayuda">Este pedido llegó sin ubicación. Pídele que la mande por el chat (un toque) y aquí se calcula sola, o elige un precio.</p>
-      <button class="btn rojo" data-acc="pedir-ubicacion" style="margin-bottom:10px">📍 Pedir ubicación al cliente</button>`}
+      : CHAT_ACTIVO ? `<p class="ayuda">Este pedido llegó sin ubicación. Pídele que la mande por el chat (un toque) y aquí se calcula sola, o elige un precio.</p>
+      <button class="btn rojo" data-acc="pedir-ubicacion" style="margin-bottom:10px">📍 Pedir ubicación al cliente</button>`
+      : `<p class="ayuda">Este pedido llegó sin ubicación. Llama o escribe al cliente y elige el precio:</p>`}
     <div class="extra" style="margin:0">${OPCIONES_DELIVERY.map(m => `<button data-acc="fijar-delivery" data-monto="${m}">${dinero(m)}</button>`).join("")}</div>
     <div class="pchat-escribir"><input id="delivery-otro" type="number" inputmode="numeric" placeholder="Otro monto (RD$)"><button class="btn borde" data-acc="fijar-delivery-otro">Poner</button></div>
   </div>`;
@@ -399,7 +406,7 @@ function fijarDelivery(p, monto, km){
   if (km) cambios.km = +km;
   editandoDelivery = null;
   cambiar(p, cambios, null, `Delivery ${dinero(monto)} · total ${dinero(total)}`);
-  responder(p, `El delivery a tu ubicación es ${dinero(monto)}. Total a pagar: ${dinero(total)}.${p.pago === "Transferencia" ? " Puedes transferir ese monto y mandarnos el comprobante por aquí." : ""}`);
+  if (CHAT_ACTIVO) responder(p, `El delivery a tu ubicación es ${dinero(monto)}. Total a pagar: ${dinero(total)}.${p.pago === "Transferencia" ? " Puedes transferir ese monto y mandarnos el comprobante por aquí." : ""}`);
 }
 async function responder(p, texto){
   if (!texto.trim()) return;
