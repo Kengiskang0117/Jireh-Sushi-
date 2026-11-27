@@ -705,7 +705,7 @@ const MENU = [
     { id:"acevichado-camaron", nombre:"Acevichado Camarón", precio:690, desc:"Relleno de camarón y aguacate, con salsa acevichada y un toque de shichimi. 8 unidades.", img:"fotos/acevichado-camaron.jpg" },
     { id:"avocado-spicy", nombre:"Avocado Spicy", precio:710, desc:"Envuelto en aguacate, relleno de camarón, queso crema y puerro, con salsa spicy picante.", img:"fotos/avocado-spicy.jpg" },
     { id:"avocado-nikkey", nombre:"Avocado Nikkey", precio:770, desc:"Relleno de salmón, puerro y queso crema, envuelto en aguacate, con topping de camarones empanizados y salsa acevichada.", img:"fotos/avocado-nikkey.jpg" },
-    { id:"avocado-acevichado", nombre:"Avocado Acevichado", precio:770, desc:"Relleno de camarones, queso crema y puerro, envuelto en aguacate, con topping de salmón en salsa picante, puerro y shichimi.", img:"fotos/avocado-acevichado.jpg" },
+    { id:"avocado-acevichado", nombre:"Spicy Acevichado", precio:770, desc:"Relleno de camarones, queso crema y puerro, envuelto en aguacate, con topping de salmón en salsa picante, puerro y shichimi.", img:"fotos/avocado-acevichado.jpg" },
     { id:"eby-nikkei", nombre:"Eby Nikkei", precio:770, desc:"Relleno de camarones, queso crema y puerro, envuelto en aguacate, con topping de salmón, salsa acevichada y togarashi. 8 unidades.", img:"fotos/eby-nikkei.jpg" }
   ]}]},
   /* ---------- @@QUESO-CREMA (rolls envueltos en queso crema, precios reales) ---------- */
@@ -821,14 +821,45 @@ const ARTE = {
    (no hace falta tocarlo para cambiar productos)
    ========================================================= */
 const $ = (s) => document.querySelector(s);
-/* Aplica las rebajas (no tocar) */
-MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => {
-  if (p.precio == null || p.precioAntes) return;
-  // @@DESCUENTO: el descuento general (descuento.js) se aplica solo en sus fechas, menos en las secciones excluidas
-  const general = typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY && !DESCUENTO.excluir.includes(sec.id) ? DESCUENTO.porcentaje : 0;
-  const pct = p.rebaja != null ? p.rebaja : (general || NEGOCIO.rebajaTodo || 0);
-  if (pct > 0) { p.precioAntes = p.precio; p.precio = Math.round(p.precio * (1 - pct / 100)); }
-})));
+/* =========================================================
+   @@ADMIN — lo que el dueño cambia desde el panel (⚙️ Administrar): precios, nombres, descripciones,
+   productos ocultos y promociones. Se guarda en Firebase (config/menu → admin) y la página lo aplica al instante.
+   Los precios de este archivo son los "normales"; lo del panel va por encima.
+   ========================================================= */
+let ADMIN = (() => { try { return JSON.parse(localStorage.getItem("jireh-admin") || "null") || {}; } catch(e) { return {}; } })();
+const hoyISO = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+/* Promoción que está corriendo ahora: la del panel (si está activa y en fecha) o la de descuento.js */
+function promoActiva(){
+  const a = ADMIN.promo, hoy = hoyISO(), d = new Date();
+  if (a && a.activo && a.porcentaje > 0 && hoy >= a.desde && hoy <= a.hasta) {
+    let vale = true;
+    if (hoy === a.hasta && a.horaFin) { const [h, m] = a.horaFin.split(":").map(Number); if (d.getHours() * 60 + d.getMinutes() >= h * 60 + m) vale = false; }
+    if (vale) return { porcentaje: a.porcentaje, titulo: a.titulo || "PROMOCIÓN", texto: a.texto || `${a.porcentaje}% de descuento`, secciones: a.secciones || [], excluir: [], deAdmin: true };
+  }
+  if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) return { porcentaje: DESCUENTO.porcentaje, titulo: DESCUENTO.titulo, texto: DESCUENTO.texto, secciones: DESCUENTO.solo || [], excluir: DESCUENTO.excluir || [] };
+  return null;
+}
+const ocultoAdmin = id => (ADMIN.ocultos || []).includes(id);
+MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => { p._base = { precio: p.precio, precioAntes: p.precioAntes, nombre: p.nombre, desc: p.desc }; })));
+/* Calcula precios, nombres y rebajas (se vuelve a llamar cuando el dueño cambia algo) */
+function calcularPrecios(){
+  const promo = promoActiva();
+  MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => {
+    const b = p._base, t = (ADMIN.textos || {})[p.id] || {};
+    p.nombre = t.nombre || b.nombre; p.desc = t.desc != null && t.desc !== "" ? t.desc : b.desc;
+    const nuevo = (ADMIN.precios || {})[p.id];
+    p.precio = nuevo > 0 ? nuevo : b.precio; p.precioAntes = nuevo > 0 ? null : b.precioAntes;
+    if (p.precio == null || p.precioAntes) return;
+    // @@DESCUENTO: promoción del panel o de descuento.js, solo en sus secciones
+    const general = promo && !promo.excluir.includes(sec.id) && (!promo.secciones.length || promo.secciones.includes(sec.id)) ? promo.porcentaje : 0;
+    const pct = p.rebaja != null ? p.rebaja : (general || NEGOCIO.rebajaTodo || 0);
+    if (pct > 0) { p.precioAntes = p.precio; p.precio = Math.round(p.precio * (1 - pct / 100)); }
+  })));
+  if (window.__productosListos) MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => {
+    const q = PRODUCTOS[p.id]; if (q) Object.assign(q, { precio: p.precio, precioAntes: p.precioAntes, nombre: p.nombre, desc: p.desc });
+  })));
+}
+calcularPrecios();
 function precioHTML(p, tam){
   const t = tam ? ` style="font-size:${tam}px"` : "";
   return `<span class="precios">${p.precioAntes ? `<span class="antes">${dinero(p.precioAntes)}</span>` : ""}<span class="precio"${t}>${dinero(p.precio)}</span></span>`;
@@ -849,11 +880,12 @@ MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => {
   p.salsasExtra = SALSAS_EXTRA.secciones.includes(sec.id);
 })));
 MENU.forEach(sec => sec.grupos.forEach(g => g.items.forEach(p => { PRODUCTOS[p.id] = { ...p, chico: !!sec.chico, arte: sec.arte }; })));
+window.__productosListos = true;
 
 /* @@AGOTADOS — Lo agotado se marca desde el PANEL (botón "Agotados"), no aquí.
    La lista llega sola desde Firebase y el menú se actualiza en vivo para todos los clientes. */
 let AGOTADOS = new Set();
-const estaAgotado = p => !!p && (AGOTADOS.has(p.id) || (!!p.salsa && AGOTADOS.has("salsa:" + p.salsa)));
+const estaAgotado = p => !!p && (AGOTADOS.has(p.id) || ocultoAdmin(p.id) || (!!p.salsa && AGOTADOS.has("salsa:" + p.salsa)));
 const protAgotada = n => AGOTADOS.has("prot:" + n);
 const salsaAgotada = n => AGOTADOS.has("salsa:" + n);
 const lineaAgotada = l => estaAgotado(PRODUCTOS[l.id]) || (!!l.prot && protAgotada(l.prot)) || (l.salsas || []).some(salsaAgotada);
@@ -876,7 +908,14 @@ setInterval(() => {
   if (PAUSA && !enBreak()) { PAUSA = null; pintarBreak(); actualizarCarrito(); }
   if (CIERRE && !cerradoHoy()) { CIERRE = null; pintarBreak(); pintarEstado(); actualizarCarrito(); }
 }, 30000);
+window.aplicarAdmin = config => {
+  const nuevo = (config && config.admin) || {};
+  if (JSON.stringify(nuevo) === JSON.stringify(ADMIN)) return false;
+  ADMIN = nuevo; try { localStorage.setItem("jireh-admin", JSON.stringify(ADMIN)); } catch(e) {}
+  calcularPrecios(); pintarBarraPromo(); programarFinPromo(); return true;
+};
 window.aplicarAgotados = (lista, config) => {
+  window.aplicarAdmin(config);
   PAUSA = config && config.pausa && config.pausa.hasta ? config.pausa : null;
   CIERRE = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null;
   pintarBreak(); if ($("#estado span")) pintarEstado();
@@ -903,7 +942,7 @@ function pintarMenu(filtro = ""){
   MENU.forEach(sec => {
     let cuerpo = "";
     sec.grupos.forEach(g => {
-      const items = g.items.filter(p => !q || (p.nombre + " " + (p.desc || "")).toLowerCase().includes(q));
+      const items = g.items.filter(p => !ocultoAdmin(p.id) && (!q || (p.nombre + " " + (p.desc || "")).toLowerCase().includes(q)));
       if (!items.length) return;
       if (g.titulo) cuerpo += `<h3 class="subgrupo">${esc(g.titulo)}</h3>`;
       cuerpo += `<div class="lista">` + items.map(p => tarjeta(p, sec.chico)).join("") + `</div>`;
@@ -1399,7 +1438,7 @@ async function enviarPedido(raiz){
     return `• ${l.cant} x ${nombreLinea(l)} — ${dinero(precioUnidad(l) * l.cant)}` + detallesLinea(l).map(x => `\n   ${x}`).join("");
   }).join("\n");
   const servicio = modo === "local" ? `para comer en el local${d.mesa.trim() ? " (mesa " + d.mesa.trim() + ")" : ""}` : modo === "delivery" ? "para delivery" : "para llevar";
-  let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY ? `🖤 *${DESCUENTO.titulo}: -${DESCUENTO.porcentaje}% aplicado*\n\n` : ""}${enBreak() ? `(Pedido hecho durante el break; entiendo que lo preparan al volver a las ${horaCorta(PAUSA.hasta)})\n\n` : ""}${lineas}\n\n`;
+  let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${promoActiva() ? `🖤 *${promoActiva().titulo}: -${promoActiva().porcentaje}% aplicado*\n\n` : ""}${enBreak() ? `(Pedido hecho durante el break; entiendo que lo preparan al volver a las ${horaCorta(PAUSA.hasta)})\n\n` : ""}${lineas}\n\n`;
   if (modo === "delivery") {
     msg += `Subtotal: ${dinero(totalDinero())}\n`;
     msg += ubic && !ubic.lejos ? `Delivery (${ubic.km} km): ${dinero(ubic.costo)}\n` : `Delivery: por confirmar\n`;
@@ -1797,9 +1836,22 @@ escucharDisponibilidad((lista, config) => { window.aplicarAgotados(lista, config
 })();
 </script>
 <script>
-/* @@DESCUENTO-BARRA: barra de arriba mientras dure el descuento */
-if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) document.getElementById("barra-descuento").outerHTML =
-  `<div class="barra-descuento"><b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span></div>`;
+/* @@DESCUENTO-BARRA: barra de arriba mientras dure la promoción (del panel o de descuento.js) */
+function pintarBarraPromo(){
+  const el = document.getElementById("barra-descuento"); if (!el) return;
+  const pr = promoActiva();
+  el.className = pr ? "barra-descuento" : "";
+  el.innerHTML = pr ? `<b>${pr.deAdmin ? "🔥" : "🖤"} ${esc(pr.titulo)}</b><span class="pct">-${pr.porcentaje}%</span><span>${esc(pr.texto)}</span>` : "";
+}
+/* Si la promoción del panel termina hoy a una hora, se quita sola a esa hora */
+let finPromoTimer = null;
+function programarFinPromo(){
+  clearTimeout(finPromoTimer);
+  const a = ADMIN.promo; if (!a || !a.activo || !a.horaFin || a.hasta !== hoyISO()) return;
+  const [h, m] = a.horaFin.split(":").map(Number), fin = new Date(); fin.setHours(h, m, 0, 0);
+  const falta = fin - Date.now(); if (falta > 0) finPromoTimer = setTimeout(() => { calcularPrecios(); pintarBarraPromo(); pintarHero(); pintarMenu($("#buscar") ? $("#buscar").value : ""); actualizarCarrito(); }, falta + 500);
+}
+pintarBarraPromo(); programarFinPromo();
 </script>
 </body>
 </html>

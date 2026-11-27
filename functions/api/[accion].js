@@ -14,6 +14,7 @@ const VAPID_CONTACTO = "https://jireh-sushi.pages.dev";
 const FIREBASE = { apiKey: "AIzaSyByDTI1tL_1cIDsZ2aQ4PQpwVF5AwZNIww", proyecto: "jireh-sushi" };
 const DOMINIO_EQUIPO = "@jirehsushi.com";
 const DELIVERYS = ["delivery@jirehsushi.com"];
+const SUPER = ["kengis@jirehsushi.com"];   // los pedidos de prueba (nombre con "prueba") solo le avisan a esta cuenta
 
 export async function onRequestPost({ request, env, params }) {
   try {
@@ -65,12 +66,15 @@ async function aviso({ id, tipo, token }, env) {
   await env.SUBS.put(clave, "1", { expirationTtl: ttl });
 
   const lista = await env.SUBS.list({ prefix: "sub:" });
-  const destinos = lista.keys.filter(k => !k.metadata || k.metadata.rol === para);
+  const destinos = lista.keys;
   const carga = JSON.stringify({ titulo, texto, etiqueta: tipo + "-" + id, url: "./panel.html" });
+  const esPrueba = /prueba/i.test(seg.nombre || "");
   let enviados = 0, borrados = 0;
   await Promise.all(destinos.map(async k => {
     const v = await env.SUBS.get(k.name); if (!v) return;
-    const { sub, rol } = JSON.parse(v); if (rol !== para) return;
+    const { sub, rol, correo } = JSON.parse(v); if (rol !== para && !(esPrueba && SUPER.includes(correo))) return;
+    if (esPrueba && !SUPER.includes(correo)) return;   // la prueba no le suena al dueño ni al delivery
+    if (!esPrueba && SUPER.includes(correo)) return;   // a la cuenta de Kengis solo le suenan sus pruebas, no los pedidos reales
     const r = await enviarPush(sub, carga, env.VAPID_PRIVATE);
     if (r.status === 404 || r.status === 410) { await env.SUBS.delete(k.name); borrados++; }   // ese celular ya no existe
     else if (r.ok) enviados++;

@@ -417,14 +417,28 @@ document.querySelectorAll("#enlaces a").forEach(a => a.addEventListener("click",
 document.querySelectorAll("img").forEach(i => { const f = () => i.classList.add("roto"); if (i.complete && !i.naturalWidth) f(); else i.addEventListener("error", f); });
 
 /* Pinta la sección de promociones solo si PROMO.activa es true */
-(function(){
+const PROMO_ORIGINAL = { ...PROMO };
+/* @@ADMIN: promoción creada por el dueño desde el panel (llega de Firebase) */
+let PROMO_ADMIN = null;
+function promoAdminActiva(){
+  const a = PROMO_ADMIN, d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  if (!a || !a.activo || !(a.porcentaje > 0) || hoy < a.desde || hoy > a.hasta) return null;
+  if (hoy === a.hasta && a.horaFin) { const [h, m] = a.horaFin.split(":").map(Number); if (d.getHours() * 60 + d.getMinutes() >= h * 60 + m) return null; }
+  return a;
+}
+function pintarPromos(){
+  Object.assign(PROMO, PROMO_ORIGINAL);
+  const pa = promoAdminActiva();
+  if (pa) Object.assign(PROMO, { activa: true, etiqueta: "-" + pa.porcentaje + "%", titulo: pa.titulo || "PROMOCIÓN", texto: (pa.texto || pa.porcentaje + "% de descuento") + ".",
+    precio: pa.porcentaje + "% de descuento", precioAntes: "", foto: "menu/fotos/logo.png", boton: "Ver el menú" });
   /* @@DESCUENTO: mientras dure el descuento (Black Friday), la sección Promociones lo muestra sola */
-  if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) Object.assign(PROMO, {
+  else if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) Object.assign(PROMO, {
     activa: true, etiqueta: "-" + DESCUENTO.porcentaje + "%", titulo: DESCUENTO.titulo,
-    texto: DESCUENTO.texto + (DESCUENTO.excluir.includes("bebidas") ? " (no aplica a bebidas)." : "."),
+    texto: DESCUENTO.texto + ((DESCUENTO.solo || []).length ? "." : DESCUENTO.excluir.includes("bebidas") ? " (no aplica a bebidas)." : "."),
     precio: DESCUENTO.porcentaje + "% de descuento", precioAntes: "", foto: DESCUENTO.imagen, boton: "Ver el menú con descuento"
   });
-  if (!PROMO.activa) return;
+  const sec0 = document.getElementById("promociones"), nav0 = document.getElementById("nav-promos");
+  if (!PROMO.activa) { sec0.hidden = true; if (nav0) nav0.hidden = true; return; }
   const e = t => String(t || "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
   const sec = document.getElementById("promociones");
   sec.innerHTML = `<div class="contenedor">
@@ -442,12 +456,20 @@ document.querySelectorAll("img").forEach(i => { const f = () => i.classList.add(
     </div>`;
   sec.hidden = false;
   const nav = document.getElementById("nav-promos"); if (nav) nav.hidden = false;
-})();
-</script>
-<script>
-/* @@DESCUENTO-BARRA: barra de arriba mientras dure el descuento */
-if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) document.getElementById("barra-descuento").outerHTML =
-  `<div class="barra-descuento"><b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span><a href="menu/index.html${/descuento=ver/.test(location.search) ? "?descuento=ver" : ""}">Pedir ahora</a></div>`;
+  pintarBarra();
+}
+/* @@DESCUENTO-BARRA: barra de arriba mientras dure la promoción */
+function pintarBarra(){
+  const el = document.getElementById("barra-descuento"); if (!el) return;
+  const pa = promoAdminActiva(), f = typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY;
+  const e = t => String(t || "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+  if (!pa && !f) { el.className = ""; el.innerHTML = ""; return; }
+  el.className = "barra-descuento";
+  el.innerHTML = pa ? `<b>🔥 ${e(pa.titulo || "PROMOCIÓN")}</b><span class="pct">-${pa.porcentaje}%</span><span>${e(pa.texto)}</span><a href="menu/index.html">Pedir ahora</a>`
+    : `<b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span><a href="menu/index.html${/descuento=ver/.test(location.search) ? "?descuento=ver" : ""}">Pedir ahora</a>`;
+}
+window.aplicarPromoAdmin = config => { const n = config && config.admin && config.admin.promo || null; if (JSON.stringify(n) === JSON.stringify(PROMO_ADMIN)) return; PROMO_ADMIN = n; pintarPromos(); pintarBarra(); };
+pintarPromos(); pintarBarra();
 </script>
 <script src="menu/mantenimiento.js"></script>
 <!-- @@CERRAR-HOY: lee de Firebase si el negocio cerró temprano hoy. Si no carga, la portada sigue normal. -->
@@ -455,6 +477,7 @@ if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) document.getElementBy
 import { escucharDisponibilidad } from "./menu/fb.js";
 escucharDisponibilidad((lista, config) => {
   window.aplicarHorarioHoy(config);   // @@HORARIO-HOY
+  window.aplicarPromoAdmin(config);   // @@ADMIN
   window.aplicarCierre(config && config.cerradoHoy ? config.cerradoHoy.hasta : 0);
   if (window.aplicarMantenimiento) window.aplicarMantenimiento(config, NEGOCIO.whatsapp, "menu/");   // @@MANTENIMIENTO
 });

@@ -23,7 +23,7 @@
 const V = "10.12.2";
 const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
 const {
-  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp, getDocs, arrayUnion, arrayRemove
+  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp, getDocs, arrayUnion, arrayRemove, FieldPath, deleteField
 } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
 const {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -89,6 +89,13 @@ export const guardarMantenimiento = (hasta) => setDoc(doc(db, "config", "menu"),
 
 /* ---------- EQUIPO: @@HORARIO-HOY — abrir o cerrar a otra hora SOLO hoy. datos = {dia, abre, cierra} o null ---------- */
 export const guardarHorarioHoy = (datos) => setDoc(doc(db, "config", "menu"), { horarioHoy: datos || null, actualizado: serverTimestamp() }, { merge: true });
+
+/* ---------- EQUIPO: @@ADMIN — lo que el dueño cambia desde "⚙️ Administrar" (precios, textos, ocultos, promoción)
+   ruta = ["precios", "hot-pollo"] · valor = lo nuevo, o null para volver a lo normal ---------- */
+export const guardarAdmin = (ruta, valor) => updateDoc(doc(db, "config", "menu"),
+  new FieldPath("admin", ...ruta), valor === null ? deleteField() : valor, "actualizado", serverTimestamp());
+export const ocultarProducto = (id, oculto) => updateDoc(doc(db, "config", "menu"),
+  new FieldPath("admin", "ocultos"), oculto ? arrayUnion(id) : arrayRemove(id), "actualizado", serverTimestamp());
 
 /* ---------- EQUIPO: break (pausa) — hasta = fecha en ms, o null para terminarlo ---------- */
 export const guardarBreak = (hasta, mensaje) => setDoc(doc(db, "config", "menu"),

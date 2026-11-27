@@ -8,6 +8,7 @@
        Viernes y sábado:    desde: "2026-11-27", hasta: "2026-11-28"
    - porcentaje: cuánto se descuenta (15 = 15 %)
    - excluir: secciones SIN descuento (ids: "bebidas", "para-picar", "cajas" = combos…)
+   - solo: si tiene algo, el descuento es SOLO para esas secciones (ej.: ["empanizados"] = Colección HOT). Vacío [] = toda la carta
    - imagen: foto que sale primero en el carrusel de la portada mientras dure
 
    Para verlo ANTES de la fecha (solo tú): abre la página con  ?descuento=ver  al final
@@ -20,8 +21,9 @@ const DESCUENTO = {
   horaFin: "20:00",          // el último día se quita a esta hora (24 h). Vacío "" = todo el día
   porcentaje: 15,
   titulo: "BLACK FRIDAY",
-  texto: "15% de descuento en toda la carta · Solo hoy hasta las 8:00 PM",
+  texto: "15% de descuento en la Colección HOT (empanizados) · Solo hoy hasta las 8:00 PM",
   excluir: ["bebidas"],
+  solo: ["empanizados"],     // 27 nov tarde: el dueño lo deja solo en los empanizados
   imagen: "menu/fotos/pasarela/black-friday.jpg"
 };
 

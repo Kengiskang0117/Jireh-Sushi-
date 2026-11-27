@@ -113,6 +113,14 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .reg-cab span{display:flex;flex-direction:column}.reg-cab b{text-transform:capitalize}.reg-cab small{color:#B5B1AD}.reg-total{font-weight:800;white-space:nowrap}
 .reg-lista{border-top:1px solid var(--borde,#333)}.reg-fila{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid #222;font-size:14px}
 .reg-fila span{display:flex;flex-direction:column;min-width:0}.reg-fila small{color:#9A958F}
+.fila-adm[hidden],.sec-ag[hidden]{display:none!important}
+.fila-adm>span:first-child{display:flex;flex-direction:column;min-width:0;flex:1}
+.adm-precio .sw{width:auto;min-width:48px;padding:0 12px;flex:none}
+.fila-adm.fila-prod{flex-direction:column;align-items:stretch;gap:8px}.fila-prod .adm-precio{justify-content:flex-start}.fila-adm small{color:#9A958F;font-size:12.5px}
+.adm-precio{display:flex;gap:6px;align-items:center;flex:none}.adm-precio input{width:86px;min-height:40px;padding:0 8px;text-align:right}
+.adm-editar{padding:10px 12px 14px;border-bottom:1px solid #222;display:flex;flex-direction:column;gap:8px}.adm-editar label,.adm-campo{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#B5B1AD;margin-bottom:8px}
+.adm-editar textarea{width:100%;font:inherit;padding:10px;border-radius:12px;background:#111;color:inherit;border:1px solid #333}
+.adm-secs{display:flex;flex-wrap:wrap;gap:8px}.adm-secs label{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #333;border-radius:999px;font-size:14px}
 .chico.cerrado{background:#3A0F0F;border-color:#8A2A2A;color:#FF9A9A}
 .banda-break.banda-cierre{background:#3A0F0F;border-color:#8A2A2A;color:#FFB4B4}.banda-break.banda-cierre small{color:#F2B8B8}.banda-break.banda-cierre button{border-color:#8A2A2A;background:#1F0707;color:#FFB4B4}
 .chico.on{background:#3A2A08;border-color:#8A6A1A;color:#FFD27A}
@@ -171,7 +179,7 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--bo
 <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, marcarAgotado, guardarBreak, guardarCierre, guardarMantenimiento, guardarHorarioHoy, escucharChat, enviarMensaje, diaDeHoy, buscarPedidos, tokenSesion } from "./fb.js";
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, marcarAgotado, guardarBreak, guardarCierre, guardarMantenimiento, guardarHorarioHoy, guardarAdmin, ocultarProducto, escucharChat, enviarMensaje, diaDeHoy, buscarPedidos, tokenSesion } from "./fb.js";
 
 const NEGOCIO = { nombre: "Jireh Sushi" };
 /* @@DELIVERYS — correos de los repartidores (en minúscula). Al entrar con uno de estos,
@@ -219,6 +227,18 @@ let rol = "cocina", usuarioActual = "", pausa = null, eligiendoBreak = false;
 let cierre = null, confirmandoCierre = false, eliminandoTodos = false, rechazando = null;
 let mant = null, confirmandoMant = false, borrando = null;   // @@MANTENIMIENTO
 let horarioHoy = null, editandoHorario = false;   // @@HORARIO-HOY
+/* @@ADMIN: "⚙️ Administrar" — el dueño cambia precios, nombres, descripciones, oculta productos y crea promociones */
+const SUPER = ["kengis@jirehsushi.com"];   // cuentas que además ven "🛠️ Mantenimiento" (Kengis / Kenmake)
+const esSuper = () => SUPER.includes((usuarioActual || "").toLowerCase());
+const marcarPrueba = p => { if (/prueba/i.test(p.nombre || "")) p.prueba = true; return p; };
+let admin = {}, menuAdmin = null, pestAdmin = "precios", buscarAdm = "", editando = null;
+async function cargarMenuAdmin(){
+  const txt = await (await fetch("index.html", { cache: "no-store" })).text();
+  const a = txt.indexOf("const CAMBIO_PROTEINA"), b = txt.indexOf("/* Ilustraciones");
+  const { MENU } = new Function(txt.slice(a, b) + "\nreturn { MENU };")();
+  return MENU.map(sec => ({ id: sec.id, nombre: sec.nombre, items: sec.grupos.flatMap(g => g.items).filter(p => !p.oculto && !p.salsa && p.precio != null)
+    .map(p => ({ id: p.id, nombre: p.nombre, desc: p.desc || "", precio: p.precio })) })).filter(s => s.items.length);
+}
 const HORARIO_NORMAL = { abre: "13:00", cierra: "20:00" };   // igual que en menu/index.html (@@HORARIO)
 const horarioDeHoy = () => horarioHoy && horarioHoy.dia === diaDeHoy() ? horarioHoy : null;
 const hora12 = h => { const [a, b] = h.split(":").map(Number); return `${(a % 12) || 12}:${String(b || 0).padStart(2, "0")} ${a >= 12 ? "PM" : "AM"}`; };
@@ -364,12 +384,16 @@ alCambiarSesion(usuario => {
   let listosAntes = null;
   pantallaEncendida();
   primeraCarga = true;
-  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; cierre = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null; mant = config && config.mantenimiento && config.mantenimiento.hasta ? config.mantenimiento : null; horarioHoy = config && config.horarioHoy ? config.horarioHoy : null; pintar(); });
+  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; cierre = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null; mant = config && config.mantenimiento && config.mantenimiento.hasta ? config.mantenimiento : null; horarioHoy = config && config.horarioHoy ? config.horarioHoy : null; admin = (config && config.admin) || {}; if (vista !== "admin" || !editando) pintar(); });
   suscribirPedidos = () => {
   if (dejarDeEscuchar) dejarDeEscuchar();
   diaEscuchado = diaDeHoy(); pedidos = []; primeraCarga = true; listosAntes = null; abierto = null;
   dejarDeEscuchar = escucharPedidosDeHoy((lista, nuevos) => {
     conectado = true;
+    /* @@PRUEBAS-APARTE: los pedidos de prueba (marcados 🧪 o con "prueba" en el nombre del cliente) solo los ve la cuenta de Kengis.
+       Al dueño y al delivery no les salen ni les suenan. */
+    lista.forEach(marcarPrueba);
+    if (!esSuper()) { lista = lista.filter(p => !p.prueba); nuevos = (nuevos || []).filter(n => !(n.prueba || /prueba/i.test(n.nombre || ""))); }
     pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
     if (rol === "delivery") {   // al delivery le suena cuando un pedido queda listo para salir
       const listos = new Set(pedidos.filter(p => p.modo === "delivery" && p.estado === "listo").map(p => p.id));
@@ -478,12 +502,13 @@ function herramientasHTML(cocina){
       <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button>
       <button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button>
       ${cocina ? `<button class="chico${horarioDeHoy() ? " on" : ""}" data-acc="horario-hoy">🕐 ${horarioDeHoy() ? "Hoy: " + hora12(horarioDeHoy().abre) : "Horario de hoy"}</button>` : ""}
-      ${cocina ? `<button class="chico mant${enMantenimiento() ? " cerrado" : ""}" data-acc="mantenimiento">🛠️ ${enMantenimiento() ? "Página en mantenimiento" : "Mantenimiento"}</button>` : ""}</div>
+      ${cocina ? `<button class="chico" data-acc="ver-admin">⚙️ Administrar</button>` : ""}
+      ${cocina && (esSuper() || enMantenimiento()) ? `<button class="chico mant${enMantenimiento() ? " cerrado" : ""}" data-acc="mantenimiento">🛠️ ${enMantenimiento() ? "Página en mantenimiento" : "Mantenimiento"}</button>` : ""}</div>
     ${cerradoHoy() ? `<div class="banda-break banda-cierre"><div><b>🔒 Cerrado por hoy</b><small>El menú se ve, pero los clientes no pueden enviar pedidos hasta mañana. Los pedidos que ya entraron siguen aquí.</small></div><button data-acc="reabrir">Volver a abrir</button></div>`
       : confirmandoCierre ? `<div class="banda-break banda-cierre"><div><b>¿Cerrar el negocio por hoy?</b><small>Los clientes verán "Hoy cerramos temprano" y no podrán hacer pedidos hasta mañana. Puedes volver a abrir cuando quieras.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-cierre">Sí, cerrar por hoy</button><button data-acc="cerrar-hoy">Cancelar</button></div></div>` : ""}
     ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
       : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}
-    ${enMantenimiento() ? `<div class="banda-break banda-cierre"><div><b>🛠️ Página en mantenimiento</b><small>Los clientes ven "Estamos mejorando nuestra página" y no pueden pedir. Se quita sola a las ${new Date(mant.hasta).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" })}</small></div>${cocina ? `<button data-acc="quitar-mant">Quitar</button>` : ""}</div>`
+    ${enMantenimiento() ? `<div class="banda-break banda-cierre"><div><b>🛠️ Página en mantenimiento</b><small>Los clientes ven "Estamos mejorando nuestra página" y no pueden pedir. Se quita sola a las ${new Date(mant.hasta).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" })}</small></div>${cocina && esSuper() ? `<button data-acc="quitar-mant">Quitar</button>` : ""}</div>`
       : confirmandoMant ? `<div class="banda-break banda-cierre"><div><b>¿Poner la página en mantenimiento?</b><small>Úsalo solo cuando se esté arreglando la página, fuera del horario. Los clientes no podrán entrar al menú (máximo 6 horas). Tú la puedes ver con ?ver=kenmake.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-mant">Sí, poner</button><button data-acc="mantenimiento">Cancelar</button></div></div>` : ""}
     ${cocina && editandoHorario ? (() => { const h = horarioDeHoy() || HORARIO_NORMAL; return `<div class="banda-break"><div style="flex:1"><b>🕐 Horario solo para hoy</b>
       <small>Los clientes ven esta hora hoy. Mañana vuelve solo al horario normal (${hora12(HORARIO_NORMAL.abre)} – ${hora12(HORARIO_NORMAL.cierra)}).</small>
@@ -499,6 +524,7 @@ function pintar(){
   if (rol === "delivery") return pintarDelivery();
   if (vista === "agotados") return pintarAgotados();
   if (vista === "registro") return pintarRegistro();
+  if (vista === "admin") return pintarAdmin();
   if (abierto) { const p = pedidos.find(x => x.id === abierto); if (p) return pintarPedido(p); abierto = null; }
   const entregados = pedidos.filter(p => p.estado === "entregado" && !p.prueba);
   const vendido = entregados.reduce((a, p) => a + (p.total || 0), 0);
@@ -611,14 +637,12 @@ function pintarPedido(p){
     </div>`; })() : ""}
     ${p.estado === "preparando" && p.listoEn ? `<div class="reloj" data-reloj="${ms(p.listoEn)}"><span style="font-size:30px">⏱️</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Tiempo de preparación (${p.minutos} min)</small></div></div>` : ""}
     ${acciones}
-    <h2>Cliente</h2>
-    <div class="dos"><a class="btn" href="tel:${esc(String(p.tel).replace(/\D/g, ""))}">📞 Llamar</a><button class="btn" data-acc="wa">💬 WhatsApp</button></div>
-    <div class="dos" style="margin-top:10px"><button class="btn" data-acc="pago">${p.pagado ? "✅ Pago recibido" : "💰 Pago recibido"}</button><button class="btn" data-acc="seguimiento">📍 Enviar seguimiento</button></div>
+    <!-- @@SIN-BOTONES-CLIENTE: se quitaron Llamar, WhatsApp, Pago recibido y Enviar seguimiento; con el chat basta (el teléfono sale arriba en el pedido) -->
     ${entrega && (p.delivery == null || editandoDelivery === p.id) ? deliveryHTML(p) : entrega ? `<button class="btn borde" data-acc="editar-delivery" style="margin-top:10px">✏️ Cambiar precio del delivery</button>` : ""}
     ${chatHTML(p)}
     <div class="dos" style="margin-top:18px">
       ${["entregado", "rechazado"].includes(p.estado) && !p.archivado ? `<button class="btn borde" data-acc="archivar">🗂️ Archivar (quitar de la vista)</button>` : p.archivado ? `<button class="btn borde" data-acc="desarchivar">↩️ Sacar de archivados</button>` : ""}
-      <button class="btn borde" data-acc="prueba">${p.prueba ? "↩️ No es prueba" : "🧪 Es un pedido de prueba"}</button></div>
+      ${esSuper() ? `<button class="btn borde" data-acc="prueba">${p.prueba ? "↩️ No es prueba" : "🧪 Es un pedido de prueba"}</button>` : ""}</div>
     ${p.archivado ? `<button class="btn borde" data-acc="eliminar" style="margin-top:10px;color:#FF9A9A;border-color:#8A2A2A">🗑️ Quitar de la lista para siempre</button>
       <p class="ayuda" style="margin-top:6px">Desaparece del panel, pero ${p.prueba ? "(como es de prueba) no cuenta en las ventas" : "sigue contando en el total de pedidos y en lo vendido"}.</p>` : ""}
   `;
@@ -738,7 +762,7 @@ function periodo(cual){
 async function cargarRegistro(desde, hasta, titulo){
   if (!desde || !hasta || desde > hasta) { reg.error = "Revisa las fechas: la primera tiene que ser antes que la segunda."; return pintar(); }
   reg = { ...reg, desde, hasta, titulo, cargando: true, error: "", datos: null, abiertoDia: null }; pintar();
-  try { reg.datos = await buscarPedidos(desde, hasta); }
+  try { reg.datos = (await buscarPedidos(desde, hasta)).map(marcarPrueba); }
   catch(e) { console.error(e); reg.error = "No se pudo buscar. Revisa el internet."; }
   reg.cargando = false; pintar();
 }
@@ -789,6 +813,64 @@ function descargarRegistro(){
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   a.download = `ventas-jireh-${reg.desde}${reg.hasta !== reg.desde ? "-al-" + reg.hasta : ""}.csv`; document.body.append(a); a.click(); a.remove();
 }
+
+/* ================= @@ADMIN: pantalla "⚙️ Administrar" ================= */
+const hoyAdm = () => diaDeHoy();
+function pintarAdmin(){
+  if (!menuAdmin) {
+    $("#app").innerHTML = `<p class="vacio">Cargando productos…</p>`;
+    cargarMenuAdmin().then(m => { menuAdmin = m; pintar(); }).catch(() => { $("#app").innerHTML = `<button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button><p class="vacio">No se pudo cargar el menú. Revisa el internet.</p>`; });
+    return;
+  }
+  const precios = admin.precios || {}, textos = admin.textos || {}, ocultos = new Set(admin.ocultos || []);
+  const cambiados = Object.keys(precios).length + Object.keys(textos).length + ocultos.size;
+  const pest = (k, t) => `<button class="${pestAdmin === k ? "activo" : ""}" data-pest="${k}">${t}</button>`;
+  let cuerpo = "";
+  if (pestAdmin === "precios" || pestAdmin === "productos") {
+    cuerpo = `<input id="buscar-adm" type="search" placeholder="Buscar producto…" value="${esc(buscarAdm)}" style="margin-bottom:6px">
+    ${pestAdmin === "precios" ? `<p class="ayuda">Escribe el precio nuevo y toca ✓. El menú cambia al instante. "Normal" lo devuelve al precio de siempre.</p>`
+      : `<p class="ayuda">Cambia el nombre o la descripción, u oculta un producto que ya no vendes (para algo que solo se acabó hoy, usa Agotados).</p>`}
+    ${menuAdmin.map(sec => `<div class="sec-ag"><h2>${esc(sec.nombre)}</h2><div class="lista-p">${sec.items.map(p => {
+      const np = precios[p.id], t = textos[p.id] || {}, oc = ocultos.has(p.id), nom = t.nombre || p.nombre;
+      if (pestAdmin === "precios") return `<div class="fila-p fila-adm" data-n="${esc((nom + " " + p.nombre).toLowerCase())}">
+        <span>${esc(nom)}<small>${np ? `Normal: ${dinero(p.precio)} · <b style="color:var(--amarillo)">cambiado</b>` : `Normal: ${dinero(p.precio)}`}</small></span>
+        <span class="adm-precio"><input type="number" inputmode="numeric" min="1" step="5" id="pr-${esc(p.id)}" value="${np || p.precio}"><button class="sw" data-guardar-precio="${esc(p.id)}">✓</button>${np ? `<button class="sw off" data-precio-normal="${esc(p.id)}">Normal</button>` : ""}</span></div>`;
+      return `<div class="fila-p fila-adm fila-prod${oc ? " off" : ""}" data-n="${esc((nom + " " + p.nombre).toLowerCase())}">
+        <span>${esc(nom)}${t.nombre || t.desc ? ` <small style="color:var(--amarillo)">editado</small>` : ""}<small>${esc((t.desc || p.desc).slice(0, 70))}${(t.desc || p.desc).length > 70 ? "…" : ""}</small></span>
+        <span class="adm-precio"><button class="sw" data-editar="${esc(p.id)}">✏️ Editar</button><button class="sw${oc ? " off" : ""}" data-ocultar="${esc(p.id)}">${oc ? "Oculto" : "Visible"}</button></span></div>
+        ${editando === p.id ? `<div class="adm-editar"><label>Nombre<input id="ed-nombre" value="${esc(nom)}" maxlength="60"></label>
+          <label>Descripción<textarea id="ed-desc" rows="3" maxlength="300">${esc(t.desc || p.desc)}</textarea></label>
+          <div class="extra" style="margin:0"><button data-guardar-texto="${esc(p.id)}">Guardar</button>${t.nombre || t.desc ? `<button data-texto-normal="${esc(p.id)}">Volver al original</button>` : ""}<button data-editar="${esc(p.id)}">Cancelar</button></div></div>` : ""}`;
+    }).join("")}</div></div>`).join("")}`;
+  } else {
+    const pr = admin.promo || {}, activa = pr.activo && pr.hasta >= hoyAdm();
+    const secs = pr.secciones || [];
+    cuerpo = `${activa ? `<div class="caja-pago ok" style="margin-top:0"><h2 style="margin:0 0 4px">🔥 Promoción activa</h2><p style="margin:0">${esc(pr.titulo)} · -${pr.porcentaje}% · ${secs.length ? secs.length + " sección" + (secs.length > 1 ? "es" : "") : "toda la carta"} · hasta el ${esc(pr.hasta.slice(8))}/${esc(pr.hasta.slice(5, 7))}${pr.horaFin ? " a las " + hora12(pr.horaFin) : ""}</p>
+        <button class="btn borde" data-acc="promo-quitar" style="margin-top:10px">Quitar la promoción ahora</button></div>` : ""}
+      <div class="tarjeta"><h2 style="margin-top:0">${activa ? "Cambiar la promoción" : "Crear una promoción"}</h2>
+      <label class="adm-campo">Nombre (sale en la franja de arriba)<input id="pm-titulo" maxlength="40" placeholder="Ej.: MARTES DE HOT" value="${esc(pr.titulo || "")}"></label>
+      <label class="adm-campo">Texto<input id="pm-texto" maxlength="120" placeholder="Ej.: 15% en todos los empanizados" value="${esc(pr.texto || "")}"></label>
+      <div class="reg-fechas"><label>Descuento (%)<input id="pm-pct" type="number" inputmode="numeric" min="1" max="90" value="${pr.porcentaje || 15}"></label>
+        <label>Desde<input id="pm-desde" type="date" value="${pr.desde || hoyAdm()}"></label><label>Hasta<input id="pm-hasta" type="date" value="${pr.hasta || hoyAdm()}"></label>
+        <label>Termina a las (el último día)<input id="pm-hora" type="time" value="${pr.horaFin || "20:00"}"></label></div>
+      <p class="ayuda" style="margin:6px 0">¿En qué secciones? Si no marcas ninguna, es en <b>toda la carta</b>.</p>
+      <div class="chips adm-secs">${menuAdmin.map(sc => `<label><input type="checkbox" class="pm-sec" value="${esc(sc.id)}" ${secs.includes(sc.id) ? "checked" : ""}> ${esc(sc.nombre)}</label>`).join("")}</div>
+      <button class="btn verde" data-acc="promo-guardar" style="margin-top:12px">${activa ? "Guardar cambios" : "Activar la promoción"}</button></div>`;
+  }
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button>
+    <div class="cab"><div><h1>⚙️ Administrar</h1><small>Lo que cambies aquí se ve en la página al instante. ${cambiados ? cambiados + " cambio" + (cambiados > 1 ? "s" : "") + " hecho" + (cambiados > 1 ? "s" : "") + "." : ""} Productos nuevos, fotos y diseño: escríbele a Kenmake.</small></div></div>
+    <div class="filtros">${pest("precios", "💲 Precios")}${pest("productos", "🍣 Productos")}${pest("promo", "🔥 Promoción")}</div>
+    ${cuerpo}`;
+  const bq = $("#buscar-adm");
+  if (bq) { filtrarAdm(); bq.addEventListener("input", e => { buscarAdm = e.target.value; filtrarAdm(); }); }
+}
+function filtrarAdm(){
+  const q = buscarAdm.trim().toLowerCase();
+  document.querySelectorAll(".fila-adm").forEach(f => f.hidden = !!q && !f.dataset.n.includes(q));
+  document.querySelectorAll(".sec-ag").forEach(sc => sc.hidden = ![...sc.querySelectorAll(".fila-adm")].some(f => !f.hidden));
+}
+const guardarYAvisar = (pr, ok) => pr.then(() => avisar(ok)).catch(e => { console.error(e); avisar("No se pudo guardar. Revisa el internet."); });
 
 function pintarAgotados(){
   if (!catalogo) {
@@ -908,6 +990,35 @@ document.addEventListener("click", e => {
   }
   if (b.dataset.acc === "ver-agotados") { vista = "agotados"; abierto = null; seguroTodo = false; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.acc === "ver-pedidos") { vista = "pedidos"; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.acc === "ver-admin") { vista = "admin"; abierto = null; editando = null; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.pest) { pestAdmin = b.dataset.pest; editando = null; return pintar(); }
+  if (b.dataset.guardarPrecio) {
+    const id = b.dataset.guardarPrecio, v = Math.round(Number($("#pr-" + id).value));
+    const base = menuAdmin.flatMap(sc => sc.items).find(p => p.id === id);
+    if (!(v > 0)) return avisar("Escribe un precio válido.");
+    if (v === base.precio) { (admin.precios || {})[id] && guardarYAvisar(guardarAdmin(["precios", id], null), "Precio normal"); return; }
+    return guardarYAvisar(guardarAdmin(["precios", id], v), `💲 ${base.nombre}: ${dinero(v)}`);
+  }
+  if (b.dataset.precioNormal) return guardarYAvisar(guardarAdmin(["precios", b.dataset.precioNormal], null), "💲 Volvió a su precio normal");
+  if (b.dataset.ocultar) { const id = b.dataset.ocultar, oc = !(admin.ocultos || []).includes(id); return guardarYAvisar(ocultarProducto(id, oc), oc ? "🙈 Oculto: ya no sale en el menú" : "👀 Visible otra vez"); }
+  if (b.dataset.editar) { editando = editando === b.dataset.editar ? null : b.dataset.editar; return pintar(); }
+  if (b.dataset.guardarTexto) {
+    const id = b.dataset.guardarTexto, base = menuAdmin.flatMap(sc => sc.items).find(p => p.id === id);
+    const n = $("#ed-nombre").value.trim(), d = $("#ed-desc").value.trim(), t = {};
+    if (n && n !== base.nombre) t.nombre = n; if (d && d !== base.desc) t.desc = d;
+    editando = null;
+    return guardarYAvisar(guardarAdmin(["textos", id], Object.keys(t).length ? t : null), "✏️ Guardado");
+  }
+  if (b.dataset.textoNormal) { editando = null; return guardarYAvisar(guardarAdmin(["textos", b.dataset.textoNormal], null), "Volvió al texto original"); }
+  if (b.dataset.acc === "promo-guardar") {
+    const promo = { activo: true, titulo: $("#pm-titulo").value.trim().toUpperCase() || "PROMOCIÓN", texto: $("#pm-texto").value.trim(), porcentaje: Math.round(Number($("#pm-pct").value)),
+      desde: $("#pm-desde").value, hasta: $("#pm-hasta").value, horaFin: $("#pm-hora").value || "", secciones: [...document.querySelectorAll(".pm-sec:checked")].map(x => x.value) };
+    if (!(promo.porcentaje > 0 && promo.porcentaje <= 90)) return avisar("El descuento tiene que ser entre 1 y 90 %.");
+    if (!promo.desde || !promo.hasta || promo.desde > promo.hasta) return avisar("Revisa las fechas: \"Desde\" tiene que ser antes que \"Hasta\".");
+    if (!promo.texto) promo.texto = `${promo.porcentaje}% de descuento${promo.secciones.length ? " en " + menuAdmin.filter(sc => promo.secciones.includes(sc.id)).map(sc => sc.nombre).join(", ") : " en toda la carta"}`;
+    return guardarYAvisar(guardarAdmin(["promo"], promo), "🔥 Promoción guardada");
+  }
+  if (b.dataset.acc === "promo-quitar") return guardarYAvisar(guardarAdmin(["promo"], null), "Promoción quitada");
   if (b.dataset.acc === "ver-registro") { vista = "registro"; abierto = null; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.periodo) { const [d, h, t] = periodo(b.dataset.periodo); return cargarRegistro(d, h, t); }
   if (b.dataset.acc === "reg-buscar") return cargarRegistro($("#reg-desde").value, $("#reg-hasta").value, "");
