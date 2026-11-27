@@ -316,7 +316,7 @@ const PROMO = {
 /* @@NEGOCIO */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
-  whatsapp: "18498846470",          // TEMPORAL (27 nov): número de Kengis para arreglos. Para volver al dueño: 18493604892
+  whatsapp: "18493604892",          // WhatsApp del dueño de Jireh
   telefono: "(849) 360-4892",
   direccion: "Calle Central #18, Ana Teresa Balaguer",
   direccionCompleta: "Calle Central #18, Ana Teresa Balaguer, Hainamosa, Santo Domingo Este",
@@ -338,8 +338,13 @@ $("#anio").textContent = new Date().getFullYear();
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 const min = h => { const [a, b] = h.split(":").map(Number); return a * 60 + (b || 0); };
 const bonita = h => { const [a, b] = h.split(":").map(Number); return `${(a % 12) || 12}:${String(b || 0).padStart(2, "0")} ${a >= 12 ? "PM" : "AM"}`; };
-const cierreDe = d => (NEGOCIO.horario.cierraDia || {})[d] || NEGOCIO.horario.cierra;
-const rangoDe = d => `${bonita(NEGOCIO.horario.abre)} – ${bonita(cierreDe(d))}`;
+const hoyTexto = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+let HORARIO_HOY = null;   // @@HORARIO-HOY: {dia, abre, cierra} que pusieron en el panel solo para hoy
+const especialHoy = dia => HORARIO_HOY && HORARIO_HOY.dia === hoyTexto() && dia === new Date().getDay() ? HORARIO_HOY : null;
+const cierreDe = d => { const e = especialHoy(d); return (e && e.cierra) || (NEGOCIO.horario.cierraDia || {})[d] || NEGOCIO.horario.cierra; };
+const abreDe = d => { const e = especialHoy(d); return (e && e.abre) || NEGOCIO.horario.abre; };
+const rangoDe = d => `${bonita(abreDe(d))} – ${bonita(cierreDe(d))}`;
+window.aplicarHorarioHoy = config => { HORARIO_HOY = config && config.horarioHoy ? config.horarioHoy : null; pintarHoras(); estado(); };
 const rango = rangoDe(2);
 const cerrados = NEGOCIO.diasCerrado.map(d => DIAS[d]).join(", ");
 /* @@HOY — tabla del horario con el día de hoy resaltado */
@@ -349,7 +354,7 @@ const cerradoHoy = () => CIERRE_HASTA > Date.now();
 window.aplicarCierre = hasta => { CIERRE_HASTA = hasta || 0; pintarHoras(); estado(); };
 function pintarHoras(){
   const ahora = new Date(), hoy = ahora.getDay(), t = ahora.getHours() * 60 + ahora.getMinutes();
-  const abiertoAhora = !cerradoHoy() && !NEGOCIO.diasCerrado.includes(hoy) && t >= min(NEGOCIO.horario.abre) && t < min(cierreDe(hoy));
+  const abiertoAhora = !cerradoHoy() && !NEGOCIO.diasCerrado.includes(hoy) && t >= min(abreDe(hoy)) && t < min(cierreDe(hoy));
   $("#horas").innerHTML = [1,2,3,4,5,6,0].map(d => {
     const c = NEGOCIO.diasCerrado.includes(d), esHoy = d === hoy;
     const est = esHoy ? `<span class="estado-hoy" style="color:${abiertoAhora ? "#3DDC84" : "#8A8580"}">${abiertoAhora ? "● Abierto ahora" : "● Cerrado ahora"}</span>` : "";
@@ -360,11 +365,11 @@ function pintarHoras(){
 }
 pintarHoras(); setInterval(pintarHoras, 60000);
 function estado(){
-  const ahora = new Date(), t = ahora.getHours() * 60 + ahora.getMinutes(), a = min(NEGOCIO.horario.abre), c = min(cierreDe(ahora.getDay()));
+  const ahora = new Date(), t = ahora.getHours() * 60 + ahora.getMinutes(), a = min(abreDe(ahora.getDay())), c = min(cierreDe(ahora.getDay()));
   const abierto = !cerradoHoy() && !NEGOCIO.diasCerrado.includes(ahora.getDay()) && t >= a && t < c;
   let prox = "hoy";
   for (let k = 0; k < 8; k++) { const d = (ahora.getDay() + k) % 7; if (NEGOCIO.diasCerrado.includes(d) || (k === 0 && (t >= a || cerradoHoy()))) continue; prox = k === 0 ? "hoy" : k === 1 ? "mañana" : "el " + DIAS[d].toLowerCase(); break; }
-  const h = bonita(NEGOCIO.horario.abre), alas = (h.startsWith("1:") ? "a la " : "a las ") + h;
+  const h = bonita(prox === "hoy" ? abreDe(ahora.getDay()) : NEGOCIO.horario.abre), alas = (h.startsWith("1:") ? "a la " : "a las ") + h;
   $("#estado span").textContent = abierto ? "Abierto ahora · Ordena en línea" : `Cerrado${cerradoHoy() ? " por hoy" : ""} · Abrimos ${prox === "hoy" ? "" : prox + " "}${alas}`;
   $("#estado i").style.background = abierto ? "#3DDC84" : "#8A8580";
 }
@@ -374,13 +379,14 @@ estado(); setInterval(estado, 60000);
    Para cambiar las fotos: agrega o quita líneas. "precio" es opcional.
    llenar: true = la foto cubre todo el cuadro (para fotos anchas sin texto).
    nombre: "" = no se muestra la etiqueta (para fotos que ya traen su texto). */
-const PASARELA = [   // orden del 25 nov. La de Black Friday se pone sola de primera el viernes (menu/descuento.js)
+const PASARELA = [   // orden del 27 nov. La de Black Friday se pone sola de primera mientras dure (menu/descuento.js)
   { img: "menu/fotos/pasarela/pausa-perfecta.jpg",     nombre: "" },
-  { img: "menu/fotos/antojo-24.jpg",                   nombre: "" },
+  { img: "menu/fotos/pasarela/new-mix-16.jpg",         nombre: "" },
   { img: "menu/fotos/pasarela/california-green.jpg",   nombre: "" },
+  { img: "menu/fotos/pasarela/mix-pollo.jpg",          nombre: "" },
   { img: "menu/fotos/pasarela/sushi-burger-pollo.jpg", nombre: "" },
-  { img: "menu/fotos/pasarela/eby-banana.jpg",         nombre: "" },
-  { img: "menu/fotos/pasarela/fernando-rolls.jpg",     nombre: "" }
+  { img: "menu/fotos/pasarela/hot-pollo.jpg",          nombre: "" },
+  { img: "menu/fotos/pasarela/hand-roll-pollo.jpg",    nombre: "" }
 ];
 if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY && DESCUENTO.imagen) PASARELA.unshift({ img: DESCUENTO.imagen, nombre: "" });   // @@DESCUENTO: su foto sale primero
 if (typeof AVISO_HOY !== "undefined" && AVISO_HOY) PASARELA.unshift({ img: AVISO_ANTES.imagen, nombre: "" });   // @@AVISO-ANTES: "Falta 1 día", solo ese día
@@ -443,10 +449,15 @@ document.querySelectorAll("img").forEach(i => { const f = () => i.classList.add(
 if (typeof DESCUENTO_HOY !== "undefined" && DESCUENTO_HOY) document.getElementById("barra-descuento").outerHTML =
   `<div class="barra-descuento"><b>🖤 ${DESCUENTO.titulo}</b><span class="pct">-${DESCUENTO.porcentaje}%</span><span>${DESCUENTO.texto}</span><a href="menu/index.html${/descuento=ver/.test(location.search) ? "?descuento=ver" : ""}">Pedir ahora</a></div>`;
 </script>
+<script src="menu/mantenimiento.js"></script>
 <!-- @@CERRAR-HOY: lee de Firebase si el negocio cerró temprano hoy. Si no carga, la portada sigue normal. -->
 <script type="module">
 import { escucharDisponibilidad } from "./menu/fb.js";
-escucharDisponibilidad((lista, config) => window.aplicarCierre(config && config.cerradoHoy ? config.cerradoHoy.hasta : 0));
+escucharDisponibilidad((lista, config) => {
+  window.aplicarHorarioHoy(config);   // @@HORARIO-HOY
+  window.aplicarCierre(config && config.cerradoHoy ? config.cerradoHoy.hasta : 0);
+  if (window.aplicarMantenimiento) window.aplicarMantenimiento(config, NEGOCIO.whatsapp, "menu/");   // @@MANTENIMIENTO
+});
 </script>
 </body>
 </html>

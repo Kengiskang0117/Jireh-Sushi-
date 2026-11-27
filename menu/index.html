@@ -529,13 +529,14 @@ a.pie-dato:hover{border-color:var(--acento)}
 <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
 <script src="descuento.js"></script>
+<script src="mantenimiento.js"></script>
 <script>
 /* =========================================================
    @@NEGOCIO — 1. DATOS DEL NEGOCIO  (para otro cliente, cambia esto)
    ========================================================= */
 const NEGOCIO = {
   nombre: "Jireh Sushi",
-  whatsapp: "18498846470",           // @@WHATSAPP  TEMPORAL (27 nov): número de Kengis. Para volver al dueño: 18493604892
+  whatsapp: "18493604892",           // @@WHATSAPP  del dueño de Jireh
   telefono: "(849) 360-4892",         // @@TELEFONO
   direccion: "Calle Central #18, Ana Teresa Balaguer",    // @@DIRECCION  (versión corta que se ve en la página)
   direccionCompleta: "Calle Central #18, Ana Teresa Balaguer, Hainamosa, Santo Domingo Este",   // la completa, para el mapa y los mensajes
@@ -861,7 +862,7 @@ let PAUSA = null;
 /* @@CERRAR-HOY: si el equipo tocó "Cerrar por hoy" en el panel, el menú se ve pero NO deja enviar pedidos hasta mañana. */
 let CIERRE = null;
 const cerradoHoy = () => !!(CIERRE && CIERRE.hasta > Date.now());
-const textoCierre = () => { const d = proximoDia(); return `Hoy cerramos temprano 🙏 Volvemos ${d === "hoy" ? "hoy" : d} ${aLas(horaBonita(NEGOCIO.horario.abre))}. ¡Gracias por tu comprensión!`; };
+const textoCierre = () => { const d = proximoDia(); return `Hoy cerramos temprano 🙏 Volvemos ${d === "hoy" ? "hoy" : d} ${aLas(horaBonita(abreProximo()))}. ¡Gracias por tu comprensión!`; };
 const horaCorta = ms => new Date(ms).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" });
 const enBreak = () => !!(PAUSA && PAUSA.hasta > Date.now());
 const textoBreak = () => `Estamos en break 🍽️ Volvemos a las ${horaCorta(PAUSA.hasta)} · Puedes hacer tu pedido y lo preparamos al volver.`;
@@ -941,7 +942,7 @@ function pintarHero(){
       <span style="display:flex;flex-wrap:wrap;gap:8px"><span class="etiqueta">${esc(DESTACADO_ETIQUETA)}</span>${p.oferta ? `<span class="etiqueta oferta">🔥 ${esc(p.oferta)}</span>` : ""}</span>
       <h1 class="display">${esc(p.nombre)}</h1>
       <p>${esc(p.desc)}</p>
-      <div class="hero-pie">${precioHTML(p, 22)}${estaAgotado(p) ? `<span class="agotado-tag">Agotado por hoy</span>` : `<span class="btn-acento">${ICONO_MAS} Agregar</span>`}</div>
+      <div class="hero-pie">${precioHTML(p, 22)}${estaAgotado(p) ? `<span class="agotado-tag">Agotado</span>` : `<span class="btn-acento">${ICONO_MAS} Agregar</span>`}</div>
     </div>`;
   $("#hero").dataset.id = p.id;
 }
@@ -1227,7 +1228,7 @@ function htmlCarrito(){
       <div class="info">
         <div class="arriba"><span>${esc(nombreLinea(l))}</span><span class="precio">${dinero(precioUnidad(l) * l.cant)}</span></div>
         ${detallesLinea(l).map(x => `<div class="nota">${esc(x)}</div>`).join("")}
-        ${lineaAgotada(l) ? `<div class="nota" style="color:#FF8A8F;font-weight:800">Agotado por hoy: quítalo para continuar</div>` : ""}
+        ${lineaAgotada(l) ? `<div class="nota" style="color:#FF8A8F;font-weight:800">Agotado: quítalo para continuar</div>` : ""}
         <div class="abajo">
           <div class="cantidad"><button data-acc="menos" data-i="${i}" aria-label="Quitar uno">−</button><span>${l.cant}</span><button data-acc="mas" data-i="${i}" aria-label="Agregar uno">+</button></div>
           <button class="quitar" data-acc="quitar" data-i="${i}">Eliminar</button>
@@ -1472,6 +1473,7 @@ async function enviarPedido(raiz){
       const id = r.id; idPedido = r.codigo;
       miPedido = { id, codigo: idPedido };
       try { localStorage.setItem("jireh-mi-pedido", JSON.stringify({ id, codigo: idPedido, t: Date.now() })); } catch(e) {}
+      try { fetch("/api/aviso", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ id, tipo: "nuevo" }) }).catch(() => {}); } catch(e) {}   // @@AVISOS-PUSH: le suena a la cocina
       if (pago === "Transferencia" && comprobanteFoto && window.JirehFB.enviarMensaje) {   // @@PAGO-OBLIGATORIO: el comprobante va al chat
         if (boton) boton.textContent = "Enviando comprobante…";
         try { await Promise.race([window.JirehFB.enviarMensaje(id, "cliente", "🧾 Comprobante de transferencia (" + pedido.totalTexto + (pedido.banco ? " · " + pedido.banco : "") + ")", comprobanteFoto), new Promise(ok => setTimeout(ok, 12000))]); }
@@ -1564,7 +1566,7 @@ function abrirDetalle(id){
     </div>
     <div class="detalle-pie">
       <div class="cantidad"><button data-acc="menos" aria-label="Quitar uno">−</button><span id="det-cant">1</span><button data-acc="mas" aria-label="Agregar uno">+</button></div>
-      <button class="btn-acento" data-acc="agregar" id="det-agregar" ${sinPrecio || ag ? "disabled" : ""}>${ag ? "Agotado por hoy" : sinPrecio ? "Precio pendiente" : "Agregar · " + dinero(p.precio)}</button>
+      <button class="btn-acento" data-acc="agregar" id="det-agregar" ${sinPrecio || ag ? "disabled" : ""}>${ag ? "Agotado" : sinPrecio ? "Precio pendiente" : "Agregar · " + dinero(p.precio)}</button>
     </div>`;
   $("#detalle").dataset.id = id;
   abrir($("#detalle"));
@@ -1669,11 +1671,17 @@ if (mesaQR) $("#cambiar-modo").hidden = true;   // si viene del QR de la mesa, n
 
 /* ---------- Horario: abierto o cerrado ---------- */
 function minutosDe(hhmm){ const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); }
-function cierreDe(dia){ return (NEGOCIO.horario.cierraDia || {})[dia] || NEGOCIO.horario.cierra; }   // hora de cerrar de ese día
+const hoyTexto = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+let HORARIO_HOY = null;   // @@HORARIO-HOY: {dia, abre, cierra} que pusieron en el panel solo para hoy
+const especialHoy = dia => HORARIO_HOY && HORARIO_HOY.dia === hoyTexto() && dia === new Date().getDay() ? HORARIO_HOY : null;
+function cierreDe(dia){ const e = especialHoy(dia); return (e && e.cierra) || (NEGOCIO.horario.cierraDia || {})[dia] || NEGOCIO.horario.cierra; }   // hora de cerrar de ese día
+function abreDe(dia){ const e = especialHoy(dia); return (e && e.abre) || NEGOCIO.horario.abre; }   // hora de abrir de ese día
+const abreProximo = () => abreDe(proximoDia() === "hoy" ? new Date().getDay() : -1);   // hora de abrir de la próxima vez que abre
+window.aplicarHorarioHoy = config => { HORARIO_HOY = config && config.horarioHoy ? config.horarioHoy : null; if ($("#estado span")) pintarEstado(); };
 function estaAbierto(){
   if (typeof cerradoHoy === "function" && cerradoHoy()) return false;   // @@CERRAR-HOY
   const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes();
-  const a = minutosDe(NEGOCIO.horario.abre), c = minutosDe(cierreDe(ahora.getDay()));
+  const a = minutosDe(abreDe(ahora.getDay())), c = minutosDe(cierreDe(ahora.getDay()));
   const dia = (a < c || m >= a) ? ahora.getDay() : (ahora.getDay() + 6) % 7;   // después de medianoche cuenta el día anterior
   if ((NEGOCIO.diasCerrado || []).includes(dia)) return false;
   return a < c ? (m >= a && m < c) : (m >= a || m < c);   // si cierra después de medianoche
@@ -1681,7 +1689,7 @@ function estaAbierto(){
 const DIAS_SEMANA = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 const aLas = h => (h.startsWith("1:") ? "a la " : "a las ") + h;
 function proximoDia(){   // "hoy", "mañana" o "el martes": cuándo vuelve a abrir
-  const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes(), a = minutosDe(NEGOCIO.horario.abre);
+  const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes(), a = minutosDe(abreDe(ahora.getDay()));
   for (let k = 0; k < 8; k++) {
     const d = (ahora.getDay() + k) % 7;
     if ((NEGOCIO.diasCerrado || []).includes(d) || (k === 0 && (m >= a || cerradoHoy()))) continue;
@@ -1695,20 +1703,21 @@ function pintarEstado(){
   const AVISO_ANTES = 60;   // minutos antes de abrir para decir "Casi abrimos"
   const AVISO_CIERRE = 30;  // minutos antes de cerrar para decir "Cerramos pronto"
   const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes();
-  const a = minutosDe(NEGOCIO.horario.abre), c = minutosDe(cierreDe(ahora.getDay()));
+  const a = minutosDe(abreDe(ahora.getDay())), c = minutosDe(cierreDe(ahora.getDay()));
   const faltaAbrir = (a - m + 1440) % 1440, faltaCerrar = (c - m + 1440) % 1440;
   const abierto = estaAbierto();
   let texto, color;
   if (abierto && faltaCerrar <= AVISO_CIERRE) { texto = `Cerramos pronto · ${aLas(horaBonita(cierreDe(ahora.getDay())))}`; color = "#F2994A"; }
   else if (abierto) { texto = "Abierto ahora"; color = "#3DDC84"; }
-  else if (cerradoHoy()) { const d = proximoDia(); texto = `Cerrado por hoy · Abrimos ${d} ${aLas(horaBonita(NEGOCIO.horario.abre))}`; color = "#8C867E"; }
+  else if (cerradoHoy()) { const d = proximoDia(); texto = `Cerrado por hoy · Abrimos ${d} ${aLas(horaBonita(abreProximo()))}`; color = "#8C867E"; }
   else if (faltaAbrir <= AVISO_ANTES && proximoDia() === "hoy") { texto = `¡Casi abrimos! · en ${faltaAbrir} min`; color = "#F2C230"; }
-  else { const d = proximoDia(); texto = `Cerrado · Abrimos ${d === "hoy" ? "" : d + " "}${aLas(horaBonita(NEGOCIO.horario.abre))}`; color = "#8C867E"; }
+  else { const d = proximoDia(); texto = `Cerrado · Abrimos ${d === "hoy" ? "hoy " : d + " "}${aLas(horaBonita(abreProximo()))}`; color = "#8C867E"; }
   const punto = $("#estado i");
   punto.style.background = color;
   punto.style.boxShadow = color === "#8C867E" ? "none" : `0 0 0 4px ${color}33`;
   $("#estado span").textContent = texto;
-  $("#horario").textContent = "Horario: " + NEGOCIO.horario.texto;
+  const e = especialHoy(new Date().getDay());
+  $("#horario").textContent = e ? `Hoy: ${horaBonita(abreDe(new Date().getDay()))} – ${horaBonita(cierreDe(new Date().getDay()))}` : "Horario: " + NEGOCIO.horario.texto;
 }
 
 /* ---------- Información, redes y pie ---------- */
@@ -1765,7 +1774,7 @@ mostrarSplash(1300, () => { if (!modo) mostrarLobby(); else irACategoriaDeLaPort
 <script type="module">
 import { crearPedido, escucharDisponibilidad, escucharSeguimiento, enviarMensaje } from "./fb.js";
 window.JirehFB = { crearPedido, enviarMensaje };
-escucharDisponibilidad((lista, config) => window.aplicarAgotados(lista, config));   // @@AGOTADOS en vivo
+escucharDisponibilidad((lista, config) => { window.aplicarAgotados(lista, config); window.aplicarHorarioHoy(config); if (window.aplicarMantenimiento) window.aplicarMantenimiento(config, NEGOCIO.whatsapp, ""); });   // @@AGOTADOS y @@MANTENIMIENTO en vivo
 
 /* @@MI-PEDIDO: botón flotante "Ver mi pedido" si el cliente tiene un pedido en curso (últimas 8 horas).
    Muestra el estado en vivo y DESAPARECE solo cuando el pedido se entrega o se rechaza. */

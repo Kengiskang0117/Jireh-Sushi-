@@ -126,14 +126,15 @@ body{padding-bottom:90px}
 
 <script type="module">
 /* @@TEXTOS */
-const NEGOCIO = { nombre: "Jireh Sushi", whatsapp: "18498846470" };   // TEMPORAL (27 nov): número de Kengis. Para volver al dueño: 18493604892
+const NEGOCIO = { nombre: "Jireh Sushi", whatsapp: "18493604892" };   // WhatsApp del dueño de Jireh
 const TEXTOS = {
   nuevo: ["Tu pedido llegó 🙌", "Estamos por confirmarlo, un momentito"],
   preparando: [["Estamos armando tus rolls 🍣", "Hecho al momento, con ingredientes frescos"],
                ["Cortando con cariño… 🔪", "Ya mismo queda"],
                ["Poniéndole el toque final ✨", "Salsas, toppings y a la caja"]],
   listoLlevar: ["¡Tu pedido está listo! 🙌", "Puedes pasar a buscarlo"],
-  listoDelivery: ["¡Tu pedido está listo! 🛍️", "El delivery sale en un momento"],
+  listoDelivery: ["¡Tu pedido está listo! 🛍️", "Esperando al delivery"],
+  recogiendo: ["El delivery va a recoger tu orden 🛵", "Ya va para el local a buscarla"],   // @@RECOGER
   en_camino: [["Tu pedido va saliendo 🛵", "El delivery ya arrancó"],
               ["Ya va por el camino 🛵", "Pendiente al teléfono"],
               ["¡Casi llega! 📍", "Ten el teléfono a mano"]],
@@ -304,12 +305,13 @@ function tick(){
     return;
   }
 
-  if (estado === "listo") { textos(delivery ? TEXTOS.listoDelivery : TEXTOS.listoLlevar); medidor(1, "Preparado", "<b>✓</b>", true); return; }
+  if (estado === "listo") { textos(delivery ? (s.recogiendo ? TEXTOS.recogiendo : TEXTOS.listoDelivery) : TEXTOS.listoLlevar); medidor(1, "Preparado", "<b>✓</b>", true); return; }
 
   if (estado === "en_camino") {
     const viaje = (s.viaje || 20) * 60000, salio = ms(s.salio) || Date.now();
     const pasado = Date.now() - salio, falta = viaje - pasado;
-    const pct = Math.max(.04, Math.min(.94, pasado / viaje));      // nunca llega a la casa hasta que marquen "Entregado"
+    let pct = Math.max(.04, Math.min(.94, pasado / viaje));      // nunca llega a la casa hasta que marquen "Entregado"
+    if (!isFinite(pct)) pct = .1;   // por si llega un dato raro: el motorcito no se rompe
     const ruta = document.getElementById("ruta"), moto = document.getElementById("moto"), hecho = document.getElementById("hecho");
     if (ruta && moto) {
       const L = ruta.getTotalLength(), p = ruta.getPointAtLength(L * pct);
@@ -440,7 +442,10 @@ if (demo) {
 } else if (!id) pintar(null);
 else import("./fb.js").then(({ escucharSeguimiento, escucharDisponibilidad, escucharChat, enviarMensaje }) => {
   escucharSeguimiento(id, s => { pintar(s); if (s) montarChat(); }, () => pintar(null));
-  chatEnviar = (t, f) => enviarMensaje(id, "cliente", t, f);
+  chatEnviar = (t, f) => enviarMensaje(id, "cliente", t, f).then(r => {   // @@AVISOS-PUSH: le suena a la cocina
+    try { fetch("/api/aviso", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ id, tipo: "chat" }) }).catch(() => {}); } catch(e) {}
+    return r;
+  });
   escucharChat(id, l => { if (l) { chatMsjs = l; pintarChat(); } });
   escucharDisponibilidad((l, c) => { PAUSA = c && c.pausa ? c.pausa : null; });
 }).catch(() => pintar(null));

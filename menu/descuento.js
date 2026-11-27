@@ -16,10 +16,11 @@
 const DESCUENTO = {
   activo: true,
   desde: "2026-11-27",
-  hasta: "2026-11-28",
+  hasta: "2026-11-27",
+  horaFin: "20:00",          // el último día se quita a esta hora (24 h). Vacío "" = todo el día
   porcentaje: 15,
   titulo: "BLACK FRIDAY",
-  texto: "15% de descuento en toda la carta · Viernes y sábado",
+  texto: "15% de descuento en toda la carta · Solo hoy hasta las 8:00 PM",
   excluir: ["bebidas"],
   imagen: "menu/fotos/pasarela/black-friday.jpg"
 };
@@ -38,6 +39,10 @@ const DESCUENTO_HOY = (function(){
   if (/[?&]descuento=ver\b/.test(location.search)) return true;
   if (!DESCUENTO.activo) return false;
   const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  if (hoy === DESCUENTO.hasta && DESCUENTO.horaFin) {   // último día: se quita a la hora indicada
+    const [hh, mm] = DESCUENTO.horaFin.split(":").map(Number);
+    if (d.getHours() * 60 + d.getMinutes() >= hh * 60 + mm) return false;
+  }
   return hoy >= DESCUENTO.desde && hoy <= DESCUENTO.hasta;
 })();
 
@@ -45,4 +50,13 @@ const AVISO_HOY = (function(){
   if (!AVISO_ANTES.activo || DESCUENTO_HOY) return false;
   const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   return hoy >= AVISO_ANTES.desde && hoy <= AVISO_ANTES.hasta;
+})();
+
+/* Si la página está abierta cuando llega la hora de fin, se recarga sola para quitar el descuento (el carrito se guarda). */
+(function(){
+  if (!DESCUENTO_HOY || !DESCUENTO.horaFin || /[?&]descuento=ver\b/.test(location.search)) return;
+  const d = new Date(), hoy = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  if (hoy !== DESCUENTO.hasta) return;
+  const [hh, mm] = DESCUENTO.horaFin.split(":").map(Number), fin = new Date(d); fin.setHours(hh, mm, 0, 0);
+  const falta = fin - d; if (falta > 0 && falta < 86400000) setTimeout(() => location.reload(), falta + 1000);
 })();

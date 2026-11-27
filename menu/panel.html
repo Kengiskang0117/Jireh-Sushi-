@@ -104,6 +104,8 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 .con-archivar{margin-bottom:10px}.con-archivar>.pedido{margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0}
 .archivar-rapido{display:block;width:100%;height:42px;border:1px solid var(--borde,#333);border-top:0;border-radius:0 0 16px 16px;background:#161616;color:#D6D1CB;font:inherit;font-size:14.5px;font-weight:700;cursor:pointer}
 .archivar-rapido:active{background:#222}
+.pie-acciones{display:grid;grid-template-columns:1fr 1fr}.pie-acciones .archivar-rapido:first-child{border-radius:0 0 0 16px}
+.pie-acciones .archivar-rapido.borrar{border-left:0;border-radius:0 0 16px 0;color:#FF9A9A}
 .reg-fechas{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 12px}.reg-fechas label{display:flex;flex-direction:column;font-size:13px;color:#B5B1AD;gap:4px;flex:1;min-width:130px}
 .reg-fechas input{min-height:44px}.reg-fechas .btn{min-height:44px;width:auto;padding:0 18px}
 .reg-dia{border:1px solid var(--borde,#333);border-radius:16px;margin-bottom:8px;overflow:hidden;background:#141414}
@@ -169,7 +171,7 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--bo
 <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, guardarBreak, guardarCierre, escucharChat, enviarMensaje, diaDeHoy, buscarPedidos } from "./fb.js";
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, marcarAgotado, guardarBreak, guardarCierre, guardarMantenimiento, guardarHorarioHoy, escucharChat, enviarMensaje, diaDeHoy, buscarPedidos, tokenSesion } from "./fb.js";
 
 const NEGOCIO = { nombre: "Jireh Sushi" };
 /* @@DELIVERYS — correos de los repartidores (en minúscula). Al entrar con uno de estos,
@@ -214,7 +216,13 @@ const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").s
 
 /* ---------- Estado de la pantalla ---------- */
 let rol = "cocina", usuarioActual = "", pausa = null, eligiendoBreak = false;
-let cierre = null, confirmandoCierre = false, eliminandoTodos = false, rechazando = null;   // @@CERRAR-HOY
+let cierre = null, confirmandoCierre = false, eliminandoTodos = false, rechazando = null;
+let mant = null, confirmandoMant = false, borrando = null;   // @@MANTENIMIENTO
+let horarioHoy = null, editandoHorario = false;   // @@HORARIO-HOY
+const HORARIO_NORMAL = { abre: "13:00", cierra: "20:00" };   // igual que en menu/index.html (@@HORARIO)
+const horarioDeHoy = () => horarioHoy && horarioHoy.dia === diaDeHoy() ? horarioHoy : null;
+const hora12 = h => { const [a, b] = h.split(":").map(Number); return `${(a % 12) || 12}:${String(b || 0).padStart(2, "0")} ${a >= 12 ? "PM" : "AM"}`; };
+const enMantenimiento = () => !!(mant && mant.hasta > Date.now());   // @@CERRAR-HOY
 const cerradoHoy = () => !!(cierre && cierre.hasta > Date.now());
 const finDelDia = () => { const d = new Date(); d.setHours(23, 59, 59, 0); return d.getTime(); };
 const enBreak = () => !!(pausa && pausa.hasta > Date.now());
@@ -246,8 +254,25 @@ async function prepararAvisos(){
     if ("serviceWorker" in navigator && !registro) registro = await navigator.serviceWorker.register("sw.js");
     if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
   } catch(e) { console.warn("avisos", e); }
+  apuntarPush();
   pintar();
 }
+/* @@AVISOS-PUSH: apunta este celular en Cloudflare para que le lleguen avisos con la app cerrada */
+const CLAVE_PUSH = "BPeIc7uAhOtQ2tdILSZYmcZM5CX6jQYzrov1ictk9NOZiXcqrohCmPJd3V-wldcm1WYrhd95TkV-CwN3ceDLngw";
+let pushListo = false;
+async function apuntarPush(){
+  try {
+    if (pushListo || !avisosOK() || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    const reg = registro || await navigator.serviceWorker.ready; registro = reg;
+    const k = CLAVE_PUSH.replace(/-/g, "+").replace(/_/g, "/"), clave = Uint8Array.from(atob(k + "=".repeat((4 - k.length % 4) % 4)), c => c.charCodeAt(0));
+    const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: clave });
+    const token = await tokenSesion(); if (!token) return;
+    const r = await fetch("/api/suscribir", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, sub: sub.toJSON() }) });
+    if (r.ok) { pushListo = true; if (!localStorage.getItem("push-avisado")) { localStorage.setItem("push-avisado", "1"); avisar("🔔 Listo: te van a llegar avisos aunque cierres la app"); } }
+    else console.warn("push: Cloudflare respondió", r.status, await r.text());
+  } catch(e) { console.warn("push", e); }
+}
+const avisarCloudflare = async (id, tipo) => { try { const token = await tokenSesion(); fetch("/api/aviso", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ id, tipo, token }) }).catch(() => {}); } catch(e) {} };
 const avisosOK = () => "Notification" in window && Notification.permission === "granted";
 function notificar(titulo, cuerpo, tag){
   if (!avisosOK()) return;
@@ -331,15 +356,15 @@ let dejarDeEscuchar = null, suscribirPedidos = null, diaEscuchado = "";
 alCambiarSesion(usuario => {
   if (dejarDeEscuchar) { dejarDeEscuchar(); dejarDeEscuchar = null; }
   suscribirPedidos = null;
-  if (!usuario) { pedidos = []; Object.values(chatsOff).forEach(f => f()); chatsOff = {}; chats = {}; pintarLogin(); return; }
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { registro = r; }).catch(() => {});
+  if (!usuario) { pushListo = false; pedidos = []; Object.values(chatsOff).forEach(f => f()); chatsOff = {}; chats = {}; pintarLogin(); return; }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { registro = r; apuntarPush(); }).catch(() => {});
   usuarioActual = (usuario.email || "").toLowerCase();
   rol = DELIVERYS.map(x => x.trim().toLowerCase()).includes(usuarioActual) ? "delivery" : "cocina";
   vista = "pedidos"; abierto = null;
   let listosAntes = null;
   pantallaEncendida();
   primeraCarga = true;
-  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; cierre = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null; pintar(); });
+  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; cierre = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null; mant = config && config.mantenimiento && config.mantenimiento.hasta ? config.mantenimiento : null; horarioHoy = config && config.horarioHoy ? config.horarioHoy : null; pintar(); });
   suscribirPedidos = () => {
   if (dejarDeEscuchar) dejarDeEscuchar();
   diaEscuchado = diaDeHoy(); pedidos = []; primeraCarga = true; listosAntes = null; abierto = null;
@@ -348,9 +373,9 @@ alCambiarSesion(usuario => {
     pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
     if (rol === "delivery") {   // al delivery le suena cuando un pedido queda listo para salir
       const listos = new Set(pedidos.filter(p => p.modo === "delivery" && p.estado === "listo").map(p => p.id));
-      if (listosAntes && [...listos].some(id => !listosAntes.has(id))) { campana(); avisar("🛵 ¡Pedido listo para salir!"); notificar("🛵 Pedido listo para salir", "Ábrelo en Entregas de hoy", "listo"); }
+      if (listosAntes && [...listos].some(id => !listosAntes.has(id))) { campana(); avisar("🛵 ¡Pedido listo para salir!"); notificar("🛵 Pedido listo para salir", "Ábrelo en Entregas de hoy", "listo-" + [...listos].find(id => !listosAntes.has(id))); }
       listosAntes = listos;
-    } else if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); nuevos.forEach(n => notificar(`🔔 Pedido nuevo #${n.codigo || ""}`, `${n.nombre || ""} · ${n.modo === "delivery" ? "Delivery" : "Para llevar"} · ${dinero(n.total)}`, "p-" + n.id)); }
+    } else if (!primeraCarga && nuevos.length) { campana(); avisar("🔔 ¡Pedido nuevo!"); nuevos.forEach(n => notificar(`🔔 Pedido nuevo #${n.codigo || ""}`, `${n.nombre || ""} · ${n.modo === "delivery" ? "Delivery" : "Para llevar"} · ${dinero(n.total)}`, "nuevo-" + n.id)); }
     escucharChats();
     primeraCarga = false;
     pintar();
@@ -387,7 +412,7 @@ function escucharChats(){
         if (!CHAT_ACTIVO) { if (u.foto) { campana(); avisar(`🧾 Llegó el comprobante de ${p.nombre} (#${p.codigo})`); notificar(`🧾 #${p.codigo} · ${p.nombre}`, "Llegó el comprobante de la transferencia", "c-" + p.id); } }
         else {
         campana(); avisar(`💬 Mensaje de ${p.nombre} (#${p.codigo})`);
-        notificar(`💬 #${p.codigo} · ${p.nombre}`, u.foto ? "📷 Envió una foto" + (u.texto ? ": " + u.texto : "") : u.texto, "c-" + p.id);
+        notificar(`💬 #${p.codigo} · ${p.nombre}`, u.foto ? "📷 Envió una foto" + (u.texto ? ": " + u.texto : "") : u.texto, "chat-" + p.id);
         }
       }
       chatsCargados[p.id] = true;
@@ -451,17 +476,25 @@ function herramientasHTML(cocina){
       ${cocina ? `<button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>` : ""}
       ${cocina ? `<button class="chico" data-acc="ver-registro">📒 Registro</button>` : ""}
       <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button>
-      <button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button></div>
+      <button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button>
+      ${cocina ? `<button class="chico${horarioDeHoy() ? " on" : ""}" data-acc="horario-hoy">🕐 ${horarioDeHoy() ? "Hoy: " + hora12(horarioDeHoy().abre) : "Horario de hoy"}</button>` : ""}
+      ${cocina ? `<button class="chico mant${enMantenimiento() ? " cerrado" : ""}" data-acc="mantenimiento">🛠️ ${enMantenimiento() ? "Página en mantenimiento" : "Mantenimiento"}</button>` : ""}</div>
     ${cerradoHoy() ? `<div class="banda-break banda-cierre"><div><b>🔒 Cerrado por hoy</b><small>El menú se ve, pero los clientes no pueden enviar pedidos hasta mañana. Los pedidos que ya entraron siguen aquí.</small></div><button data-acc="reabrir">Volver a abrir</button></div>`
       : confirmandoCierre ? `<div class="banda-break banda-cierre"><div><b>¿Cerrar el negocio por hoy?</b><small>Los clientes verán "Hoy cerramos temprano" y no podrán hacer pedidos hasta mañana. Puedes volver a abrir cuando quieras.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-cierre">Sí, cerrar por hoy</button><button data-acc="cerrar-hoy">Cancelar</button></div></div>` : ""}
     ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
-      : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}`;
+      : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}
+    ${enMantenimiento() ? `<div class="banda-break banda-cierre"><div><b>🛠️ Página en mantenimiento</b><small>Los clientes ven "Estamos mejorando nuestra página" y no pueden pedir. Se quita sola a las ${new Date(mant.hasta).toLocaleTimeString("es-DO", { hour: "numeric", minute: "2-digit" })}</small></div>${cocina ? `<button data-acc="quitar-mant">Quitar</button>` : ""}</div>`
+      : confirmandoMant ? `<div class="banda-break banda-cierre"><div><b>¿Poner la página en mantenimiento?</b><small>Úsalo solo cuando se esté arreglando la página, fuera del horario. Los clientes no podrán entrar al menú (máximo 6 horas). Tú la puedes ver con ?ver=kenmake.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-mant">Sí, poner</button><button data-acc="mantenimiento">Cancelar</button></div></div>` : ""}
+    ${cocina && editandoHorario ? (() => { const h = horarioDeHoy() || HORARIO_NORMAL; return `<div class="banda-break"><div style="flex:1"><b>🕐 Horario solo para hoy</b>
+      <small>Los clientes ven esta hora hoy. Mañana vuelve solo al horario normal (${hora12(HORARIO_NORMAL.abre)} – ${hora12(HORARIO_NORMAL.cierra)}).</small>
+      <div class="reg-fechas" style="margin:8px 0 6px"><label>Abrimos<input type="time" id="hh-abre" value="${h.abre}"></label><label>Cerramos<input type="time" id="hh-cierra" value="${h.cierra}"></label></div>
+      <div class="extra" style="margin:0"><button data-acc="guardar-horario">Guardar</button>${horarioDeHoy() ? `<button data-acc="horario-normal">Volver al normal</button>` : ""}<button data-acc="horario-hoy">Cancelar</button></div></div></div>`; })() : ""}`;
 }
 /* @@DEVOLUCION: pedido rechazado que se pagó por transferencia (con comprobante o marcado pagado) y todavía no se devolvió */
 const debeDevolver = p => p.estado === "rechazado" && p.pago === "Transferencia" && !p.prueba && !p.reembolsado && (p.pagado || p.porDevolver || !!comprobanteDe(p) || p.porDevolver);
 /* @@ARCHIVAR-RAPIDO: botón 🗂️ al lado de cada pedido terminado (entregado o rechazado) */
 const conArchivar = (p, html) => ["entregado", "rechazado"].includes(p.estado) && !p.archivado && !debeDevolver(p)
-  ? `<div class="con-archivar">${html}<button class="archivar-rapido" data-arch="${esc(p.id)}" aria-label="Archivar pedido #${esc(p.codigo)}">🗂️ Archivar</button></div>` : html;
+  ? `<div class="con-archivar">${html}<div class="pie-acciones"><button class="archivar-rapido" data-arch="${esc(p.id)}" aria-label="Archivar pedido #${esc(p.codigo)}">🗂️ Archivar</button><button class="archivar-rapido borrar" data-borrar="${esc(p.id)}" aria-label="Eliminar pedido #${esc(p.codigo)}">${borrando === p.id ? "¿Seguro? Toca otra vez" : "🗑️ Eliminar"}</button></div></div>` : html;
 function pintar(){
   if (rol === "delivery") return pintarDelivery();
   if (vista === "agotados") return pintarAgotados();
@@ -539,7 +572,8 @@ function pintarPedido(p){
       ${entrega && AVISOS_WA ? `<button class="btn" data-acc="grupo">🛵 Mandar al grupo de delivery</button>` : ""}</div>
     ${entrega ? `<p class="ayuda" style="margin-top:8px">Al tocar "Listo", al delivery le suena en su celular.</p>` : ""}`;
   if (p.estado === "listo") acciones = `
-    <div class="botones">${entrega ? `<button class="btn rojo" data-acc="camino">🛵 Salió · va en camino</button>${AVISOS_WA ? `<button class="btn" data-acc="grupo">Mandar al grupo de delivery</button>` : ""}` : ""}
+    ${entrega ? `<p class="ayuda" style="margin:0 0 8px">${p.recogiendo ? `✋ ${esc(p.repartidor || "El delivery")} lo tomó y viene a buscarlo.` : "Esperando que el delivery lo tome."}</p>` : ""}
+    <div class="botones">${entrega ? `<button class="btn rojo" data-acc="camino">📦 El delivery ya lo recogió</button>${AVISOS_WA ? `<button class="btn" data-acc="grupo">Mandar al grupo de delivery</button>` : ""}` : ""}
       <button class="btn verde" data-acc="entregado">📦 Entregado</button></div>`;
   if (p.estado === "en_camino") acciones = `<div class="botones"><button class="btn verde" data-acc="entregado">📦 Entregado</button></div>`;
   if (p.estado === "entregado" || p.estado === "rechazado") acciones = `<div class="botones"><button class="btn borde" data-acc="reabrir">Reabrir pedido</button></div>`;
@@ -612,7 +646,8 @@ function tarjetaEntrega(p, apagado){
     <span class="info"><small style="color:var(--rojo-claro);font-weight:800">#${esc(p.codigo)}</small><b>${esc(p.nombre)}</b><small>📍 ${esc(p.dir || "Sin dirección")}</small>
       <span class="tiempo" style="color:${p.pagado || p.pago === "Transferencia" ? "var(--suave)" : "var(--amarillo)"}">${esc(cobrar(p))}</span>
       ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ Sale en <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}
-      ${p.estado === "en_camino" && p.repartidor ? `<span class="tiempo" style="color:#8FD3FF">🛵 ${esc(p.repartidor)}</span>` : ""}</span>
+      ${p.estado === "en_camino" && p.repartidor ? `<span class="tiempo" style="color:#8FD3FF">🛵 ${esc(p.repartidor)}</span>` : ""}
+      ${p.estado === "listo" && p.recogiendo ? `<span class="tiempo" style="color:#8FD3FF">✋ ${esc(p.repartidor || "Delivery")} va a buscarlo</span>` : ""}</span>
     <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
   </button>`;
 }
@@ -637,13 +672,17 @@ function pintarDelivery(){
     ${listos.length ? listos.map(p => tarjetaEntrega(p)).join("") : `<div class="vacio" style="padding:18px">Nada listo por ahora. Te suena cuando la cocina termine uno 🔔</div>`}
     ${camino.length ? `<h2>En camino</h2>${camino.map(p => tarjetaEntrega(p)).join("")}` : ""}
     ${cocina.length ? `<h2>En cocina (próximos)</h2>${cocina.map(p => tarjetaEntrega(p, true)).join("")}` : ""}
-    ${hechos.length ? `<h2>Entregados hoy · efectivo ${dinero(efectivo)}</h2><p class="ayuda" style="margin:-4px 0 8px">Toca "🗂️ Archivar" para quitar un pedido entregado. Queda guardado en el registro de ventas.</p>${hechos.map(p => conArchivar(p, tarjetaEntrega(p, true))).join("")}` : ""}`;
+    ${hechos.length ? `<h2>Entregados hoy · efectivo ${dinero(efectivo)}</h2><p class="ayuda" style="margin:-4px 0 8px">"🗂️ Archivar" o "🗑️ Eliminar" quitan el pedido de la lista. Los dos quedan guardados en el registro de ventas.</p>${hechos.map(p => conArchivar(p, tarjetaEntrega(p, true))).join("")}` : ""}`;
   relojes();
 }
 function pintarEntrega(p){
   let acciones = "";
   if (p.estado === "preparando") acciones = `<div class="reloj"><span style="font-size:30px">👨‍🍳</span><div><b data-fin="${ms(p.listoEn)}">--:--</b><small>Todavía en cocina. Te suena cuando esté listo.</small></div></div>`;
-  if (p.estado === "listo") acciones = `<div class="botones"><button class="btn rojo" data-acc="d-camino">🛵 Lo tomo · salgo ahora</button></div>`;
+  /* @@RECOGER: 1) el delivery toma el pedido y va al local (el cliente ve "va a recoger tu orden"); 2) lo recoge y sale (el cliente ve "en camino") */
+  if (p.estado === "listo") acciones = !p.recogiendo
+    ? `<div class="botones"><button class="btn rojo" data-acc="d-tomar">✋ Lo tomo · voy a buscarlo</button></div>`
+    : `<p class="ayuda" style="margin:0 0 8px">✋ Lo tomó ${esc(p.repartidor || "el delivery")}. Cuando tengas el pedido en la mano:</p>
+       <div class="botones"><button class="btn rojo" data-acc="d-camino">📦 Ya lo recogí · salgo para el cliente</button></div>`;
   if (p.estado === "en_camino") acciones = `<div class="botones"><button class="btn verde" data-acc="d-entregado">📦 Entregado</button>
     ${p.pago !== "Transferencia" ? `<button class="btn" data-acc="d-cobrado">${p.pagado ? "✅ Cobrado" : "💵 Marcar cobrado"}</button>` : ""}</div>`;
   $("#app").innerHTML = `
@@ -760,7 +799,7 @@ function pintarAgotados(){
   const lista = [...agotados];
   $("#app").innerHTML = `
     <button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button>
-    <div class="cab"><div><h1>Agotados de hoy</h1><small>Toca un producto para marcarlo. El menú cambia al instante.</small></div></div>
+    <div class="cab"><div><h1>Agotados</h1><small>Toca un producto para marcarlo. El menú cambia al instante y se queda así hasta que alguien lo vuelva a poner disponible.</small></div></div>
     <div class="tarjeta">
       <h2 style="margin-top:0">Agotado ahora (${lista.length})</h2>
       ${lista.length ? `<div class="chips">${lista.map(k => `<button data-k="${esc(k)}">✕ ${esc(nombreDe(k))}</button>`).join("")}</div>
@@ -784,7 +823,7 @@ async function cambiarAgotado(k){
   const nuevo = new Set(agotados); nuevo.has(k) ? nuevo.delete(k) : nuevo.add(k);
   const quedo = nuevo.has(k);
   agotados = nuevo; pintar();
-  try { await guardarAgotados([...nuevo]); avisar(quedo ? `🚫 ${nombreDe(k)}: agotado` : `✅ ${nombreDe(k)}: disponible`); }
+  try { await marcarAgotado(k, quedo); avisar(quedo ? `🚫 ${nombreDe(k)}: agotado` : `✅ ${nombreDe(k)}: disponible`); }
   catch (e) { console.error(e); avisar("No se pudo guardar. Revisa el internet."); }
 }
 
@@ -812,6 +851,30 @@ document.addEventListener("click", e => {
     const hasta = Date.now() + (+b.dataset.dur) * 60000; eligiendoBreak = false;
     pausa = { hasta }; pintar();
     guardarBreak(hasta).then(() => avisar(`🍽️ Break hasta las ${horaCorta(hasta)}`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "horario-hoy") { editandoHorario = !editandoHorario; return pintar(); }   // @@HORARIO-HOY
+  if (b.dataset.acc === "guardar-horario") {
+    const abre = $("#hh-abre").value, cierra = $("#hh-cierra").value;
+    if (!abre || !cierra || abre >= cierra) return avisar("Revisa las horas: la de abrir tiene que ser antes que la de cerrar.");
+    horarioHoy = { dia: diaDeHoy(), abre, cierra }; editandoHorario = false; pintar();
+    guardarHorarioHoy(horarioHoy).then(() => avisar(`🕐 Hoy: ${hora12(abre)} – ${hora12(cierra)}`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "horario-normal") {
+    horarioHoy = null; editandoHorario = false; pintar();
+    guardarHorarioHoy(null).then(() => avisar("🕐 Horario normal")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "mantenimiento") { confirmandoMant = !confirmandoMant && !enMantenimiento(); return pintar(); }   // @@MANTENIMIENTO
+  if (b.dataset.acc === "confirmar-mant") {
+    const hasta = Date.now() + 6 * 3600000; confirmandoMant = false; mant = { hasta }; pintar();
+    guardarMantenimiento(hasta).then(() => avisar("🛠️ Página en mantenimiento")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
+  if (b.dataset.acc === "quitar-mant") {
+    mant = null; pintar();
+    guardarMantenimiento(null).then(() => avisar("✅ La página está abierta otra vez")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
     return;
   }
   if (b.dataset.acc === "cerrar-hoy") { confirmandoCierre = !confirmandoCierre && !cerradoHoy(); if (cerradoHoy()) confirmandoCierre = false; return pintar(); }   // @@CERRAR-HOY
@@ -857,6 +920,13 @@ document.addEventListener("click", e => {
     return;
   }
   if (b.dataset.filtro) { filtro = b.dataset.filtro; return pintar(); }
+  if (b.dataset.borrar) {   // @@ELIMINAR-RAPIDO: sale de todas las listas, pero sigue en el Registro de ventas
+    const pa = pedidos.find(x => x.id === b.dataset.borrar); if (!pa) return;
+    if (borrando !== pa.id) { borrando = pa.id; pintar(); setTimeout(() => { if (borrando === pa.id) { borrando = null; pintar(); } }, 4000); return; }
+    borrando = null; pa.archivado = true; pa.eliminado = true; pintar();
+    actualizarPedido(pa.id, { archivado: true, eliminado: true }).then(() => avisar(`🗑️ #${pa.codigo} eliminado · sigue en el registro de ventas`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
   if (b.dataset.arch) {
     const pa = pedidos.find(x => x.id === b.dataset.arch); if (!pa) return;
     pa.archivado = true; pintar();
@@ -906,6 +976,7 @@ document.addEventListener("click", e => {
     }
     case "listo":
       cambiar(p, { estado: "listo" }, { estado: "listo" }, "Marcado como listo");
+      if (p.modo === "delivery") avisarCloudflare(p.id, "listo");   // le suena al delivery aunque tenga la app cerrada
       if (AVISOS_WA && p.modo !== "delivery") abrirWA(telWA(p.tel), llenar(MSG.listoLlevar, p));
       break;
     case "camino":
@@ -921,7 +992,8 @@ document.addEventListener("click", e => {
     case "grupo": abrirWA("", mensajeDelivery(p)); break;
     case "wa": abrirWA(telWA(p.tel), `Hola ${(p.nombre || "").split(/\s+/)[0]}, te escribimos de Jireh Sushi sobre tu pedido #${p.codigo}. `); break;
     case "seguimiento": abrirWA(telWA(p.tel), `Sigue tu pedido #${p.codigo} en vivo aquí: ${enlaceSeguimiento(p.id)}`); break;
-    case "d-camino": {   // el delivery toma el pedido: queda a su nombre y el cliente ve el motorcito
+    case "d-tomar": cambiar(p, { recogiendo: true, repartidor: nombreUsuario() }, { recogiendo: true }, "✋ Tomado · ve a buscarlo al local"); break;
+    case "d-camino": {   // el delivery ya recogió el pedido: sale y el cliente ve el motorcito
       const viaje = Math.min(40, Math.max(10, Math.round((Number(p.km) || 3) * 3 + 5)));
       const salio = enMinutos(0);
       cambiar(p, { estado: "en_camino", salio, viaje, repartidor: nombreUsuario() }, { estado: "en_camino", salio, viaje }, "¡Buen viaje! 🛵");

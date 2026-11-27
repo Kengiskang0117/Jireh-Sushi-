@@ -23,7 +23,7 @@
 const V = "10.12.2";
 const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
 const {
-  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp, getDocs
+  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp, getDocs, arrayUnion, arrayRemove
 } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
 const {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -74,10 +74,21 @@ export function escucharDisponibilidad(alCambiar){
     () => alCambiar([], {}));
 }
 /* ---------- EQUIPO: guardar la lista de agotados (merge: no borra el break) ---------- */
+/* @@AGOTADOS-SEGUROS: marca o desmarca UN producto sin tocar los demás.
+   Antes se guardaba la lista completa: si otro celular tenía la lista vieja, borraba los agotados que puso el otro. */
+export const marcarAgotado = (k, agotado) => setDoc(doc(db, "config", "menu"),
+  { agotados: agotado ? arrayUnion(k) : arrayRemove(k), actualizado: serverTimestamp() }, { merge: true });
 export const guardarAgotados = lista => setDoc(doc(db, "config", "menu"), { agotados: lista, actualizado: serverTimestamp() }, { merge: true });
 /* ---------- EQUIPO: @@CERRAR-HOY — cerrar el negocio antes de tiempo. hasta = fecha en ms (fin del día), o null para volver a abrir ---------- */
 export const guardarCierre = (hasta) => setDoc(doc(db, "config", "menu"),
   { cerradoHoy: hasta ? { hasta } : null, actualizado: serverTimestamp() }, { merge: true });
+
+/* ---------- EQUIPO: @@MANTENIMIENTO — pantalla "Estamos mejorando". hasta = fecha en ms, o null para quitarla ---------- */
+export const guardarMantenimiento = (hasta) => setDoc(doc(db, "config", "menu"),
+  { mantenimiento: hasta ? { hasta } : null, actualizado: serverTimestamp() }, { merge: true });
+
+/* ---------- EQUIPO: @@HORARIO-HOY — abrir o cerrar a otra hora SOLO hoy. datos = {dia, abre, cierra} o null ---------- */
+export const guardarHorarioHoy = (datos) => setDoc(doc(db, "config", "menu"), { horarioHoy: datos || null, actualizado: serverTimestamp() }, { merge: true });
 
 /* ---------- EQUIPO: break (pausa) — hasta = fecha en ms, o null para terminarlo ---------- */
 export const guardarBreak = (hasta, mensaje) => setDoc(doc(db, "config", "menu"),
@@ -104,6 +115,9 @@ export function escucharPedidosDeHoy(alCambiar, alFallar){
     alCambiar(lista, nuevos);
   }, e => alFallar && alFallar(e));
 }
+
+/* ---------- EQUIPO: token de la sesión (para que Cloudflare sepa que es alguien del equipo) ---------- */
+export const tokenSesion = () => auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve(null);
 
 /* ---------- EQUIPO: @@REGISTRO — pedidos entre dos días (formato "2026-11-27"), para ver las ventas de la semana o el mes ---------- */
 export async function buscarPedidos(desde, hasta){
