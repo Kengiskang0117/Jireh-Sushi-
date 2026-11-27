@@ -101,6 +101,16 @@ input{width:100%;height:54px;border-radius:14px;border:1px solid var(--borde);ba
 /* @@BREAK-ESTILO y @@MINUTOS-EXTRA */
 .herramientas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:-4px 0 14px}
 .herramientas .chico{padding:11px 12px;font-size:15px;font-weight:700;color:var(--texto)}
+.con-archivar{margin-bottom:10px}.con-archivar>.pedido{margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.archivar-rapido{display:block;width:100%;height:42px;border:1px solid var(--borde,#333);border-top:0;border-radius:0 0 16px 16px;background:#161616;color:#D6D1CB;font:inherit;font-size:14.5px;font-weight:700;cursor:pointer}
+.archivar-rapido:active{background:#222}
+.reg-fechas{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 12px}.reg-fechas label{display:flex;flex-direction:column;font-size:13px;color:#B5B1AD;gap:4px;flex:1;min-width:130px}
+.reg-fechas input{min-height:44px}.reg-fechas .btn{min-height:44px;width:auto;padding:0 18px}
+.reg-dia{border:1px solid var(--borde,#333);border-radius:16px;margin-bottom:8px;overflow:hidden;background:#141414}
+.reg-cab{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.reg-cab span{display:flex;flex-direction:column}.reg-cab b{text-transform:capitalize}.reg-cab small{color:#B5B1AD}.reg-total{font-weight:800;white-space:nowrap}
+.reg-lista{border-top:1px solid var(--borde,#333)}.reg-fila{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid #222;font-size:14px}
+.reg-fila span{display:flex;flex-direction:column;min-width:0}.reg-fila small{color:#9A958F}
 .chico.cerrado{background:#3A0F0F;border-color:#8A2A2A;color:#FF9A9A}
 .banda-break.banda-cierre{background:#3A0F0F;border-color:#8A2A2A;color:#FFB4B4}.banda-break.banda-cierre small{color:#F2B8B8}.banda-break.banda-cierre button{border-color:#8A2A2A;background:#1F0707;color:#FFB4B4}
 .chico.on{background:#3A2A08;border-color:#8A6A1A;color:#FFD27A}
@@ -159,7 +169,7 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--bo
 <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
 <script type="module">
-import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, guardarBreak, guardarCierre, escucharChat, enviarMensaje } from "./fb.js";
+import { entrar, salir, alCambiarSesion, escucharPedidosDeHoy, actualizarPedido, enMinutos, escucharDisponibilidad, guardarAgotados, guardarBreak, guardarCierre, escucharChat, enviarMensaje, diaDeHoy, buscarPedidos } from "./fb.js";
 
 const NEGOCIO = { nombre: "Jireh Sushi" };
 /* @@DELIVERYS — correos de los repartidores (en minúscula). Al entrar con uno de estos,
@@ -204,7 +214,7 @@ const llenar = (t, p, extra = {}) => t.replace(/\{nombre\}/g, (p.nombre || "").s
 
 /* ---------- Estado de la pantalla ---------- */
 let rol = "cocina", usuarioActual = "", pausa = null, eligiendoBreak = false;
-let cierre = null, confirmandoCierre = false, eliminandoTodos = false;   // @@CERRAR-HOY
+let cierre = null, confirmandoCierre = false, eliminandoTodos = false, rechazando = null;   // @@CERRAR-HOY
 const cerradoHoy = () => !!(cierre && cierre.hasta > Date.now());
 const finDelDia = () => { const d = new Date(); d.setHours(23, 59, 59, 0); return d.getTime(); };
 const enBreak = () => !!(pausa && pausa.hasta > Date.now());
@@ -317,9 +327,10 @@ function pintarLogin(error = "", correoPrevio = ""){
   });
 }
 
-let dejarDeEscuchar = null;
+let dejarDeEscuchar = null, suscribirPedidos = null, diaEscuchado = "";
 alCambiarSesion(usuario => {
   if (dejarDeEscuchar) { dejarDeEscuchar(); dejarDeEscuchar = null; }
+  suscribirPedidos = null;
   if (!usuario) { pedidos = []; Object.values(chatsOff).forEach(f => f()); chatsOff = {}; chats = {}; pintarLogin(); return; }
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => { registro = r; }).catch(() => {});
   usuarioActual = (usuario.email || "").toLowerCase();
@@ -328,7 +339,10 @@ alCambiarSesion(usuario => {
   let listosAntes = null;
   pantallaEncendida();
   primeraCarga = true;
-  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; cierre = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null; if (rol !== "delivery") pintar(); });
+  escucharDisponibilidad((lista, config) => { agotados = new Set(lista); pausa = config && config.pausa && config.pausa.hasta ? config.pausa : null; cierre = config && config.cerradoHoy && config.cerradoHoy.hasta ? config.cerradoHoy : null; pintar(); });
+  suscribirPedidos = () => {
+  if (dejarDeEscuchar) dejarDeEscuchar();
+  diaEscuchado = diaDeHoy(); pedidos = []; primeraCarga = true; listosAntes = null; abierto = null;
   dejarDeEscuchar = escucharPedidosDeHoy((lista, nuevos) => {
     conectado = true;
     pedidos = lista.sort((a, b) => ms(b.creado) - ms(a.creado));
@@ -341,7 +355,14 @@ alCambiarSesion(usuario => {
     primeraCarga = false;
     pintar();
   }, err => { conectado = false; console.error(err); avisar("Sin conexión con los pedidos. Revisa el internet."); pintar(); });
+  };
+  suscribirPedidos();
 });
+/* @@CAMBIO-DE-DIA: si el panel se queda abierto (o la app vuelve del fondo) después de medianoche,
+   cambia solo a los pedidos del día nuevo. Antes se quedaba mostrando los de ayer hasta recargar. */
+function revisarDia(){ if (suscribirPedidos && diaEscuchado && diaDeHoy() !== diaEscuchado) suscribirPedidos(); }
+setInterval(revisarDia, 60000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") revisarDia(); });
 
 /* ---------- @@CHAT: mensajes de los clientes (sala de espera) ---------- */
 let chats = {}, chatsOff = {}, chatsCargados = {};
@@ -423,9 +444,28 @@ const GRUPOS = {
   entregado: p => !p.archivado && ["entregado", "rechazado"].includes(p.estado),
   archivados: p => !!p.archivado && !p.eliminado   // @@ELIMINAR: "eliminado" no se ve en ninguna lista, pero sigue contando en las ventas
 };
+/* Botones de arriba (Agotados, Registro, Break, Cerrar por hoy). El delivery ve Break y Cerrar por hoy. */
+function herramientasHTML(cocina){
+  return `
+    <div class="herramientas">
+      ${cocina ? `<button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>` : ""}
+      ${cocina ? `<button class="chico" data-acc="ver-registro">📒 Registro</button>` : ""}
+      <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button>
+      <button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button></div>
+    ${cerradoHoy() ? `<div class="banda-break banda-cierre"><div><b>🔒 Cerrado por hoy</b><small>El menú se ve, pero los clientes no pueden enviar pedidos hasta mañana. Los pedidos que ya entraron siguen aquí.</small></div><button data-acc="reabrir">Volver a abrir</button></div>`
+      : confirmandoCierre ? `<div class="banda-break banda-cierre"><div><b>¿Cerrar el negocio por hoy?</b><small>Los clientes verán "Hoy cerramos temprano" y no podrán hacer pedidos hasta mañana. Puedes volver a abrir cuando quieras.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-cierre">Sí, cerrar por hoy</button><button data-acc="cerrar-hoy">Cancelar</button></div></div>` : ""}
+    ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
+      : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}`;
+}
+/* @@DEVOLUCION: pedido rechazado que se pagó por transferencia (con comprobante o marcado pagado) y todavía no se devolvió */
+const debeDevolver = p => p.estado === "rechazado" && p.pago === "Transferencia" && !p.prueba && !p.reembolsado && (p.pagado || p.porDevolver || !!comprobanteDe(p) || p.porDevolver);
+/* @@ARCHIVAR-RAPIDO: botón 🗂️ al lado de cada pedido terminado (entregado o rechazado) */
+const conArchivar = (p, html) => ["entregado", "rechazado"].includes(p.estado) && !p.archivado && !debeDevolver(p)
+  ? `<div class="con-archivar">${html}<button class="archivar-rapido" data-arch="${esc(p.id)}" aria-label="Archivar pedido #${esc(p.codigo)}">🗂️ Archivar</button></div>` : html;
 function pintar(){
   if (rol === "delivery") return pintarDelivery();
   if (vista === "agotados") return pintarAgotados();
+  if (vista === "registro") return pintarRegistro();
   if (abierto) { const p = pedidos.find(x => x.id === abierto); if (p) return pintarPedido(p); abierto = null; }
   const entregados = pedidos.filter(p => p.estado === "entregado" && !p.prueba);
   const vendido = entregados.reduce((a, p) => a + (p.total || 0), 0);
@@ -435,14 +475,7 @@ function pintar(){
     <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Pedidos de hoy</h1>
       <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"}</small></div>
       <button class="chico" data-acc="salir">Salir</button></div>
-    <div class="herramientas">
-      <button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>
-      <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button>
-      <button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button></div>
-    ${cerradoHoy() ? `<div class="banda-break banda-cierre"><div><b>🔒 Cerrado por hoy</b><small>El menú se ve, pero los clientes no pueden enviar pedidos hasta mañana. Los pedidos que ya entraron siguen aquí.</small></div><button data-acc="reabrir">Volver a abrir</button></div>`
-      : confirmandoCierre ? `<div class="banda-break banda-cierre"><div><b>¿Cerrar el negocio por hoy?</b><small>Los clientes verán "Hoy cerramos temprano" y no podrán hacer pedidos hasta mañana. Puedes volver a abrir cuando quieras.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-cierre">Sí, cerrar por hoy</button><button data-acc="cerrar-hoy">Cancelar</button></div></div>` : ""}
-    ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
-      : eligiendoBreak ? `<div class="banda-break"><div><b>¿Cuánto dura el break?</b><small>Los clientes verán: "Estamos en break, volvemos a las …"</small></div><div class="extra" style="margin:0">${MINUTOS_BREAK.map(m => `<button data-acc="ini-break" data-dur="${m}">${m} min</button>`).join("")}<button data-acc="break">Cancelar</button></div></div>` : ""}
+    ${herramientasHTML(true)}
     ${sonidoListo && (avisosOK() || !("Notification" in window)) ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido y los avisos de pedidos nuevos</button>`}
     <div class="resumen">
       <div><b>${pedidos.filter(p => p.estado !== "rechazado" && !p.prueba).length}</b><small>Pedidos</small></div>
@@ -453,16 +486,16 @@ function pintar(){
       ${[["activos","En curso"],["nuevo","Nuevos"],["preparando","En cocina"],["salida","Para salir"],["entregado","Terminados"],["archivados","Archivados"]]
         .map(([k, t]) => `<button class="${filtro === k ? "activo" : ""}" data-filtro="${k}">${t}<span class="n">${cuenta(k)}</span></button>`).join("")}
     </div>
-    ${lista.length ? lista.map(p => `
+    ${lista.length ? lista.map(p => conArchivar(p, `
       <button class="pedido ${p.estado === "nuevo" ? "nuevo" : ""}" data-abrir="${esc(p.id)}">
         <span class="num">#${esc(p.codigo)}</span>
         <span class="info"><b>${esc(p.nombre)}${p.prueba ? ` <span class="nprueba">prueba</span>` : ""}</b>
-          ${p.pago === "Transferencia" ? (p.pagado ? `<span class="ncomp ok">✅ Pagado</span>` : comprobanteDe(p) ? `<span class="ncomp">🧾 Revisar pago</span>` : `<span class="ncomp no">🧾 Sin comprobante</span>`) : ""}
+          ${debeDevolver(p) ? `<span class="ncomp no">💸 Devolver dinero</span>` : p.estado === "rechazado" ? "" : p.pago === "Transferencia" ? (p.pagado ? `<span class="ncomp ok">✅ Pagado</span>` : comprobanteDe(p) ? `<span class="ncomp">🧾 Revisar pago</span>` : `<span class="ncomp no">🧾 Sin comprobante</span>`) : ""}
           ${sinLeer(p.id) ? `<span class="nmsj">💬 ${sinLeer(p.id)} ${sinLeer(p.id) > 1 ? "nuevos" : "nuevo"}</span>` : ""}
           <small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${hora(p.creado)} · ${dinero(p.total)}</small>
           ${p.estado === "preparando" && p.listoEn ? `<span class="tiempo">⏱️ <span data-fin="${ms(p.listoEn)}">--:--</span></span>` : ""}</span>
         <span class="est ${p.estado}">${ESTADOS[p.estado] || p.estado}</span>
-      </button>`).join("")
+      </button>`)).join("")
       : ""}
     ${filtro === "entregado" && lista.length ? `<button class="btn borde" data-acc="archivar-todos" style="margin-top:6px">🗂️ Archivar todos los terminados</button>` : ""}
     ${filtro === "archivados" ? `<p class="ayuda" style="margin-top:8px">Los archivados no se ven en "En curso" ni "Terminados", pero se guardan y cuentan en las ventas del día (menos los marcados como prueba).</p>
@@ -486,6 +519,8 @@ function pintarPedido(p){
   const entrega = p.modo === "delivery";
   // conserva lo que se está escribiendo en el chat aunque la pantalla se actualice
   const txtPrevio = $("#pchat-txt") ? $("#pchat-txt").value : "", conFoco = document.activeElement && document.activeElement.id === "pchat-txt";
+  // también conserva el motivo de rechazo que se está escribiendo (si entra otro pedido, la pantalla se actualiza)
+  const motivoPrevio = $("#motivo") ? $("#motivo").value : "", motivoFoco = document.activeElement && document.activeElement.id === "motivo";
   marcarChat(p.id);
   let acciones = "";
   if (p.estado === "nuevo") acciones = `
@@ -495,7 +530,8 @@ function pintarPedido(p){
       ? `<button class="btn verde" disabled style="opacity:.45;cursor:not-allowed">🔒 Primero confirma el pago</button>`   // @@PAGO-ANTES: no se cocina sin dinero
       : `<button class="btn verde" data-acc="aceptar">✅ Aceptar · listo en ${minutosSel} min</button>`}
       <button class="btn borde" data-acc="rechazar">No se puede preparar</button></div>
-    <div id="caja-rechazo" hidden style="margin-top:10px"><textarea id="motivo" placeholder="Motivo para el cliente (ej.: se nos acabó el salmón)"></textarea>
+    <div id="caja-rechazo" ${rechazando === p.id ? "" : "hidden"} style="margin-top:10px"><textarea id="motivo" placeholder="Motivo para el cliente (ej.: se nos acabó el salmón)"></textarea>
+      ${p.pago === "Transferencia" ? `<p class="ayuda" style="color:var(--amarillo);margin:8px 0 0">💸 Este cliente pagó por transferencia: después de rechazar, hay que devolverle el dinero.</p>` : ""}
       <div class="botones" style="margin-top:8px"><button class="btn rojo" data-acc="confirmar-rechazo">Rechazar y avisar al cliente</button></div></div>`;
   if (p.estado === "preparando") acciones = `
     <div class="extra"><span>¿Necesitas más tiempo?</span>${MINUTOS_EXTRA.map(m => `<button data-acc="extra" data-mas="${m}">+${m} min</button>`).join("")}</div>
@@ -527,7 +563,13 @@ function pintarPedido(p){
       ${p.repartidor ? `<div class="fila"><span>Delivery</span><span>🛵 ${esc(p.repartidor)}</span></div>` : ""}
       <div class="fila"><span>Pago</span><span>${esc(p.pago)}${p.banco ? " · " + esc(p.banco) : ""}${p.cambio ? " (paga con " + esc(p.cambio) + ")" : ""}${p.pagado ? " ✅ recibido" : ""}</span></div>
     </div>
-    ${p.pago === "Transferencia" ? (() => { const c = comprobanteDe(p); return `<div class="caja-pago ${p.pagado ? "ok" : ""}">
+    ${debeDevolver(p) || p.reembolsado ? `<div class="caja-pago ${p.reembolsado ? "ok" : ""}">   <!-- @@DEVOLUCION -->
+      <h2 style="margin:0 0 6px">💸 ${p.reembolsado ? "Dinero devuelto" : "Hay que devolver " + esc(p.totalTexto || dinero(p.total))}</h2>
+      ${p.reembolsado ? `<p style="margin:0;color:#7BE3A4;font-weight:700">✅ Ya se le devolvió el dinero al cliente.</p><button class="btn borde" data-acc="no-reembolsado" style="margin-top:8px">Deshacer</button>`
+        : `<p class="ayuda" style="margin:0 0 8px">El pedido se rechazó y el cliente pagó${p.banco ? " a " + esc(p.banco) : ""}. Escríbele o llámalo para pedirle su cuenta y devolverle el dinero.</p>
+           <button class="btn verde" data-acc="reembolsado">✅ Ya le devolví el dinero</button>`}
+    </div>` : ""}
+    ${p.pago === "Transferencia" && p.estado !== "rechazado" ? (() => { const c = comprobanteDe(p); return `<div class="caja-pago ${p.pagado ? "ok" : ""}">
       <h2 style="margin:0 0 8px">🧾 Pago por transferencia · ${esc(p.totalTexto || dinero(p.total))}${p.banco ? " · " + esc(p.banco) : ""}</h2>
       ${c ? `<a href="${c.foto}" target="_blank" rel="noopener"><img src="${c.foto}" alt="Comprobante"></a>` : `<p style="margin:0;color:var(--amarillo)">Todavía no hay comprobante.</p>`}
       ${p.pagado ? `<p style="margin:8px 0 0;color:#7BE3A4;font-weight:800">✅ Pago confirmado</p>`
@@ -548,6 +590,7 @@ function pintarPedido(p){
   `;
   relojes();
   const c = $("#pchat"); if (c) c.scrollTop = c.scrollHeight;
+  if ($("#motivo")) { $("#motivo").value = motivoPrevio; if (motivoFoco) $("#motivo").focus(); }
   if ($("#pchat-txt")) { $("#pchat-txt").value = txtPrevio; if (conFoco) $("#pchat-txt").focus(); $("#pchat-txt").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); responder(p, e.target.value); e.target.value = ""; } }); }
 }
 
@@ -557,7 +600,7 @@ function relojes(){
   document.querySelectorAll("[data-reloj]").forEach(el => el.classList.toggle("tarde", +el.dataset.reloj < Date.now()));
 }
 setInterval(relojes, 1000);
-setInterval(() => { if (pausa && !enBreak()) { pausa = null; if (rol !== "delivery") pintar(); } if (cierre && !cerradoHoy()) { cierre = null; if (rol !== "delivery") pintar(); } }, 30000);
+setInterval(() => { if (pausa && !enBreak()) { pausa = null; pintar(); } if (cierre && !cerradoHoy()) { cierre = null; pintar(); } }, 30000);
 
 /* ---------- @@VISTA-DELIVERY: pantalla de los repartidores ---------- */
 const nombreUsuario = () => usuarioActual.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -574,7 +617,7 @@ function tarjetaEntrega(p, apagado){
   </button>`;
 }
 function pintarDelivery(){
-  const mios = pedidos.filter(p => p.modo === "delivery");
+  const mios = pedidos.filter(p => p.modo === "delivery" && !p.archivado && !p.eliminado && !p.prueba);   // los archivados y de prueba no le salen al delivery
   if (abierto) { const p = mios.find(x => x.id === abierto); if (p) return pintarEntrega(p); abierto = null; }
   const listos = mios.filter(p => p.estado === "listo"), camino = mios.filter(p => p.estado === "en_camino");
   const cocina = mios.filter(p => p.estado === "preparando"), hechos = mios.filter(p => p.estado === "entregado");
@@ -583,6 +626,7 @@ function pintarDelivery(){
     <div class="cab"><img src="fotos/logo.png" alt=""><div><h1>Entregas de hoy</h1>
       <small><span class="punto ${conectado ? "on" : ""}"></span>${conectado ? "En vivo" : "Conectando…"} · ${esc(nombreUsuario())}</small></div>
       <button class="chico" data-acc="salir">Salir</button></div>
+    ${herramientasHTML(false)}
     ${sonidoListo && (avisosOK() || !("Notification" in window)) ? "" : `<button class="sonido" data-acc="sonido">🔔 Toca aquí para activar el sonido y los avisos cuando un pedido esté listo</button>`}
     <div class="resumen">
       <div><b>${listos.length}</b><small>Para salir</small></div>
@@ -593,7 +637,7 @@ function pintarDelivery(){
     ${listos.length ? listos.map(p => tarjetaEntrega(p)).join("") : `<div class="vacio" style="padding:18px">Nada listo por ahora. Te suena cuando la cocina termine uno 🔔</div>`}
     ${camino.length ? `<h2>En camino</h2>${camino.map(p => tarjetaEntrega(p)).join("")}` : ""}
     ${cocina.length ? `<h2>En cocina (próximos)</h2>${cocina.map(p => tarjetaEntrega(p, true)).join("")}` : ""}
-    ${hechos.length ? `<h2>Entregados hoy · efectivo ${dinero(efectivo)}</h2>${hechos.map(p => tarjetaEntrega(p, true)).join("")}` : ""}`;
+    ${hechos.length ? `<h2>Entregados hoy · efectivo ${dinero(efectivo)}</h2><p class="ayuda" style="margin:-4px 0 8px">Toca "🗂️ Archivar" para quitar un pedido entregado. Queda guardado en el registro de ventas.</p>${hechos.map(p => conArchivar(p, tarjetaEntrega(p, true))).join("")}` : ""}`;
   relojes();
 }
 function pintarEntrega(p){
@@ -637,6 +681,76 @@ async function cargarCatalogo(){
   return secciones;
 }
 const nombreDe = k => { for (const s of catalogo || []) for (const it of s.items) if (it.k === k) return it.n; return k; };
+/* ================= @@REGISTRO: ventas por día, semana o mes =================
+   Busca en Firebase los pedidos entre dos fechas. Cuenta todos (también archivados y quitados de la lista),
+   menos los de prueba y los rechazados. Se puede descargar en Excel (CSV). */
+let reg = { desde: "", hasta: "", titulo: "", datos: null, cargando: false, error: "", abiertoDia: null };
+const sumarDias = (dia, n) => { const d = new Date(dia + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const nombreDia = dia => new Date(dia + "T12:00:00Z").toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+function periodo(cual){
+  const hoy = diaDeHoy(), dow = (new Date(hoy + "T12:00:00Z").getUTCDay() + 6) % 7;   // 0 = lunes
+  if (cual === "hoy") return [hoy, hoy, "Hoy"];
+  if (cual === "ayer") { const a = sumarDias(hoy, -1); return [a, a, "Ayer"]; }
+  if (cual === "semana") return [sumarDias(hoy, -dow), hoy, "Esta semana"];
+  if (cual === "semana-pasada") return [sumarDias(hoy, -dow - 7), sumarDias(hoy, -dow - 1), "Semana pasada"];
+  if (cual === "mes") return [hoy.slice(0, 8) + "01", hoy, "Este mes"];
+  if (cual === "mes-pasado") { const fin = sumarDias(hoy.slice(0, 8) + "01", -1); return [fin.slice(0, 8) + "01", fin, "Mes pasado"]; }
+}
+async function cargarRegistro(desde, hasta, titulo){
+  if (!desde || !hasta || desde > hasta) { reg.error = "Revisa las fechas: la primera tiene que ser antes que la segunda."; return pintar(); }
+  reg = { ...reg, desde, hasta, titulo, cargando: true, error: "", datos: null, abiertoDia: null }; pintar();
+  try { reg.datos = await buscarPedidos(desde, hasta); }
+  catch(e) { console.error(e); reg.error = "No se pudo buscar. Revisa el internet."; }
+  reg.cargando = false; pintar();
+}
+const cuentaVenta = p => !p.prueba && p.estado === "entregado";   // vendido = entregado (igual que en "Pedidos de hoy")
+function pintarRegistro(){
+  if (!reg.desde) { const [d, h, t] = periodo("semana"); cargarRegistro(d, h, t); return; }
+  const validos = (reg.datos || []).filter(cuentaVenta).sort((a, b) => ms(a.creado) - ms(b.creado));
+  const total = validos.reduce((a, p) => a + (p.total || 0), 0);
+  const efectivo = validos.filter(p => p.pago !== "Transferencia").reduce((a, p) => a + (p.total || 0), 0);
+  const delivery = validos.reduce((a, p) => a + (p.delivery || 0), 0);
+  const porDia = {}; validos.forEach(p => (porDia[p.dia] = porDia[p.dia] || []).push(p));
+  const dias = Object.keys(porDia).sort().reverse();
+  const botonP = (k, t) => `<button class="${reg.titulo === t ? "activo" : ""}" data-periodo="${k}">${t}</button>`;
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="ver-pedidos">← Pedidos de hoy</button>
+    <div class="cab"><div><h1>📒 Registro de ventas</h1><small>Pedidos entregados, también los archivados. No cuenta los de prueba ni los rechazados.</small></div></div>
+    <div class="filtros" style="flex-wrap:wrap">${botonP("hoy","Hoy")}${botonP("ayer","Ayer")}${botonP("semana","Esta semana")}${botonP("semana-pasada","Semana pasada")}${botonP("mes","Este mes")}${botonP("mes-pasado","Mes pasado")}</div>
+    <div class="reg-fechas"><label>Desde<input type="date" id="reg-desde" value="${reg.desde}"></label><label>Hasta<input type="date" id="reg-hasta" value="${reg.hasta}"></label><button class="btn borde" data-acc="reg-buscar">Buscar</button></div>
+    ${reg.error ? `<p class="ayuda" style="color:var(--amarillo)">${esc(reg.error)}</p>` : ""}
+    ${reg.cargando ? `<div class="vacio">Buscando…</div>` : reg.datos ? `
+      <div class="resumen">
+        <div><b>${validos.length}</b><small>Pedidos</small></div>
+        <div><b style="font-size:19px">${dinero(total)}</b><small>Vendido</small></div>
+        <div><b style="font-size:19px">${dinero(efectivo)}</b><small>En efectivo</small></div>
+      </div>
+      <p class="ayuda" style="margin:0 0 10px">Transferencia: ${dinero(total - efectivo)} · De eso, delivery: ${dinero(delivery)}</p>
+      ${(() => { const sin = (reg.datos || []).filter(p => !p.prueba && !["entregado", "rechazado"].includes(p.estado)); return sin.length ? `<p class="ayuda" style="margin:0 0 10px;color:var(--amarillo)">⚠️ ${sin.length} pedido${sin.length === 1 ? "" : "s"} sin marcar como entregado${sin.length === 1 ? "" : "s"} (no se cuenta${sin.length === 1 ? "" : "n"}): ${sin.map(p => "#" + esc(p.codigo) + " del " + esc(p.dia.slice(8)) + "/" + esc(p.dia.slice(5, 7))).join(", ")}</p>` : ""; })()}
+      ${validos.length ? `<button class="btn borde" data-acc="reg-excel" style="margin-bottom:12px">⬇️ Descargar en Excel</button>` : ""}
+      ${dias.length ? dias.map(d => {
+        const l = porDia[d], t = l.reduce((a, p) => a + (p.total || 0), 0), abierto = reg.abiertoDia === d;
+        return `<div class="reg-dia"><button class="reg-cab" data-dia="${d}"><span><b>${esc(nombreDia(d))}</b><small>${l.length} pedido${l.length === 1 ? "" : "s"}</small></span><span class="reg-total">${dinero(t)} ${abierto ? "▲" : "▼"}</span></button>
+          ${abierto ? `<div class="reg-lista">${l.map(p => `<div class="reg-fila"><span><b>#${esc(p.codigo)}</b> · ${hora(p.creado)} · ${esc(p.nombre)}<small>${p.modo === "delivery" ? "🛵 Delivery" : "🥡 Para llevar"} · ${esc(p.pago || "")} · ${(p.items || []).map(i => i.cant + " " + i.nombre).join(", ")}</small></span><b>${dinero(p.total)}</b></div>`).join("")}</div>` : ""}</div>`;
+      }).join("") : `<div class="vacio">No hay ventas en esas fechas.</div>`}
+      ${(() => {   // @@REGISTRO-RECHAZADOS
+        const rech = (reg.datos || []).filter(p => !p.prueba && p.estado === "rechazado").sort((a, b) => ms(b.creado) - ms(a.creado));
+        if (!rech.length) return "";
+        const falta = rech.filter(p => p.pago === "Transferencia" && (p.pagado || p.porDevolver) && !p.reembolsado);
+        return `<div class="reg-dia" style="margin-top:14px"><button class="reg-cab" data-dia="rechazados"><span><b>❌ Rechazados</b><small>${rech.length} pedido${rech.length === 1 ? "" : "s"} · no cuentan en las ventas${falta.length ? ` · <span style="color:var(--amarillo)">💸 ${falta.length} por devolver</span>` : ""}</small></span><span class="reg-total">${dinero(rech.reduce((a, p) => a + (p.total || 0), 0))} ${reg.abiertoDia === "rechazados" ? "▲" : "▼"}</span></button>
+          ${reg.abiertoDia === "rechazados" ? `<div class="reg-lista">${rech.map(p => `<div class="reg-fila"><span><b>#${esc(p.codigo)}</b> · ${esc(p.dia.slice(8))}/${esc(p.dia.slice(5, 7))} · ${esc(p.nombre)}<small>${esc(p.motivo || "Sin motivo")} · ${esc(p.pago || "")}${p.pago === "Transferencia" ? (p.reembolsado ? " · ✅ devuelto" : (p.pagado || p.porDevolver) ? " · 💸 falta devolver" : "") : ""}</small></span><b>${dinero(p.total)}</b></div>`).join("")}</div>` : ""}</div>`;
+      })()}` : ""}`;
+}
+function descargarRegistro(){
+  const validos = (reg.datos || []).filter(cuentaVenta).sort((a, b) => ms(a.creado) - ms(b.creado));
+  const c = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+  const filas = [["Día", "Hora", "Pedido", "Cliente", "Teléfono", "Tipo", "Pago", "Productos", "Subtotal", "Delivery", "Total"]]
+    .concat(validos.map(p => [p.dia, hora(p.creado), p.codigo, p.nombre, p.tel, p.modo === "delivery" ? "Delivery" : "Para llevar", p.pago, (p.items || []).map(i => i.cant + " " + i.nombre).join(" + "), p.subtotal || "", p.delivery || 0, p.total || 0]));
+  const csv = "\ufeff" + filas.map(f => f.map(c).join(";")).join("\r\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `ventas-jireh-${reg.desde}${reg.hasta !== reg.desde ? "-al-" + reg.hasta : ""}.csv`; document.body.append(a); a.click(); a.remove();
+}
+
 function pintarAgotados(){
   if (!catalogo) {
     $("#app").innerHTML = `<p class="vacio">Cargando productos…</p>`;
@@ -725,12 +839,17 @@ document.addEventListener("click", e => {
     return;
   }
   if (b.dataset.acc === "archivar-todos") {
-    const t = pedidos.filter(GRUPOS.entregado);
+    const t = pedidos.filter(GRUPOS.entregado).filter(x => !debeDevolver(x));   // los que falta devolver el dinero se quedan a la vista
     Promise.all(t.map(x => actualizarPedido(x.id, { archivado: true }))).then(() => avisar(`🗂️ ${t.length} archivados`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
     return;
   }
   if (b.dataset.acc === "ver-agotados") { vista = "agotados"; abierto = null; seguroTodo = false; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.acc === "ver-pedidos") { vista = "pedidos"; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.acc === "ver-registro") { vista = "registro"; abierto = null; window.scrollTo(0, 0); return pintar(); }
+  if (b.dataset.periodo) { const [d, h, t] = periodo(b.dataset.periodo); return cargarRegistro(d, h, t); }
+  if (b.dataset.acc === "reg-buscar") return cargarRegistro($("#reg-desde").value, $("#reg-hasta").value, "");
+  if (b.dataset.acc === "reg-excel") return descargarRegistro();
+  if (b.dataset.dia) { reg.abiertoDia = reg.abiertoDia === b.dataset.dia ? null : b.dataset.dia; return pintar(); }
   if (b.dataset.acc === "todo-disponible") {
     if (!seguroTodo) { seguroTodo = true; return pintar(); }
     seguroTodo = false; agotados = new Set(); pintar();
@@ -738,6 +857,12 @@ document.addEventListener("click", e => {
     return;
   }
   if (b.dataset.filtro) { filtro = b.dataset.filtro; return pintar(); }
+  if (b.dataset.arch) {
+    const pa = pedidos.find(x => x.id === b.dataset.arch); if (!pa) return;
+    pa.archivado = true; pintar();
+    actualizarPedido(pa.id, { archivado: true }).then(() => avisar(`🗂️ #${pa.codigo} archivado · queda en el registro`)).catch(() => avisar("No se pudo guardar. Revisa el internet."));
+    return;
+  }
   if (b.dataset.abrir) { abierto = b.dataset.abrir; window.scrollTo(0, 0); return pintar(); }
   if (b.dataset.min) { minutosSel = +b.dataset.min; return pintar(); }
   const p = pedidos.find(x => x.id === abierto);
@@ -768,10 +893,14 @@ document.addEventListener("click", e => {
         { estado: "preparando", minutos: minutosSel, listoEn: enMinutos(minutosSel) }, "Aceptado ✅ El cliente ya lo ve en su pantalla");
       if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.aceptado, p, { min: minutosSel }));
       break;
-    case "rechazar": $("#caja-rechazo").hidden = false; $("#motivo").focus(); break;
+    case "rechazar": rechazando = p.id; $("#caja-rechazo").hidden = false; $("#motivo").focus(); break;
+    case "reembolsado": cambiar(p, { reembolsado: true }, null, "💸 Anotado: dinero devuelto"); break;
+    case "no-reembolsado": cambiar(p, { reembolsado: false }, null, "Desmarcado"); break;
     case "confirmar-rechazo": {
       const motivo = $("#motivo").value.trim();
-      cambiar(p, { estado: "rechazado", motivo }, { estado: "rechazado", motivo }, "Pedido rechazado · el cliente lo ve en su pantalla");
+      const cambios = { estado: "rechazado", motivo };
+      if (p.pago === "Transferencia" && (p.pagado || comprobanteDe(p))) cambios.porDevolver = true;   // queda anotado para el registro
+      cambiar(p, cambios, { estado: "rechazado", motivo }, "Pedido rechazado · el cliente lo ve en su pantalla");
       if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.rechazado, p, { motivo }));
       break;
     }

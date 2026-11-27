@@ -23,7 +23,7 @@
 const V = "10.12.2";
 const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
 const {
-  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp
+  getFirestore, collection, doc, writeBatch, updateDoc, setDoc, addDoc, runTransaction, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp, getDocs
 } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
 const {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -103,6 +103,12 @@ export function escucharPedidosDeHoy(alCambiar, alFallar){
     const nuevos = s.docChanges().filter(c => c.type === "added" && !s.metadata.hasPendingWrites).map(c => c.doc.id);
     alCambiar(lista, nuevos);
   }, e => alFallar && alFallar(e));
+}
+
+/* ---------- EQUIPO: @@REGISTRO — pedidos entre dos días (formato "2026-11-27"), para ver las ventas de la semana o el mes ---------- */
+export async function buscarPedidos(desde, hasta){
+  const s = await getDocs(query(collection(db, "pedidos"), where("dia", ">=", desde), where("dia", "<=", hasta)));
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 /* ---------- EQUIPO: cambiar un pedido ----------

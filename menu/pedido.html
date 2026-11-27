@@ -249,6 +249,7 @@ function pintar(s){
   app.innerHTML = `
     <div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>${s.nombre ? esc(s.nombre) + ", t" : "T"}u pedido #${esc(s.codigo)}</h1><small>${delivery ? "Delivery" : "Para llevar"}</small></div></div>
     ${rechazado ? `<p class="frase">${TEXTOS.rechazado[0]}</p><p class="sub">${TEXTOS.rechazado[1]}${s.motivo ? "<br>" + esc(s.motivo) : ""}</p>
+      ${s.pago === "Transferencia" ? `<p class="sub" style="color:#7BE3A4;font-weight:700">💸 Si ya transferiste, te devolvemos tu dinero. Te vamos a contactar.</p>` : ""}
       <a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>` : `
     <div class="escena" id="escena"></div>
     <p class="frase" id="frase"></p><p class="sub" id="sub"></p>
