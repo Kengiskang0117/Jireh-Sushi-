@@ -14,7 +14,7 @@ const VAPID_CONTACTO = "https://jireh-sushi.pages.dev";
 const FIREBASE = { apiKey: "AIzaSyByDTI1tL_1cIDsZ2aQ4PQpwVF5AwZNIww", proyecto: "jireh-sushi" };
 const DOMINIO_EQUIPO = "@jirehsushi.com";
 const DELIVERYS = ["delivery@jirehsushi.com"];
-const SUPER = ["kengis@jirehsushi.com"];   // los pedidos de prueba (nombre con "prueba") solo le avisan a esta cuenta
+const SUPER = ["kengis17@jirehsushi.com", "kengis@jirehsushi.com"];   // los pedidos de prueba (nombre con "prueba") solo le avisan a esta cuenta
 
 export async function onRequestPost({ request, env, params }) {
   try {
