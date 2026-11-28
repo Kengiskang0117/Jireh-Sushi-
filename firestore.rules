@@ -26,7 +26,19 @@ service cloud.firestore {
 
     // ---------- Pedido completo (privado) ----------
     match /pedidos/{id} {
-      allow read, update, delete: if esEquipo();
+      allow read: if esEquipo();
+      // El cliente que pagó por transferencia puede CANCELAR (sin borrar) mientras está "nuevo":
+      // queda como rechazado "Cancelado por el cliente" para que el dueño le devuelva el dinero.
+      allow update: if esEquipo()
+        || (resource.data.estado == 'nuevo' && resource.data.get('pago', '') == 'Transferencia'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'motivo', 'canceladoCliente', 'porDevolver'])
+            && request.resource.data.estado == 'rechazado' && request.resource.data.motivo == 'Cancelado por el cliente'
+            && request.resource.data.canceladoCliente == true);
+      // El equipo borra cuando quiera. El CLIENTE puede cancelar (borrar) su pedido solo mientras está "nuevo",
+      // en las primeras 3 horas y si no pagó por transferencia (con su enlace largo y único).
+      allow delete: if esEquipo()
+        || (resource.data.estado == 'nuevo' && resource.data.get('pago', '') != 'Transferencia'
+            && request.time < resource.data.creado + duration.value(3, 'h'));
 
       allow create: if request.resource.data.estado == 'nuevo'
         && request.resource.data.creado == request.time
@@ -72,13 +84,21 @@ service cloud.firestore {
         && request.resource.data.texto is string && request.resource.data.texto.size() <= 1000
         && (!('foto' in request.resource.data) || (request.resource.data.foto is string && request.resource.data.foto.size() < 900000))
         && (request.resource.data.de == 'cliente' || (request.resource.data.de == 'negocio' && esEquipo()));
-      allow update, delete: if esEquipo();
+      allow update: if esEquipo();
+      allow delete: if esEquipo()
+        || get(/databases/$(database)/documents/seguimiento/$(id)).data.estado == 'nuevo';   // al cancelar el cliente
     }
 
     match /seguimiento/{id} {
       allow get: if true;                 // con el enlace exacto
       allow list: if esEquipo();          // nadie de afuera puede listar todos
-      allow update, delete: if esEquipo();
+      allow update: if esEquipo()
+        || (resource.data.estado == 'nuevo' && resource.data.get('pago', '') == 'Transferencia'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'motivo', 'canceladoCliente'])
+            && request.resource.data.estado == 'rechazado' && request.resource.data.motivo == 'Cancelado por el cliente'
+            && request.resource.data.canceladoCliente == true);
+      allow delete: if esEquipo()
+        || (resource.data.estado == 'nuevo' && resource.data.get('pago', '') != 'Transferencia');   // al cancelar el cliente
 
       // Solo se crea junto con su pedido (en el mismo envío)
       allow create: if request.resource.data.estado == 'nuevo'

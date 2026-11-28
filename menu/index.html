@@ -1332,7 +1332,7 @@ function htmlDatos(){
       ${!cerradoHoy() && estaAbierto() && enBreak() ? `<div class="aviso-cerrado">${esc(textoBreak())}</div>` : ""}
       ${!cerradoHoy() && !aceptaPedidos() ? `<div class="aviso-cerrado">${esc(textoNoPedidos())}</div>` : ""}
       <div class="campo"><label for="f-nombre">Nombre y apellido</label><input id="f-nombre" type="text" placeholder="Tu nombre completo" value="${esc(d.nombre)}" autocomplete="name"></div>
-      <div class="campo"><label for="f-tel">Teléfono / WhatsApp</label><input id="f-tel" type="tel" placeholder="809-000-0000" value="${esc(d.tel)}" autocomplete="tel"></div>
+      <div class="campo"><label for="f-tel">Teléfono / WhatsApp</label><input id="f-tel" type="tel" inputmode="numeric" placeholder="8090000000" value="${esc(soloTel(d.tel))}" autocomplete="tel"></div>
       ${modo === "delivery" && NEGOCIO.soloUbicacion ? `<div class="campo"><span class="lbl">📍 Tu ubicación</span>
         <button class="${ubic && !ubic.aprox ? "btn-borde" : "btn-acento"} ubic-btn" data-acc="ubicacion" style="height:54px;width:100%">📍 ${ubic && !ubic.aprox ? "Actualizar mi ubicación" : "Usar mi ubicación actual"}</button>
         ${ubicEstado ? `<small class="ubic-estado ${ubicFallo ? "aviso" : ""}">${esc(ubicEstado)}</small>${ubicFallo ? `<small class="ubic-estado">¿No te funciona? <a href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Escríbenos por WhatsApp</a> y te ayudamos.</small>` : ""}`
@@ -1609,7 +1609,9 @@ function clicCarrito(e){
   }
 }
 $("#carrito-lateral").addEventListener("click", clicCarrito);
-function escribirDatos(e){ if (e.target.closest("#f-nombre,#f-tel,#f-cambio,#f-mesa,#f-dir,#f-ref,#f-comprobante,#f-notas")) leerDatos(e.currentTarget); }
+// Teléfono: solo números y máximo 10 (849 884 6470). Si pegan +1 o 1 delante, se quita.
+function soloTel(t){ let n = String(t || "").replace(/\D/g, ""); if (n.length === 11 && n[0] === "1") n = n.slice(1); return n.slice(0, 10); }
+function escribirDatos(e){ if (e.target.id === "f-tel") { const n = soloTel(e.target.value); if (n !== e.target.value) e.target.value = n; } if (e.target.closest("#f-nombre,#f-tel,#f-cambio,#f-mesa,#f-dir,#f-ref,#f-comprobante,#f-notas")) leerDatos(e.currentTarget); }
 ["#carrito-lateral","#carrito-movil"].forEach(s => { $(s).addEventListener("input", escribirDatos); $(s).addEventListener("change", escribirDatos); });
 $("#carrito-movil").addEventListener("click", clicCarrito);
 

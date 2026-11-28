@@ -89,6 +89,17 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3A
 .chat-wa{display:block;text-align:center;color:var(--suave);font-size:12.5px;padding:0 0 10px;text-decoration:underline}
 body{padding-bottom:90px}
 .pie{color:#6E6862;font-size:12px;margin-top:18px}
+/* @@FIN: pantalla ordenada cuando el pedido se cancela o no se pudo hacer */
+.fin{background:var(--tarjeta);border:1px solid var(--borde);border-radius:22px;padding:22px 18px 18px;margin-bottom:6px}
+.fin .ico{width:62px;height:62px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;font-size:30px;background:#232327}
+.fin h2{font-size:20px;margin:0 0 4px}
+.fin .sub{margin:0}
+.fin .cod{display:inline-block;margin-top:10px;font-size:12.5px;color:var(--suave);border:1px solid var(--borde);border-radius:99px;padding:4px 10px}
+.devolucion{margin-top:14px;text-align:left;background:rgba(47,212,122,.08);border:1px solid rgba(47,212,122,.35);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45}
+.devolucion b{display:block;color:#7BE3A4;margin-bottom:2px}
+.acciones{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.acciones .btn{margin:0;text-align:center}
+.btn.sec{background:transparent;border:1px solid var(--borde);color:var(--texto)}
 .vivo{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--suave);margin-top:10px}
 .vivo i{width:8px;height:8px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 4px rgba(47,212,122,.18)}
 
@@ -252,11 +263,22 @@ function alertaCancelar(){
   const n = document.createElement("p"); n.className = "nota"; n.style.color = "#F2C230";
   n.textContent = "No se pudo cancelar: ya lo están preparando o no hay internet. Escríbenos por el chat."; app.append(n);
 }
+const nombreBonito = n => { n = String(n || "").trim(); return n ? n.charAt(0).toUpperCase() + n.slice(1) : ""; };
+function finHTML({ ico, titulo, texto, transferencia, codigo, verCodigo }){
+  const tel = String(NEGOCIO.whatsapp).replace(/\D/g, "");
+  const msg = encodeURIComponent("Hola, es sobre mi pedido #" + (codigo || "") + (transferencia ? " (cancelado, pagué por transferencia)" : ""));
+  return `<div class="fin"><div class="ico">${ico}</div><h2>${titulo}</h2><p class="sub">${texto}</p>
+      ${codigo && verCodigo ? `<span class="cod">Pedido #${esc(codigo)}</span>` : ""}
+      ${transferencia ? `<div class="devolucion"><b>💸 Te devolvemos tu dinero</b>Si ya hiciste la transferencia, te escribimos para devolvértela. No tienes que hacer nada.</div>` : ""}
+      <div class="acciones"><a class="btn" href="index.html">Volver al menú</a>
+      <a class="btn sec" href="https://api.whatsapp.com/send?phone=${tel}&text=${msg}" target="_blank" rel="noopener">Escribir por WhatsApp</a></div></div>`;
+}
 function pintarCancelado(){
   try { const m = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); if (m && m.id === id) localStorage.removeItem("jireh-mi-pedido"); } catch(e) {}
-  app.innerHTML = `<div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>Pedido cancelado</h1></div></div>
-    <p class="frase">Listo, tu pedido fue cancelado 👍</p><p class="sub">No te vamos a cobrar nada. Cuando quieras, haz otro pedido.</p>
-    <a class="btn" href="index.html">Volver al menú</a>`;
+  const s = actual || {};
+  app.innerHTML = `<div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>${s.nombre ? esc(nombreBonito(s.nombre)) + ", t" : "T"}u pedido</h1><small>${s.modo === "delivery" ? "Delivery" : s.modo ? "Para llevar" : ""}</small></div></div>
+    ${finHTML({ ico: "👍", titulo: "Pedido cancelado", texto: "Listo, cancelaste tu pedido. No te vamos a cobrar nada.", codigo: s.codigo, verCodigo: true })}
+    <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
 }
 function pintar(s){
   if (cancelado) return pintarCancelado();
@@ -265,7 +287,8 @@ function pintar(s){
   if (!demo && (!s || s.estado === "entregado" || s.estado === "rechazado")) { try { const m = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); if (m && m.id === id) localStorage.removeItem("jireh-mi-pedido"); } catch(e) {} }
   if (!s) {
     app.innerHTML = `<div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>Tu pedido</h1></div></div>
-      <p class="sub">${TEXTOS.noExiste}</p><a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>`;
+      ${finHTML({ ico: "🔎", titulo: "No encontramos el pedido", texto: TEXTOS.noExiste })}
+      <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
     return;
   }
   const delivery = s.modo === "delivery";
@@ -276,10 +299,10 @@ function pintar(s){
     : [["nuevo","✓","Recibido"],["preparando","👨‍🍳","Preparando"],["listo","🙌","Listo"],["entregado","🎉","Entregado"]];
   const pos = orden.indexOf(s.estado === "listo" && delivery ? "preparando" : s.estado);
   app.innerHTML = `
-    <div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>${s.nombre ? esc(s.nombre) + ", t" : "T"}u pedido #${esc(s.codigo)}</h1><small>${delivery ? "Delivery" : "Para llevar"}</small></div></div>
-    ${rechazado ? `<p class="frase">${s.canceladoCliente ? "Pedido cancelado 👍" : TEXTOS.rechazado[0]}</p><p class="sub">${s.canceladoCliente ? "Cancelaste tu pedido." : TEXTOS.rechazado[1]}${s.motivo && !s.canceladoCliente ? "<br>" + esc(s.motivo) : ""}</p>
-      ${s.pago === "Transferencia" ? `<p class="sub" style="color:#7BE3A4;font-weight:700">💸 Si ya transferiste, te devolvemos tu dinero. Te vamos a contactar.</p>` : ""}
-      <a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>` : `
+    <div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>${s.nombre ? esc(nombreBonito(s.nombre)) + ", t" : "T"}u pedido #${esc(s.codigo)}</h1><small>${delivery ? "Delivery" : "Para llevar"}</small></div></div>
+    ${rechazado ? (s.canceladoCliente
+        ? finHTML({ ico: "👍", titulo: "Pedido cancelado", texto: "Listo, cancelaste tu pedido.", transferencia: s.pago === "Transferencia", codigo: s.codigo })
+        : finHTML({ ico: "😔", titulo: TEXTOS.rechazado[0].replace(/\s*\p{Extended_Pictographic}+/gu, ""), texto: TEXTOS.rechazado[1] + (s.motivo ? "<br><b>" + esc(s.motivo) + "</b>" : ""), transferencia: s.pago === "Transferencia", codigo: s.codigo })) : `
     <div class="escena" id="escena"></div>
     <p class="frase" id="frase"></p><p class="sub" id="sub"></p>
     <div id="medidor"><div class="barra" id="barra"><i></i></div><div class="tiempo"><span id="izq"></span><span id="der"></span></div></div>
@@ -294,7 +317,7 @@ function pintar(s){
       ${s.pago === "Transferencia" ? `<p class="nota" style="margin-top:6px">Si cancelas, te devolvemos el dinero de tu transferencia.</p>` : ""}` : ""}
     ${s.estado !== "entregado" && s.estado !== "rechazado" ? (CHAT_ACTIVO ? `<button class="contacto" data-chat>💬 ¿Una pregunta, algo extra o el comprobante? Escríbenos aquí</button>`
       : `<a class="contacto" href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}&text=${encodeURIComponent("Hola, es sobre mi pedido #" + (s.codigo || ""))}" target="_blank" rel="noopener" style="display:block;text-decoration:none">💬 ¿Tarda mucho? Escríbenos por WhatsApp</a>`) : ""}`}
-    <div class="vivo"><i></i>En vivo</div>
+    ${rechazado ? "" : `<div class="vivo"><i></i>En vivo</div>`}
     <div class="pie">${NEGOCIO.nombre} · Kenmake Soluciones</div>`;
   tick();
 }

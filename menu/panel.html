@@ -48,7 +48,8 @@ button{font:inherit;cursor:pointer}
 .resumen div{background:var(--tarjeta);border:1px solid var(--borde);border-radius:16px;padding:12px}
 .resumen b{display:block;font-size:24px;color:var(--rojo-claro)}
 .resumen small{color:var(--suave);font-size:13px}
-.filtros{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px}
+.filtros{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filtros::-webkit-scrollbar{display:none}   /* sin la barra blanca de desplazamiento; se desliza con el dedo o la rueda */
 .filtros button{flex:none;height:42px;padding:0 14px;border-radius:999px;border:1px solid var(--borde);background:var(--tarjeta);color:var(--texto);font-size:15px;font-weight:700}
 .filtros button.activo{background:var(--rojo);border-color:var(--rojo)}
 .filtros .n{display:inline-block;min-width:22px;margin-left:6px;padding:1px 6px;border-radius:999px;background:rgba(255,255,255,.18);font-size:13px}
@@ -522,10 +523,10 @@ function herramientasHTML(cocina){
       ${cocina ? `<button class="chico" data-acc="ver-agotados">🚫 Agotados${agotados.size ? " (" + agotados.size + ")" : ""}</button>` : ""}
       ${cocina ? `<button class="chico" data-acc="ver-registro">📒 Registro</button>` : ""}
       <button class="chico${enBreak() ? " on" : ""}" data-acc="break">🍽️ ${enBreak() ? "En break" : "Break"}</button>
-      <button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button>
+      ${cocina ? `<button class="chico${cerradoHoy() ? " cerrado" : ""}" data-acc="cerrar-hoy">🔒 ${cerradoHoy() ? "Cerrado por hoy" : "Cerrar por hoy"}</button>` : `<button class="chico" data-acc="ver-registro">📒 Registro</button>`}
       ${cocina ? `<button class="chico${horarioDeHoy() ? " on" : ""}" data-acc="horario-hoy">🕐 ${horarioDeHoy() ? "Hoy: " + hora12(horarioDeHoy().abre) : "Horario de hoy"}</button>` : ""}
       ${cocina ? `<button class="chico" data-acc="ver-admin">⚙️ Administrar</button>` : ""}
-      ${cocina && (esSuper() || enMantenimiento()) ? `<button class="chico mant${enMantenimiento() ? " cerrado" : ""}" data-acc="mantenimiento">🛠️ ${enMantenimiento() ? "Página en mantenimiento" : "Mantenimiento"}</button>` : ""}</div>
+      ${cocina && esSuper() ? `<button class="chico mant${enMantenimiento() ? " cerrado" : ""}" data-acc="mantenimiento">🛠️ ${enMantenimiento() ? "Página en mantenimiento" : "Mantenimiento"}</button>` : ""}</div>
     ${cerradoHoy() ? `<div class="banda-break banda-cierre"><div><b>🔒 Cerrado por hoy</b><small>El menú se ve, pero los clientes no pueden enviar pedidos hasta mañana. Los pedidos que ya entraron siguen aquí.</small></div><button data-acc="reabrir">Volver a abrir</button></div>`
       : confirmandoCierre ? `<div class="banda-break banda-cierre"><div><b>¿Cerrar el negocio por hoy?</b><small>Los clientes verán "Hoy cerramos temprano" y no podrán hacer pedidos hasta mañana. Puedes volver a abrir cuando quieras.</small></div><div class="extra" style="margin:0"><button data-acc="confirmar-cierre">Sí, cerrar por hoy</button><button data-acc="cerrar-hoy">Cancelar</button></div></div>` : ""}
     ${enBreak() ? `<div class="banda-break"><div><b>En break hasta las ${horaCorta(pausa.hasta)}</b><small>Los clientes ven el aviso en el menú. Los pedidos siguen entrando.</small></div><button data-acc="fin-break">Terminar break</button></div>`
@@ -713,6 +714,7 @@ function tarjetaEntrega(p, apagado){
   </button>`;
 }
 function pintarDelivery(){
+  if (vista === "registro") return pintarRegistroDelivery();
   const mios = pedidos.filter(p => p.modo === "delivery" && !p.archivado && !p.eliminado && !p.prueba);   // los archivados y de prueba no le salen al delivery
   if (abierto) { const p = mios.find(x => x.id === abierto); if (p) return pintarEntrega(p); abierto = null; }
   const listos = mios.filter(p => p.estado === "listo"), camino = mios.filter(p => p.estado === "en_camino");
@@ -841,6 +843,55 @@ function pintarRegistro(){
           ${reg.abiertoDia === "rechazados" ? `<div class="reg-lista">${rech.map(p => `<div class="reg-fila"><span><b>#${esc(p.codigo)}</b> · ${esc(p.dia.slice(8))}/${esc(p.dia.slice(5, 7))} · ${esc(p.nombre)}<small>${esc(p.motivo || "Sin motivo")} · ${esc(p.pago || "")}${p.pago === "Transferencia" ? (p.reembolsado ? " · ✅ devuelto" : (p.pagado || p.porDevolver) ? " · 💸 falta devolver" : "") : ""}</small></span><b>${dinero(p.total)}</b></div>`).join("")}</div>` : ""}</div>`;
       })()}` : ""}`;
 }
+/* ================= @@REGISTRO-DELIVERY: registro del panel del delivery =================
+   Solo los pedidos de DELIVERY (los que recoge el cliente en el local no salen aquí).
+   Sirve para buscar un pedido si hubo un error: quién lo llevó, a qué hora salió y llegó, cuánto se cobró.
+   Usa la misma búsqueda que el registro del dueño (buscarPedidos), así la información está en los dos lados. */
+const ESTADO_REG = { entregado: "✅ Entregado", en_camino: "🛵 En camino", listo: "📦 Listo para salir", preparando: "👨‍🍳 En cocina", nuevo: "🆕 Nuevo", rechazado: "❌ Rechazado" };
+function pintarRegistroDelivery(){
+  if (!reg.desde) { const [d, h, t] = periodo("hoy"); cargarRegistro(d, h, t); return; }
+  const todos = (reg.datos || []).filter(p => p.modo === "delivery" && !p.prueba && (!p.privado || esSuper())).sort((a, b) => ms(b.creado) - ms(a.creado));
+  const busq = (reg.buscar || "").trim().toLowerCase();
+  const lista = busq ? todos.filter(p => [p.codigo, p.nombre, p.tel, p.dir, p.repartidor].join(" ").toLowerCase().includes(busq)) : todos;
+  const hechos = todos.filter(p => p.estado === "entregado");
+  const efectivo = hechos.filter(p => p.pago !== "Transferencia").reduce((a, p) => a + (p.total || 0), 0);
+  const cargos = hechos.reduce((a, p) => a + (p.delivery || 0), 0);
+  const sinCerrar = todos.filter(p => !["entregado", "rechazado"].includes(p.estado));
+  const porDia = {}; lista.forEach(p => (porDia[p.dia] = porDia[p.dia] || []).push(p));
+  const dias = Object.keys(porDia).sort().reverse();
+  const botonP = (k, t) => `<button class="${reg.titulo === t ? "activo" : ""}" data-periodo="${k}">${t}</button>`;
+  const fila = p => `<div class="reg-fila"><span><div><b>#${esc(p.codigo)}</b> · ${esc(p.nombre || "")} · ${esc(ESTADO_REG[p.estado] || p.estado)}</div>
+      <small>📍 ${esc(p.dir || "Sin dirección")}${p.ref ? " · " + esc(p.ref) : ""}${p.km ? " · " + distTexto(+p.km) : ""}</small>
+      <small>📞 ${esc(p.tel || "")} · ${p.pago === "Transferencia" ? "💳 Transferencia" : "💵 Efectivo"}${p.pagado ? " ✅" : ""}${p.cambio ? " · paga con " + esc(p.cambio) : ""}</small>
+      <small>🕐 Pidió ${hora(p.creado)}${p.salio ? " · salió " + hora(p.salio) : ""}${p.entregado && p.entregado !== true ? " · llegó " + hora(p.entregado) : ""}${p.repartidor ? " · 🛵 " + esc(p.repartidor) : ""}</small>
+      ${p.estado === "rechazado" && p.motivo ? `<small style="color:var(--amarillo)">Motivo: ${esc(p.motivo)}</small>` : ""}
+      ${mapa(p) ? `<small><a href="${esc(mapa(p))}" target="_blank" rel="noopener" style="color:var(--rojo-claro)">Ver en el mapa</a></small>` : ""}</span>
+    <span class="reg-total" style="text-align:right">${dinero(p.total || 0)}<small>Delivery ${dinero(p.delivery || 0)}</small></span></div>`;
+  $("#app").innerHTML = `
+    <button class="volver" data-acc="ver-pedidos">← Entregas de hoy</button>
+    <div class="cab"><div><h1>📒 Registro de entregas</h1><small>Solo pedidos de delivery, también los archivados. Los que el cliente recoge en el local no salen aquí.</small></div></div>
+    <div class="filtros" style="flex-wrap:wrap">${botonP("hoy","Hoy")}${botonP("ayer","Ayer")}${botonP("semana","Esta semana")}${botonP("semana-pasada","Semana pasada")}${botonP("mes","Este mes")}</div>
+    <div class="reg-fechas"><label>Desde<input type="date" id="reg-desde" value="${reg.desde}"></label><label>Hasta<input type="date" id="reg-hasta" value="${reg.hasta}"></label><button class="btn borde" data-acc="reg-buscar">Buscar</button></div>
+    ${reg.error ? `<p class="ayuda" style="color:var(--amarillo)">${esc(reg.error)}</p>` : ""}
+    ${reg.cargando ? `<div class="vacio">Buscando…</div>` : reg.datos ? `
+      <div class="resumen">
+        <div><b>${hechos.length}</b><small>Entregados</small></div>
+        <div><b style="font-size:19px">${dinero(efectivo)}</b><small>Cobrado en efectivo</small></div>
+        <div><b style="font-size:19px">${dinero(cargos)}</b><small>En deliverys</small></div>
+      </div>
+      ${sinCerrar.length ? `<p class="ayuda" style="margin:0 0 10px;color:var(--amarillo)">⚠️ ${sinCerrar.length} pedido${sinCerrar.length === 1 ? "" : "s"} sin marcar como entregado${sinCerrar.length === 1 ? "" : "s"}. Revísalo${sinCerrar.length === 1 ? "" : "s"} abajo.</p>` : ""}
+      <input id="reg-buscar-txt" type="search" placeholder="Buscar por número, nombre, teléfono o dirección…" value="${esc(reg.buscar || "")}" style="margin-bottom:10px">
+      ${dias.length ? dias.map(d => {
+        const l = porDia[d], abierto = reg.abiertoDia === d || dias.length === 1 || !!busq;
+        return `<div class="reg-dia"><button class="reg-cab" data-dia="${d}"><span><b>${esc(nombreDia(d))}</b><small>${l.length} delivery${l.length === 1 ? "" : "s"}</small></span><span class="reg-total">${abierto ? "▲" : "▼"}</span></button>
+          ${abierto ? `<div class="reg-lista">${l.map(fila).join("")}</div>` : ""}</div>`;
+      }).join("") : `<div class="vacio">${busq ? "No hay ningún delivery con eso." : "No hay deliverys en esas fechas."}</div>`}` : ""}`;
+}
+document.addEventListener("input", e => {   // buscador del registro del delivery
+  if (e.target.id !== "reg-buscar-txt") return;
+  reg.buscar = e.target.value; const pos = e.target.selectionStart; pintar();
+  const n = document.getElementById("reg-buscar-txt"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch(_) {} }
+});
 function descargarRegistro(){
   const validos = (reg.datos || []).filter(cuentaVenta).sort((a, b) => ms(a.creado) - ms(b.creado));
   const c = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
@@ -992,13 +1043,13 @@ document.addEventListener("click", e => {
     guardarHorarioHoy(null).then(() => avisar("🕐 Horario normal")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
     return;
   }
-  if (b.dataset.acc === "mantenimiento") { confirmandoMant = !confirmandoMant && !enMantenimiento(); return pintar(); }   // @@MANTENIMIENTO
-  if (b.dataset.acc === "confirmar-mant") {
+  if (b.dataset.acc === "mantenimiento") { if (!esSuper()) return; confirmandoMant = !confirmandoMant && !enMantenimiento(); return pintar(); }   // @@MANTENIMIENTO
+  if (b.dataset.acc === "confirmar-mant") { if (!esSuper()) return;
     const hasta = Date.now() + 6 * 3600000; confirmandoMant = false; mant = { hasta }; pintar();
     guardarMantenimiento(hasta).then(() => avisar("🛠️ Página en mantenimiento")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
     return;
   }
-  if (b.dataset.acc === "quitar-mant") {
+  if (b.dataset.acc === "quitar-mant") { if (!esSuper()) return;
     mant = null; pintar();
     guardarMantenimiento(null).then(() => avisar("✅ La página está abierta otra vez")).catch(() => avisar("No se pudo guardar. Revisa el internet."));
     return;
@@ -1149,7 +1200,7 @@ document.addEventListener("click", e => {
     }
       if (AVISOS_WA) abrirWA(telWA(p.tel), llenar(MSG.enCamino, p));
       break;
-    case "entregado": cambiar(p, { estado: "entregado" }, { estado: "entregado" }, "Pedido entregado"); break;
+    case "entregado": cambiar(p, { estado: "entregado", entregado: new Date() }, { estado: "entregado" }, "Pedido entregado"); break;
     case "reabrir": cambiar(p, { estado: "preparando" }, { estado: "preparando" }, "Pedido reabierto"); break;
     case "grupo": abrirWA("", mensajeDelivery(p)); break;
     case "wa": abrirWA(telWA(p.tel), `Hola ${(p.nombre || "").split(/\s+/)[0]}, te escribimos de Jireh Sushi sobre tu pedido #${p.codigo}. `); break;
