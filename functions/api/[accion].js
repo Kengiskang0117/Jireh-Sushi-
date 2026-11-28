@@ -54,6 +54,9 @@ async function aviso({ id, tipo, token }, env) {
     if (seg.estado !== "nuevo" || Date.now() - seg.creado > 15 * 60000) return json({ ok: false, error: "No es un pedido nuevo" }, 409);
     para = "cocina"; titulo = `🍣 Pedido nuevo ${codigo}`; texto = `${quien} · ${seg.modo === "delivery" ? "Delivery" : "Para llevar"}${seg.pago ? " · " + seg.pago : ""}. Toca para verlo.`;
     clave = "ya:nuevo:" + id; ttl = 86400;
+  } else if (tipo === "cancelado") {   // el cliente canceló su pedido (antes de que lo aceptaran)
+    if (seg.estado !== "nuevo") return json({ ok: false, error: "Ya no se puede cancelar" }, 409);
+    para = "cocina"; titulo = `❌ Pedido cancelado ${codigo}`; texto = `${quien} canceló su pedido antes de que lo aceptaran.`; clave = "ya:cancelado:" + id; ttl = 86400;
   } else if (tipo === "chat") {        // lo llama la página del cliente al escribir en el chat
     if (["entregado", "rechazado"].includes(seg.estado)) return json({ ok: false, error: "Pedido cerrado" }, 409);
     para = "cocina"; titulo = `💬 ${codigo} · ${quien}`; texto = "Te escribió en el chat del pedido."; clave = "ya:chat:" + id; ttl = 60;   // máximo 1 aviso por minuto
@@ -68,13 +71,13 @@ async function aviso({ id, tipo, token }, env) {
   const lista = await env.SUBS.list({ prefix: "sub:" });
   const destinos = lista.keys;
   const carga = JSON.stringify({ titulo, texto, etiqueta: tipo + "-" + id, url: "./panel.html" });
-  const esPrueba = /prueba/i.test(seg.nombre || "");
+  /* @@PRUEBAS: "Kenmake" en el nombre = prueba de Kengis (solo le suena a él). "Prueba" = prueba del negocio (le suena al equipo, como siempre) */
+  const deKengis = /kenmake/i.test(seg.nombre || "");
   let enviados = 0, borrados = 0;
   await Promise.all(destinos.map(async k => {
     const v = await env.SUBS.get(k.name); if (!v) return;
-    const { sub, rol, correo } = JSON.parse(v); if (rol !== para && !(esPrueba && SUPER.includes(correo))) return;
-    if (esPrueba && !SUPER.includes(correo)) return;   // la prueba no le suena al dueño ni al delivery
-    if (!esPrueba && SUPER.includes(correo)) return;   // a la cuenta de Kengis solo le suenan sus pruebas, no los pedidos reales
+    const { sub, rol, correo } = JSON.parse(v), soyKengis = SUPER.includes(correo);
+    if (deKengis ? !soyKengis : (soyKengis || rol !== para)) return;   // las de Kengis solo a él; lo demás al equipo (a Kengis no le suenan los pedidos reales)
     const r = await enviarPush(sub, carga, env.VAPID_PRIVATE);
     if (r.status === 404 || r.status === 410) { await env.SUBS.delete(k.name); borrados++; }   // ese celular ya no existe
     else if (r.ok) enviados++;

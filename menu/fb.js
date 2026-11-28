@@ -123,6 +123,24 @@ export function escucharPedidosDeHoy(alCambiar, alFallar){
   }, e => alFallar && alFallar(e));
 }
 
+/* ---------- CLIENTE: @@CANCELAR — el cliente cancela su pedido mientras está "nuevo" (antes de que lo acepten).
+   Se borra todo de la base de datos: mensajes del chat, el pedido y su seguimiento. ---------- */
+export async function cancelarPedido(id){
+  const m = await getDocs(collection(db, "seguimiento", id, "mensajes"));
+  const b1 = writeBatch(db); m.docs.forEach(d => b1.delete(d.ref)); if (m.docs.length) await b1.commit();
+  const b2 = writeBatch(db); b2.delete(doc(db, "pedidos", id)); b2.delete(doc(db, "seguimiento", id)); await b2.commit();
+}
+
+export const borrarPedido = cancelarPedido;
+/* Si pagó por transferencia, NO se borra: queda como rechazado "Cancelado por el cliente" para que el dueño le devuelva el dinero */
+export async function cancelarConDevolucion(id){
+  const motivo = "Cancelado por el cliente";
+  const b = writeBatch(db);
+  b.update(doc(db, "pedidos", id), { estado: "rechazado", motivo, canceladoCliente: true, porDevolver: true });
+  b.update(doc(db, "seguimiento", id), { estado: "rechazado", motivo, canceladoCliente: true });
+  await b.commit();
+}   // el equipo (Kengis) borra de verdad un pedido de prueba
+
 /* ---------- EQUIPO: token de la sesión (para que Cloudflare sepa que es alguien del equipo) ---------- */
 export const tokenSesion = () => auth.currentUser ? auth.currentUser.getIdToken() : Promise.resolve(null);
 

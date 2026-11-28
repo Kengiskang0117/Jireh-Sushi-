@@ -268,6 +268,7 @@ img{display:block;max-width:100%}
 .copiar{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--acento);background:transparent;color:var(--acento);font-weight:700;font-size:13px;cursor:pointer}
 .ubic-btn{height:48px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
 .ubic-estado{font-size:13px;color:var(--texto-suave,#A9A39A)}
+
 .ubic-estado.ok{color:#7BD88F}
 .ubic-estado.aviso{color:#F2C230}
 .check{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;color:#C9C3B8;cursor:pointer}
@@ -574,8 +575,10 @@ const NEGOCIO = {
 
   /* @@DELIVERY-KM — cálculo del delivery por distancia */
   local: { lat: 18.5253433, lng: -69.8228972 },  // @@UBICACION-LOCAL  Jireh Sushi (Google Maps), cerca de la bomba Credigas, Carr. Mella
-  deliveryPorKm: 30,       // RD$ por cada kilómetro
-  deliveryMinimo: 50,      // lo mínimo que se cobra de delivery
+  ultimoPedidoAntes: 30,   // @@ULTIMO-PEDIDO: minutos antes de cerrar en que se deja de recibir pedidos (cierra 8:00 → último pedido 7:30)
+  deliveryPorKm: 30,       // RD$ por cada kilómetro (desde 1 km)
+  deliveryMinimo: 50,      // @@DELIVERY-CERCA: menos de 1 km (se muestra en metros) = RD$ 50
+  deliveryDesde1km: 100,   // de 1 km en adelante: mínimo RD$ 100 (y RD$ 30 por km si sale más)
   factorCalles: 1.3,       // distancia en línea recta × 1.3 ≈ distancia por las calles
   deliveryMaxKm: 20        // más lejos de esto: el delivery se coordina con el cliente por WhatsApp
 };
@@ -754,7 +757,6 @@ const MENU = [
     { id:"hot-pollo", nombre:"Hot Pollo", precio:490, desc:"Pollo empanizado, queso crema y puerro. 8 unidades.", img:"fotos/hot-pollo.jpg" },
     { id:"hot-cangrejo", nombre:"Hot Cangrejo", precio:495, desc:"Cangrejo, puerro y queso crema, empanizado. 8 unidades.", img:"fotos/hot-cangrejo.jpg" },
     { id:"hot-toriyaki", nombre:"Hot Toriyaki", precio:520, desc:"Pollo, aguacate y queso crema, empanizado, con salsa teriyaki y chispa de ajonjolí. 8 unidades.", img:"fotos/hot-toriyaki.jpg" },
-    { id:"hot-pollo-acevichado", nombre:"Hot Pollo Acevichado", precio:540, desc:"Pollo empanizado, queso crema y puerro, en salsa acevichada con chispa de shichimi. 8 unidades.", img:"fotos/hot-pollo-acevichado.jpg" },
     { id:"hot-camaron", nombre:"Hot Camarón", precio:575, desc:"Camarón empanizado, queso crema y puerro. 8 unidades.", img:"fotos/hot-camaron.jpg" },
     { id:"barbacoa-bacon", nombre:"Barbacoa Bacon", precio:575, desc:"Relleno de pollo empanizado, bacon, queso crema y puerro, empanizado, bañado en salsa teriyaki y chispa de puerro. 8 unidades.", img:"fotos/barbacoa-bacon.jpg" },
     { id:"hot-salmon", nombre:"Hot Salmon", precio:595, desc:"Salmón, queso crema y puerro, empanizado. 8 unidades.", img:"fotos/hot-salmon.jpg" },
@@ -1093,6 +1095,14 @@ function distanciaKm(a, b){    // distancia en línea recta entre dos puntos del
   const h = Math.sin(dLat/2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng/2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+/* @@DELIVERY-TARIFA (28 nov, pedido del dueño): menos de 1 km → RD$ 50 y se muestra en metros (ej. "650 m");
+   de 1 km en adelante → mínimo RD$ 100, o RD$ 30 por km si da más (ej. 4.2 km → 5 × 30 = RD$ 150). */
+function calcularDelivery(punto){
+  const km = Math.round(distanciaKm(NEGOCIO.local, punto) * NEGOCIO.factorCalles * 100) / 100;   // con dos decimales
+  const costo = km < 1 ? NEGOCIO.deliveryMinimo : Math.max(NEGOCIO.deliveryDesde1km, Math.ceil(km) * NEGOCIO.deliveryPorKm);
+  return { km, costo, lejos: km > NEGOCIO.deliveryMaxKm };
+}
+const distTexto = km => km < 1 ? Math.min(950, Math.max(50, Math.round(km * 1000 / 50) * 50)) + " m" : String(Math.round(km * 10) / 10).replace(".", ",") + " km";
 function costoDelivery(){ return modo === "delivery" && ubic && !ubic.lejos ? ubic.costo : 0; }
 function totalConDelivery(){ return totalDinero() + costoDelivery(); }
 let ubicFallo = false, ubicTexto = "";
@@ -1108,22 +1118,45 @@ async function nombreDelPunto(p){
 function pedirUbicacion(){
   ubicFallo = false;
   if (!navigator.geolocation) { ubicFallo = true; ubicEstado = "Tu teléfono no permite compartir la ubicación desde aquí."; actualizarCarrito(); return; }
-  ubicEstado = "Buscando tu ubicación…"; actualizarCarrito();
-  navigator.geolocation.getCurrentPosition(pos => {
-    const punto = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    const km = Math.max(1, Math.ceil(distanciaKm(NEGOCIO.local, punto) * NEGOCIO.factorCalles));
-    const lejos = km > NEGOCIO.deliveryMaxKm;
-    ubic = { ...punto, km, lejos, costo: Math.max(NEGOCIO.deliveryMinimo, km * NEGOCIO.deliveryPorKm) }; limpiarError();
-    ubicEstado = ""; ubicTexto = "";
-    actualizarCarrito();
-    nombreDelPunto(punto).then(t => { ubicTexto = t; actualizarCarrito(); });
+  ubicEstado = "Buscando tu ubicación… (unos segundos)"; actualizarCarrito();
+  /* @@UBICACION-PRECISA: escucha el GPS unos segundos y se queda con la lectura más precisa.
+     Antes tomaba la primera, que a veces es vieja o aproximada (por Wi-Fi) y no "se actualizaba". */
+  let mejor = null, vieja = null, listo = false, tomarPrimera = false, vigia = null, reloj = null, limite = null;
+  const terminar = () => {
+    if (listo) return;
+    const usar = mejor || vieja;
+    if (!usar) { tomarPrimera = true; return; }   // a los 5 s todavía no hay nada: se queda con la primera que llegue
+    listo = true; if (vigia !== null) navigator.geolocation.clearWatch(vigia); clearTimeout(reloj); clearTimeout(limite);
+    fijarPunto({ lat: usar.coords.latitude, lng: usar.coords.longitude }, Math.round(usar.coords.accuracy || 0), false);
+  };
+  vigia = navigator.geolocation.watchPosition(pos => {
+    if (Date.now() - pos.timestamp > 120000) { vieja = vieja || pos; if (tomarPrimera) terminar(); return; }   // lectura vieja guardada: solo si no llega otra
+    if (!mejor || pos.coords.accuracy < mejor.coords.accuracy) mejor = pos;
+    if (pos.coords.accuracy <= 50 || tomarPrimera) terminar();
+    else { ubicEstado = `Afinando la ubicación… (±${Math.round(pos.coords.accuracy)} m)`; actualizarCarrito(); }
   }, err => {
+    if (mejor || vieja) { tomarPrimera = true; return terminar(); }
+    if (err && err.code === 3) return;   // tiempo agotado de una lectura: sigue esperando hasta el límite
+    listo = true; if (vigia !== null) navigator.geolocation.clearWatch(vigia); clearTimeout(reloj); clearTimeout(limite);
     ubicFallo = true;
     ubicEstado = err && err.code === 1
       ? "No diste permiso. Activa la ubicación del teléfono y, en el navegador, permite la ubicación para esta página. Luego toca el botón otra vez."
       : "No pudimos obtener tu ubicación. Revisa que la ubicación (GPS) del teléfono esté encendida y vuelve a tocar el botón.";
     actualizarCarrito();
-  }, { enableHighAccuracy: true, timeout: 15000 });
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  if (!listo) reloj = setTimeout(terminar, 5000);   // máximo 5 segundos esperando una lectura buena
+  if (!listo) limite = setTimeout(() => {   // a los 25 s sin ninguna lectura: avisar
+    if (listo) return; listo = true; if (vigia !== null) navigator.geolocation.clearWatch(vigia);
+    ubicFallo = true; ubicEstado = "No pudimos obtener tu ubicación. Revisa que la ubicación (GPS) del teléfono esté encendida y vuelve a tocar el botón."; actualizarCarrito();
+  }, 25000);
+}
+/* Pone el punto de entrega del GPS y calcula el delivery */
+function fijarPunto(punto, precision, movido){
+  const { km, costo, lejos } = calcularDelivery(punto);
+  ubic = { ...punto, km, lejos, costo, precision: precision || (ubic && ubic.precision) || 0, movido: !!movido };
+  limpiarError(); ubicEstado = ""; ubicFallo = false; ubicTexto = "";
+  actualizarCarrito();
+  nombreDelPunto(punto).then(t => { ubicTexto = t; actualizarCarrito(); });
 }
 /* ================= @@SUGERENCIAS-DIRECCION =================
    Mientras el cliente escribe su dirección le sugerimos:
@@ -1210,8 +1243,7 @@ function elegirSugerencia(input, x){
     // punto del mapa: calcula el delivery como si compartiera su ubicación (aproximado)
     if (!ubic || ubic.aprox) {
       const punto = { lat: x.lat, lng: x.lng };
-      const km = Math.max(1, Math.ceil(distanciaKm(NEGOCIO.local, punto) * NEGOCIO.factorCalles));
-      ubic = { ...punto, km, lejos: km > NEGOCIO.deliveryMaxKm, costo: Math.max(NEGOCIO.deliveryMinimo, km * NEGOCIO.deliveryPorKm), aprox: true };
+      ubic = { ...punto, ...calcularDelivery(punto), aprox: true };
       ubicEstado = "";
     }
   }
@@ -1298,14 +1330,15 @@ function htmlDatos(){
       <button class="volver" data-acc="volver">← Volver al pedido</button>
       ${cerradoHoy() ? `<div class="aviso-cerrado">${esc(textoCierre())} Por hoy no estamos recibiendo pedidos.</div>` : ""}
       ${!cerradoHoy() && estaAbierto() && enBreak() ? `<div class="aviso-cerrado">${esc(textoBreak())}</div>` : ""}
-      ${!cerradoHoy() && !estaAbierto() ? `<div class="aviso-cerrado">Ahora estamos cerrados. Puedes enviar tu pedido y lo atendemos al abrir (${esc(NEGOCIO.horario.texto)}).</div>` : ""}
+      ${!cerradoHoy() && !aceptaPedidos() ? `<div class="aviso-cerrado">${esc(textoNoPedidos())}</div>` : ""}
       <div class="campo"><label for="f-nombre">Nombre y apellido</label><input id="f-nombre" type="text" placeholder="Tu nombre completo" value="${esc(d.nombre)}" autocomplete="name"></div>
       <div class="campo"><label for="f-tel">Teléfono / WhatsApp</label><input id="f-tel" type="tel" placeholder="809-000-0000" value="${esc(d.tel)}" autocomplete="tel"></div>
       ${modo === "delivery" && NEGOCIO.soloUbicacion ? `<div class="campo"><span class="lbl">📍 Tu ubicación</span>
         <button class="${ubic && !ubic.aprox ? "btn-borde" : "btn-acento"} ubic-btn" data-acc="ubicacion" style="height:54px;width:100%">📍 ${ubic && !ubic.aprox ? "Actualizar mi ubicación" : "Usar mi ubicación actual"}</button>
         ${ubicEstado ? `<small class="ubic-estado ${ubicFallo ? "aviso" : ""}">${esc(ubicEstado)}</small>${ubicFallo ? `<small class="ubic-estado">¿No te funciona? <a href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Escríbenos por WhatsApp</a> y te ayudamos.</small>` : ""}`
-          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás lejos (${ubic.km} km). Te escribimos para el delivery.</small>`
-          : ubic && !ubic.aprox ? `<small class="ubic-estado ok">✓ Lista · Delivery <b>${dinero(ubic.costo)}</b>${ubicTexto ? "<br>" + esc(ubicTexto) : ""}</small>`
+          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás lejos (${distTexto(ubic.km)}). Te escribimos para el delivery.</small>`
+          : ubic && !ubic.aprox ? `<small class="ubic-estado ok">✓ Lista · Delivery <b>${dinero(ubic.costo)}</b>${ubicTexto ? "<br>" + esc(ubicTexto) : ""}</small>
+            ${ubic.precision > 120 ? `<small class="ubic-estado aviso">Salió aproximada (±${ubic.precision} m). Sal a un lugar abierto o junto a una ventana y toca <b>Actualizar mi ubicación</b> otra vez.</small>` : ""}`
           : `<small class="ubic-estado">Cuando el teléfono pregunte, toca <b>Permitir</b>.</small>`}
       </div>
       <div class="campo"><label for="f-ref">Indicaciones (opcional)</label><input id="f-ref" type="text" placeholder="Ej.: casa verde, apto. 3B" value="${esc(d.ref)}"></div>` : ""}
@@ -1334,16 +1367,16 @@ function htmlDatos(){
       <div class="campo"><span class="lbl">Ubicación para el delivery</span>
         <button class="btn-borde ubic-btn" data-acc="ubicacion">📍 ${ubic ? "Actualizar mi ubicación" : "Usar mi ubicación"}</button>
         ${ubicEstado ? `<small class="ubic-estado">${esc(ubicEstado)}</small>`
-          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${ubic.km} km. Por la distancia, coordinamos el delivery contigo por WhatsApp.</small>`
-          : ubic ? `<small class="ubic-estado ok">✓ ${ubic.aprox ? "Dirección encontrada" : "Ubicación lista"} · aprox. ${ubic.km} km · Delivery ${dinero(ubic.costo)}</small>`
-          : `<small class="ubic-estado">Tócalo para calcular el delivery (${NEGOCIO.moneda} ${NEGOCIO.deliveryPorKm} por km) y para que el repartidor te encuentre rápido.</small>`}
+          : ubic && ubic.lejos ? `<small class="ubic-estado aviso">Estás a unos ${distTexto(ubic.km)}. Por la distancia, coordinamos el delivery contigo por WhatsApp.</small>`
+          : ubic ? `<small class="ubic-estado ok">✓ ${ubic.aprox ? "Dirección encontrada" : "Ubicación lista"} · aprox. ${distTexto(ubic.km)} · Delivery ${dinero(ubic.costo)}</small>`
+          : `<small class="ubic-estado">Tócalo para calcular el delivery (${NEGOCIO.moneda} ${NEGOCIO.deliveryMinimo} si estás cerca) y para que el repartidor te encuentre rápido.</small>`}
       </div>` : ""}
       ${modo === "local" ? `<div class="campo"><label for="f-mesa">Número de mesa</label><input id="f-mesa" type="text" inputmode="numeric" placeholder="Ej.: 5" value="${esc(d.mesa)}" ${mesaQR ? "readonly" : ""}>${mesaQR ? `<small style="color:var(--texto-suave)">Detectada por el código QR de tu mesa</small>` : ""}</div>` : ""}
       ${NEGOCIO.comprobante ? `<label class="check"><input type="checkbox" id="f-comprobante" ${d.comprobante ? "checked" : ""}> Necesito comprobante fiscal</label>` : ""}
       <div class="campo"><label for="f-notas">Notas para el pedido (opcional)</label><textarea id="f-notas" rows="2" placeholder="${modo === "local" ? "Ej.: traer las bebidas primero" : modo === "delivery" ? "Ej.: tocar el timbre, llamar al llegar" : "Ej.: paso a buscarlo a las 7:30"}">${esc(d.notas)}</textarea></div>
       <div class="resumen">
         ${modo === "delivery" ? `<div class="linea"><span>Subtotal</span><span>${dinero(totalDinero())}</span></div>
-        <div class="linea"><span>Delivery${ubic && !ubic.lejos ? ` (${ubic.km} km)` : ""}</span><span>${ubic && !ubic.lejos ? dinero(ubic.costo) : "Por confirmar"}</span></div>` : ""}
+        <div class="linea"><span>Delivery${ubic && !ubic.lejos ? ` (${distTexto(ubic.km)})` : ""}</span><span>${ubic && !ubic.lejos ? dinero(ubic.costo) : "Por confirmar"}</span></div>` : ""}
         <div class="total-linea" style="border:none;padding:0;margin:0"><span>Total</span><span class="precio">${dinero(totalConDelivery())}</span></div>
       </div>
       <div class="error" id="f-error" role="alert"></div>
@@ -1390,6 +1423,7 @@ function actualizarCarrito(){
 
 function validar(raiz, paraCocina){
   if (cerradoHoy()) { const e = raiz.querySelector("#f-error"); if (e) e.textContent = "Por hoy ya cerramos y no estamos recibiendo pedidos. " + textoCierre(); return null; }   // @@CERRAR-HOY
+  if (!aceptaPedidos() && !paraCocina) { const e = raiz.querySelector("#f-error"); if (e) e.textContent = textoNoPedidos(); return null; }   // @@ULTIMO-PEDIDO
   leerDatos(raiz);
   const d = datosGuardados, err = raiz.querySelector("#f-error");
   if (d.nombre.trim().length < 2) { err.textContent = "Escribe tu nombre para el pedido."; raiz.querySelector("#f-nombre").focus(); return null; }
@@ -1442,7 +1476,7 @@ async function enviarPedido(raiz){
   let msg = `¡Hola ${NEGOCIO.nombre}! Quiero hacer este pedido ${servicio}:\n\n${promoActiva() ? `🖤 *${promoActiva().titulo}: -${promoActiva().porcentaje}% aplicado*\n\n` : ""}${enBreak() ? `(Pedido hecho durante el break; entiendo que lo preparan al volver a las ${horaCorta(PAUSA.hasta)})\n\n` : ""}${lineas}\n\n`;
   if (modo === "delivery") {
     msg += `Subtotal: ${dinero(totalDinero())}\n`;
-    msg += ubic && !ubic.lejos ? `Delivery (${ubic.km} km): ${dinero(ubic.costo)}\n` : `Delivery: por confirmar\n`;
+    msg += ubic && !ubic.lejos ? `Delivery (${distTexto(ubic.km)}): ${dinero(ubic.costo)}\n` : `Delivery: por confirmar\n`;
   }
   msg += `*Total a pagar: ${dinero(totalConDelivery())}*${modo === "delivery" && !(ubic && !ubic.lejos) ? " + delivery" : ""}\n\n`;
   msg += `Nombre: ${d.nombre}\nTeléfono: ${d.tel}`;
@@ -1497,7 +1531,7 @@ async function enviarPedido(raiz){
       nombre: d.nombre.trim(), tel: d.tel.trim(),
       dir: entrega ? d.dir.trim() : "", ref: entrega ? d.ref.trim() : "",
       ubic: entrega && ubic ? { lat: +ubic.lat.toFixed(6), lng: +ubic.lng.toFixed(6), aprox: !!ubic.aprox } : null,
-      items: carrito.map(l => ({ cant: l.cant, nombre: nombreLinea(l), precio: precioUnidad(l), detalles: detallesLinea(l) })),
+      items: carrito.map(l => ({ cant: l.cant, nombre: nombreLinea(l), precio: precioUnidad(l), detalles: detallesLinea(l), img: (PRODUCTOS[l.id] && PRODUCTOS[l.id].img) || "" })),   // img: foto chiquita en el panel
       subtotal: totalDinero(),
       delivery: entrega && ubic && !ubic.lejos ? ubic.costo : null,
       km: entrega && ubic && !ubic.lejos ? ubic.km : null,
@@ -1513,6 +1547,12 @@ async function enviarPedido(raiz){
       const id = r.id; idPedido = r.codigo;
       miPedido = { id, codigo: idPedido };
       try { localStorage.setItem("jireh-mi-pedido", JSON.stringify({ id, codigo: idPedido, t: Date.now() })); } catch(e) {}
+      try {   // @@MI-PEDIDO-RESUMEN: lo que pidió, para mostrárselo en "Mi pedido" (solo en su celular)
+        const res = JSON.parse(localStorage.getItem("jireh-resumenes") || "{}");
+        Object.keys(res).forEach(k => { if (Date.now() - (res[k].t || 0) > 3 * 86400000) delete res[k]; });
+        res[id] = { t: Date.now(), items: pedido.items.map(i => ({ cant: i.cant, nombre: i.nombre, precio: i.precio, img: i.img, detalles: i.detalles })), subtotal: pedido.subtotal, delivery: pedido.delivery, total: pedido.total, pago: pedido.pago };
+        localStorage.setItem("jireh-resumenes", JSON.stringify(res));
+      } catch(e) {}
       try { fetch("/api/aviso", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ id, tipo: "nuevo" }) }).catch(() => {}); } catch(e) {}   // @@AVISOS-PUSH: le suena a la cocina
       if (pago === "Transferencia" && comprobanteFoto && window.JirehFB.enviarMensaje) {   // @@PAGO-OBLIGATORIO: el comprobante va al chat
         if (boton) boton.textContent = "Enviando comprobante…";
@@ -1726,6 +1766,20 @@ function estaAbierto(){
   if ((NEGOCIO.diasCerrado || []).includes(dia)) return false;
   return a < c ? (m >= a && m < c) : (m >= a || m < c);   // si cierra después de medianoche
 }
+/* @@ULTIMO-PEDIDO (28 nov): solo se reciben pedidos con la tienda abierta y hasta 30 min antes de cerrar.
+   Fuera de eso el menú se ve, pero no deja confirmar el pedido. */
+function horaUltimoPedido(){ const c = minutosDe(cierreDe(new Date().getDay())) - (NEGOCIO.ultimoPedidoAntes || 0); const t = (c + 1440) % 1440; return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
+function aceptaPedidos(){
+  if (!estaAbierto()) return false;
+  const ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes(), c = minutosDe(cierreDe(ahora.getDay()));
+  return ((c - m + 1440) % 1440) > (NEGOCIO.ultimoPedidoAntes || 0);
+}
+function textoNoPedidos(){
+  if (cerradoHoy()) return textoCierre();
+  if (estaAbierto()) return `Ya no estamos recibiendo pedidos por hoy (el último es ${aLas(horaBonita(horaUltimoPedido()))}). ¡Te esperamos mañana!`;
+  const d = proximoDia();
+  return `Ahora estamos cerrados. Recibimos pedidos ${d === "hoy" ? "hoy" : d} desde ${aLas(horaBonita(abreProximo())).replace(/^a la(s)? /, "la$1 ")}.`;
+}
 const DIAS_SEMANA = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 const aLas = h => (h.startsWith("1:") ? "a la " : "a las ") + h;
 function proximoDia(){   // "hoy", "mañana" o "el martes": cuándo vuelve a abrir
@@ -1747,7 +1801,8 @@ function pintarEstado(){
   const faltaAbrir = (a - m + 1440) % 1440, faltaCerrar = (c - m + 1440) % 1440;
   const abierto = estaAbierto();
   let texto, color;
-  if (abierto && faltaCerrar <= AVISO_CIERRE) { texto = `Cerramos pronto · ${aLas(horaBonita(cierreDe(ahora.getDay())))}`; color = "#F2994A"; }
+  if (abierto && !aceptaPedidos()) { texto = `Ya no recibimos pedidos por hoy · cerramos ${aLas(horaBonita(cierreDe(ahora.getDay())))}`; color = "#F2994A"; }
+  else if (abierto && faltaCerrar <= AVISO_CIERRE + 30) { texto = `Último pedido ${aLas(horaBonita(horaUltimoPedido()))}`; color = "#F2994A"; }
   else if (abierto) { texto = "Abierto ahora"; color = "#3DDC84"; }
   else if (cerradoHoy()) { const d = proximoDia(); texto = `Cerrado por hoy · Abrimos ${d} ${aLas(horaBonita(abreProximo()))}`; color = "#8C867E"; }
   else if (faltaAbrir <= AVISO_ANTES && proximoDia() === "hoy") { texto = `¡Casi abrimos! · en ${faltaAbrir} min`; color = "#F2C230"; }

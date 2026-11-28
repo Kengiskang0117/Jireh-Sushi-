@@ -57,6 +57,10 @@ body{margin:0;min-height:100vh;background:radial-gradient(120% 70% at 50% 0%,#3A
 @keyframes latido{70%{box-shadow:0 0 0 10px rgba(227,18,27,0)}100%{box-shadow:0 0 0 0 rgba(227,18,27,0)}}
 .nota{color:var(--suave);font-size:13px;line-height:1.5;margin:0}
 .btn{display:inline-block;margin-top:14px;padding:13px 20px;border-radius:14px;background:#1E7A45;color:#fff;text-decoration:none;font-weight:700}
+.resumen-pedido{margin:14px 0 4px}.ver-resumen{width:100%;background:#181818;border:1px solid #2a2a2a;color:inherit;border-radius:14px;padding:12px;font:inherit;font-weight:700;cursor:pointer}
+.lista-resumen{border:1px solid #2a2a2a;border-top:0;border-radius:0 0 14px 14px;padding:6px 12px;text-align:left}.fila-r{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #222;font-size:14px}
+.fila-r:last-child{border-bottom:0}.fila-r img{width:40px;height:40px;border-radius:8px;object-fit:cover;flex:none}.fila-r span{flex:1;min-width:0}.fila-r small{display:block;color:#9A958F}.fila-r.tot{color:#C9C3B8}
+.cancelar-pedido{display:block;margin:10px auto 0;background:none;border:1px solid #5a2a2a;color:#FF9A9A;border-radius:999px;padding:10px 18px;font:inherit;font-weight:700;cursor:pointer}
 .contacto{display:inline-block;background:transparent;font:inherit;cursor:pointer;line-height:1.4;margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--borde);color:var(--texto);text-decoration:none;font-size:14px;font-weight:600}   /* @@CONTACTO: botón discreto para escribir al negocio */
 /* @@CHAT — sala de espera: chat del pedido con el negocio */
 .chat-boton{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;display:flex;align-items:center;gap:10px;padding:14px 22px;border-radius:999px;border:0;background:var(--rojo);color:#fff;font-weight:800;font-size:16px;box-shadow:0 12px 30px rgba(0,0,0,.5);cursor:pointer;white-space:nowrap}
@@ -231,7 +235,31 @@ const ESC = {
 };
 
 /* ---------- Pantalla ---------- */
+/* @@MI-PEDIDO-RESUMEN: lo que pidió (guardado en su celular al hacer el pedido) */
+let verResumen = false;
+function resumenHTML(){
+  let r = null; try { r = (JSON.parse(localStorage.getItem("jireh-resumenes") || "{}") || {})[id]; } catch(e) {}
+  if (!r || !r.items) return "";
+  const din = n => "RD$ " + Math.round(n).toLocaleString("en-US");
+  return `<div class="resumen-pedido"><button class="ver-resumen" data-resumen>🧾 ${verResumen ? "Ocultar" : "Ver"} lo que pedí · ${din(r.total)}</button>
+    ${verResumen ? `<div class="lista-resumen">${r.items.map(i => `<div class="fila-r">${i.img ? `<img src="${esc(i.img)}" alt="" onerror="this.remove()">` : ""}<span><b>${i.cant} x</b> ${esc(i.nombre)}${(i.detalles || []).filter(d => !/normal/i.test(d)).map(d => `<small>${esc(d)}</small>`).join("")}</span><b>${din(i.precio * i.cant)}</b></div>`).join("")}
+      ${r.delivery ? `<div class="fila-r tot"><span>Delivery</span><b>${din(r.delivery)}</b></div>` : ""}
+      <div class="fila-r tot"><span>Total · ${esc(r.pago || "")}</span><b>${din(r.total)}</b></div></div>` : ""}</div>`;
+}
+/* @@CANCELAR: el cliente puede cancelar mientras el pedido no lo han aceptado */
+let confirmandoCancelar = false, cancelarFb = null, cancelarDevFb = null, cancelado = false;
+function alertaCancelar(){
+  const n = document.createElement("p"); n.className = "nota"; n.style.color = "#F2C230";
+  n.textContent = "No se pudo cancelar: ya lo están preparando o no hay internet. Escríbenos por el chat."; app.append(n);
+}
+function pintarCancelado(){
+  try { const m = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); if (m && m.id === id) localStorage.removeItem("jireh-mi-pedido"); } catch(e) {}
+  app.innerHTML = `<div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>Pedido cancelado</h1></div></div>
+    <p class="frase">Listo, tu pedido fue cancelado 👍</p><p class="sub">No te vamos a cobrar nada. Cuando quieras, haz otro pedido.</p>
+    <a class="btn" href="index.html">Volver al menú</a>`;
+}
 function pintar(s){
+  if (cancelado) return pintarCancelado();
   actual = s; escenaDe = "";
   // pedido terminado: se borra el aviso "Ver mi pedido" del menú (@@MI-PEDIDO)
   if (!demo && (!s || s.estado === "entregado" || s.estado === "rechazado")) { try { const m = JSON.parse(localStorage.getItem("jireh-mi-pedido") || "null"); if (m && m.id === id) localStorage.removeItem("jireh-mi-pedido"); } catch(e) {} }
@@ -249,7 +277,7 @@ function pintar(s){
   const pos = orden.indexOf(s.estado === "listo" && delivery ? "preparando" : s.estado);
   app.innerHTML = `
     <div class="top"><img src="fotos/logo.png" alt="Jireh Sushi"><div><h1>${s.nombre ? esc(s.nombre) + ", t" : "T"}u pedido #${esc(s.codigo)}</h1><small>${delivery ? "Delivery" : "Para llevar"}</small></div></div>
-    ${rechazado ? `<p class="frase">${TEXTOS.rechazado[0]}</p><p class="sub">${TEXTOS.rechazado[1]}${s.motivo ? "<br>" + esc(s.motivo) : ""}</p>
+    ${rechazado ? `<p class="frase">${s.canceladoCliente ? "Pedido cancelado 👍" : TEXTOS.rechazado[0]}</p><p class="sub">${s.canceladoCliente ? "Cancelaste tu pedido." : TEXTOS.rechazado[1]}${s.motivo && !s.canceladoCliente ? "<br>" + esc(s.motivo) : ""}</p>
       ${s.pago === "Transferencia" ? `<p class="sub" style="color:#7BE3A4;font-weight:700">💸 Si ya transferiste, te devolvemos tu dinero. Te vamos a contactar.</p>` : ""}
       <a class="btn" href="https://api.whatsapp.com/send?phone=${NEGOCIO.whatsapp}">Escribir por WhatsApp</a>` : `
     <div class="escena" id="escena"></div>
@@ -261,6 +289,9 @@ function pintar(s){
       return `<div class="paso ${cls}"><i>${cls === "ok" ? "✓" : ic}</i>${t}</div>`;
     }).join("")}</div>
     <p class="nota">Esta pantalla se actualiza sola. Los tiempos son aproximados.</p>
+    ${resumenHTML()}
+    ${s.estado === "nuevo" && !demo ? `<button class="cancelar-pedido" data-cancelar>${confirmandoCancelar ? "¿Seguro? Toca otra vez para cancelar" : "Cancelar mi pedido"}</button>
+      ${s.pago === "Transferencia" ? `<p class="nota" style="margin-top:6px">Si cancelas, te devolvemos el dinero de tu transferencia.</p>` : ""}` : ""}
     ${s.estado !== "entregado" && s.estado !== "rechazado" ? (CHAT_ACTIVO ? `<button class="contacto" data-chat>💬 ¿Una pregunta, algo extra o el comprobante? Escríbenos aquí</button>`
       : `<a class="contacto" href="https://api.whatsapp.com/send?phone=${String(NEGOCIO.whatsapp).replace(/\D/g, "")}&text=${encodeURIComponent("Hola, es sobre mi pedido #" + (s.codigo || ""))}" target="_blank" rel="noopener" style="display:block;text-decoration:none">💬 ¿Tarda mucho? Escríbenos por WhatsApp</a>`) : ""}`}
     <div class="vivo"><i></i>En vivo</div>
@@ -418,7 +449,23 @@ function mandarUbicacion(btn){
     alert(err && err.code === 1 ? "Activa la ubicación y permite el acceso para esta página, luego toca otra vez." : "No pudimos obtener tu ubicación. Enciende el GPS y prueba otra vez.");
   }, { enableHighAccuracy: true, timeout: 15000 });
 }
-document.addEventListener("click", e => {
+document.addEventListener("click", async e => {
+  if (e.target.closest("[data-resumen]")) { verResumen = !verResumen; return pintar(actual); }
+  const bc = e.target.closest("[data-cancelar]");
+  if (bc) {
+    if (!confirmandoCancelar) { confirmandoCancelar = true; pintar(actual); setTimeout(() => { if (confirmandoCancelar && !cancelado) { confirmandoCancelar = false; pintar(actual); } }, 5000); return; }
+    if (!cancelarFb || !actual || actual.estado !== "nuevo") return;
+    bc.disabled = true; bc.textContent = "Cancelando…";
+    try {
+      await fetch("/api/aviso", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, tipo: "cancelado" }) }).catch(() => {});   // le avisa a la cocina
+      if (actual.pago === "Transferencia") { await cancelarDevFb(id); confirmandoCancelar = false; return; }   // queda "Cancelado por el cliente"; la pantalla cambia sola
+      await cancelarFb(id); cancelado = true; pintarCancelado();
+    } catch(err) {
+      console.error(err); confirmandoCancelar = false; pintar(actual);
+      alertaCancelar();
+    }
+    return;
+  }
   if (e.target.closest("[data-chat]")) return abrirChat();
   if (e.target.closest("[data-chat-cerrar]")) return cerrarChat();
   const r = e.target.closest("[data-rapido]");
@@ -440,7 +487,8 @@ if (demo) {
     sig(); setInterval(sig, 6000);
   } else pintar(de(demo));
 } else if (!id) pintar(null);
-else import("./fb.js").then(({ escucharSeguimiento, escucharDisponibilidad, escucharChat, enviarMensaje }) => {
+else import("./fb.js").then(({ escucharSeguimiento, escucharDisponibilidad, escucharChat, enviarMensaje, cancelarPedido, cancelarConDevolucion }) => {
+  cancelarFb = cancelarPedido; cancelarDevFb = cancelarConDevolucion;
   escucharSeguimiento(id, s => { pintar(s); if (s) montarChat(); }, () => pintar(null));
   chatEnviar = (t, f) => enviarMensaje(id, "cliente", t, f).then(r => {   // @@AVISOS-PUSH: le suena a la cocina
     try { fetch("/api/aviso", { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ id, tipo: "chat" }) }).catch(() => {}); } catch(e) {}

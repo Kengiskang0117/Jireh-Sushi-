@@ -370,7 +370,9 @@ function estado(){
   let prox = "hoy";
   for (let k = 0; k < 8; k++) { const d = (ahora.getDay() + k) % 7; if (NEGOCIO.diasCerrado.includes(d) || (k === 0 && (t >= a || cerradoHoy()))) continue; prox = k === 0 ? "hoy" : k === 1 ? "mañana" : "el " + DIAS[d].toLowerCase(); break; }
   const h = bonita(prox === "hoy" ? abreDe(ahora.getDay()) : NEGOCIO.horario.abre), alas = (h.startsWith("1:") ? "a la " : "a las ") + h;
-  $("#estado span").textContent = abierto ? "Abierto ahora · Ordena en línea" : `Cerrado${cerradoHoy() ? " por hoy" : ""} · Abrimos ${prox === "hoy" ? "" : prox + " "}${alas}`;
+  const ultimo = c - 30, cerrandoPedidos = abierto && t >= ultimo;   // @@ULTIMO-PEDIDO: 30 min antes de cerrar ya no se reciben pedidos (igual que en el menú)
+  if (cerrandoPedidos) { $("#estado span").textContent = `Ya no recibimos pedidos por hoy · ¡Te esperamos mañana!`; $("#estado i").style.background = "#F2994A"; return; }
+  $("#estado span").textContent = abierto ? (t >= ultimo - 30 ? `Abierto · Último pedido ${bonita(String(Math.floor(ultimo / 60)).padStart(2, "0") + ":" + String(ultimo % 60).padStart(2, "0"))}` : "Abierto ahora · Ordena en línea") : `Cerrado${cerradoHoy() ? " por hoy" : ""} · Abrimos ${prox === "hoy" ? "" : prox + " "}${alas}`;
   $("#estado i").style.background = abierto ? "#3DDC84" : "#8A8580";
 }
 estado(); setInterval(estado, 60000);
